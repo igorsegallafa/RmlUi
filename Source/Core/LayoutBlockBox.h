@@ -158,11 +158,13 @@ public:
 	/// @return This box's offset root.
 	const LayoutBlockBox* GetOffsetRoot() const;
 
-
 	/// Returns the block box's dimension box.
 	Box& GetBox();
 	/// Returns the block box's dimension box.
 	const Box& GetBox() const;
+
+	// Debug dump layout tree.
+	String DumpTree(int depth = 0) const;
 
 	void* operator new(size_t size);
 	void operator delete(void* chunk, size_t size);

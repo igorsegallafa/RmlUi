@@ -722,6 +722,20 @@ const Box& LayoutBlockBox::GetBox() const
 	return box;
 }
 
+String LayoutBlockBox::DumpTree(int depth) const
+{
+	const String context_str = (context == BLOCK ? "block" : "inline");
+	String value = String(depth * 2, ' ') + "LayoutBlockBox (" + context_str + ")" + " | " + LayoutElementName(element) + '\n';
+
+	for (auto&& block_box : block_boxes)
+		value += block_box->DumpTree(depth + 1);
+
+	for (auto&& line_box : line_boxes)
+		value += line_box->DumpTree(depth + 1);
+
+	return value;
+}
+
 void* LayoutBlockBox::operator new(size_t size)
 {
 	void* memory = LayoutEngine::AllocateLayoutChunk(size);

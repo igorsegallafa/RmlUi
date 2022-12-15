@@ -148,6 +148,11 @@ void LayoutInlineBoxText::SizeElement(bool RMLUI_UNUSED_PARAMETER(split))
 	RMLUI_UNUSED(split);
 }
 
+String LayoutInlineBoxText::DumpNameValue() const
+{
+	return "LayoutInlineBoxText ('" + line_contents.substr(0, 20) + "')";
+}
+
 void* LayoutInlineBoxText::operator new(size_t size)
 {
 	return LayoutEngine::AllocateLayoutChunk(size);

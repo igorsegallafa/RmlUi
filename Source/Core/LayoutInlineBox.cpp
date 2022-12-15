@@ -389,6 +389,22 @@ float LayoutInlineBox::GetBaseline() const
 	return baseline;
 }
 
+String LayoutInlineBox::DumpNameValue() const
+{
+	return "LayoutInlineBox";
+}
+
+String LayoutInlineBox::DumpTree(int depth) const
+{
+	const String parent_str = (parent ? LayoutElementName(parent->GetElement()) : "none");
+	String value = String(depth * 2, ' ') + DumpNameValue() + " | " + LayoutElementName(element) + " | P: " + parent_str + '\n';
+
+	for (auto&& child : children)
+		value += child->DumpTree(depth + 1);
+
+	return value;
+}
+
 void* LayoutInlineBox::operator new(size_t size)
 {
 	return LayoutEngine::AllocateLayoutChunk(size);
@@ -406,6 +422,17 @@ FontFaceHandle LayoutInlineBox::GetParentFont() const
 		return line->GetBlockBox()->GetParent()->GetElement()->GetFontFaceHandle();
 	else
 		return parent->GetElement()->GetFontFaceHandle();
+}
+
+String LayoutElementName(Element* element)
+{
+	if (!element)
+		return "nullptr";
+	if (!element->GetId().empty())
+		return '#' + element->GetId();
+	if (element->GetTagName() == "#text")
+		return "text";
+	return element->GetAddress();
 }
 
 } // namespace Rml

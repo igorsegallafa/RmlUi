@@ -71,6 +71,9 @@ public:
 	/// Sizes the inline box's element.
 	void SizeElement(bool split) override;
 
+	// Debug dump type name and value.
+	String DumpNameValue() const override;
+
 	void* operator new(size_t size);
 	void operator delete(void* chunk, size_t size);
 

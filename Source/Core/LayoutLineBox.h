@@ -92,6 +92,9 @@ public:
 
 	bool GetBaselineOfLastLine(float& baseline) const;
 
+	// Debug dump layout tree.
+	String DumpTree(int depth) const;
+
 	void* operator new(size_t size);
 	void operator delete(void* chunk, size_t size);
 

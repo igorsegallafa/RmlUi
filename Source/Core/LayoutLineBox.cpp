@@ -380,6 +380,16 @@ bool LayoutLineBox::GetBaselineOfLastLine(float& baseline) const
 	return true;
 }
 
+String LayoutLineBox::DumpTree(int depth) const
+{
+	String value = String(depth * 2, ' ') + "LayoutLineBox (" + (open_inline_box ? "open" : "closed") + ")\n";
+
+	for (auto&& inline_box : inline_boxes)
+		value += inline_box->DumpTree(depth + 1);
+
+	return value;
+}
+
 void* LayoutLineBox::operator new(size_t size)
 {
 	return LayoutEngine::AllocateLayoutChunk(size);

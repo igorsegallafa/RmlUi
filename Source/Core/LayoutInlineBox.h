@@ -132,6 +132,11 @@ public:
 	/// @return The box's baseline.
 	float GetBaseline() const;
 
+	// Debug dump type name and value.
+	virtual String DumpNameValue() const;
+	// Debug dump layout tree.
+	String DumpTree(int depth) const;
+
 	void* operator new(size_t size);
 	void operator delete(void* chunk, size_t size);
 
@@ -171,6 +176,9 @@ protected:
 	// True if we're a link in a chain of inline boxes flowing from previous lines.
 	bool chained;
 };
+
+// Safely return element name for debugging.
+String LayoutElementName(Element* element);
 
 } // namespace Rml
 #endif

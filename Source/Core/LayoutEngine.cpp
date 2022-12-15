@@ -84,6 +84,41 @@ static inline bool ValidateTopLevelElement(Element* element)
 	return true;
 }
 
+#ifdef RMLUI_DEBUG
+static bool g_debug_dumping_layout_tree = false;
+struct DebugDumpLayoutTree {
+	Element* element;
+	LayoutBlockBox* block_box;
+	bool is_printing_tree_root = false;
+
+	DebugDumpLayoutTree(Element* element, LayoutBlockBox* block_box) : element(element), block_box(block_box)
+	{
+		// When an element with this ID is encountered, dump the formatted layout tree (including all sub-layouts).
+		static const String debug_trigger_id = "rmlui-debug-layout";
+		is_printing_tree_root = (element->GetId() == debug_trigger_id);
+		if (is_printing_tree_root)
+			g_debug_dumping_layout_tree = true;
+	}
+	~DebugDumpLayoutTree()
+	{
+		if (g_debug_dumping_layout_tree)
+		{
+			const String header = ":: " + LayoutElementName(element) + " ::\n";
+			const String layout_tree = header + block_box->DumpTree();
+			if (SystemInterface* system_interface = GetSystemInterface())
+				system_interface->LogMessage(Log::LT_INFO, layout_tree);
+
+			if (is_printing_tree_root)
+				g_debug_dumping_layout_tree = false;
+		}
+	}
+};
+#else
+struct DebugDumpLayoutTree {
+	DebugDumpLayoutTree(Element* /*element*/, LayoutBlockBox* /*block_box*/) {}
+};
+#endif
+
 // Formats the contents for a root-level element (usually a document or floating element).
 void LayoutEngine::FormatElement(Element* element, Vector2f containing_block, const Box* override_initial_box, Vector2f* out_visible_overflow_size)
 {
@@ -96,8 +131,9 @@ void LayoutEngine::FormatElement(Element* element, Vector2f containing_block, co
 
 	if (!ValidateTopLevelElement(element))
 		return;
-	
+
 	auto containing_block_box = MakeUnique<LayoutBlockBox>(nullptr, nullptr, Box(containing_block), 0.0f, FLT_MAX);
+	DebugDumpLayoutTree debug_dump_tree(element, containing_block_box.get());
 
 	Box box;
 	if (override_initial_box)
