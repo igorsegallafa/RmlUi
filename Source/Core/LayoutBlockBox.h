@@ -113,25 +113,24 @@ public:
 	/// Formats, sizes, and positions all absolute elements in this block.
 	void CloseAbsoluteElements();
 
-	/// Returns the offset from the top-left corner of this box's offset element the next child box will be
-	/// positioned at.
-	/// @param[out] box_position The box cursor position.
+	/// Returns the offset from the top-left corner of this box's offset element the next child box will be positioned at.
 	/// @param[in] top_margin The top margin of the box. This will be collapsed as appropriate against other block boxes.
 	/// @param[in] clear_property The value of the underlying element's clear property.
-	void PositionBox(Vector2f& box_position, float top_margin = 0, Style::Clear clear_property = Style::Clear::None) const;
-	/// Returns the offset from the top-left corner of this box's offset element the next child block box, of the
-	/// given dimensions, will be positioned at. This will include the margins on the new block box.
-	/// @param[out] box_position The block box cursor position.
+	/// @return The box cursor position.
+	Vector2f NextBoxPosition(float top_margin = 0, Style::Clear clear_property = Style::Clear::None) const;
+	/// Returns the offset from the top-left corner of this box's offset element the next child block box, of the given dimensions,
+	/// will be positioned at. This will include the margins on the new block box.
 	/// @param[in] box The dimensions of the new box.
 	/// @param[in] clear_property The value of the underlying element's clear property.
-	void PositionBlockBox(Vector2f& box_position, const Box& box, Style::Clear clear_property) const;
+	/// @return The block box cursor position.
+	Vector2f NextBlockBoxPosition(const Box& box, Style::Clear clear_property) const;
 	/// Returns the offset from the top-left corner of this box for the next line.
-	/// @param box_position[out] The line box position.
 	/// @param box_width[out] The available width for the line box.
 	/// @param wrap_content[out] Set to true if the line box should grow to fit inline boxes, false if it should wrap them.
 	/// @param dimensions[in] The minimum dimensions of the line.
-	void PositionLineBox(Vector2f& box_position, float& box_width, bool& wrap_content, Vector2f dimensions) const;
-
+	/// @return The line box position.
+	Vector2f NextLineBoxPosition(float& out_box_width, bool& out_wrap_content, Vector2f dimensions) const;
+	
 	/// Calculate the dimensions of the box's internal content width; i.e. the size used to calculate the shrink-to-fit width.
 	float GetShrinkToFitWidth() const;
 	/// Get the visible overflow size. Note: This is only well-defined after the layout box has been closed.
@@ -180,7 +179,7 @@ private:
 	CloseResult CloseInlineBlockBox();
 
 	// Positions a floating element within this block box.
-	void PositionFloat(Element* element, float offset = 0);
+	void PlaceFloat(Element* element, float offset = 0);
 
 	// Checks if we have a new vertical overflow on an auto-scrolling element. If so, our vertical scrollbar will
 	// be enabled and our block boxes will be destroyed. All content will need to re-formatted. Returns true if no

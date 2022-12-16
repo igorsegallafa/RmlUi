@@ -70,7 +70,7 @@ LayoutInlineBox* LayoutLineBox::Close(UniquePtr<LayoutInlineBox> overflow)
 	if (!position_set &&
 		!inline_boxes.empty())
 	{
-		parent->PositionLineBox(position, dimensions.x, wrap_content, Vector2f(0, 0));
+		position = parent->NextLineBoxPosition(dimensions.x, wrap_content, Vector2f(0, 0));
 		dimensions.y = 0;
 
 		position_set = true;
@@ -246,7 +246,7 @@ LayoutInlineBox* LayoutLineBox::AddBox(UniquePtr<LayoutInlineBox> box_ptr)
 			if (!box->CanOverflow())
 				minimum_dimensions.x += right_spacing;
 
-			parent->PositionLineBox(position, dimensions.x, wrap_content, minimum_dimensions);
+			position = parent->NextLineBoxPosition(dimensions.x, wrap_content, minimum_dimensions);
 			dimensions.y = minimum_dimensions.y;
 
 			first_box = true;

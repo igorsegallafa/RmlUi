@@ -57,13 +57,13 @@ void LayoutBlockBoxSpace::ImportSpace(const LayoutBlockBoxSpace& space)
 }
 
 // Generates the position for a box of a given size within a containing block box.
-void LayoutBlockBoxSpace::PositionBox(Vector2f& box_position, float& box_width, float cursor, const Vector2f dimensions) const
+Vector2f LayoutBlockBoxSpace::NextBoxPosition(float& box_width, float cursor, const Vector2f dimensions) const
 {
-	box_width = PositionBox(box_position, cursor, dimensions);
+	return NextBoxPosition(box_width, cursor, dimensions, Style::Float::None);
 }
 
 // Generates and sets the position for a floating box of a given size within our block box.
-float LayoutBlockBoxSpace::PositionBox(float cursor, Element* element)
+float LayoutBlockBoxSpace::PlaceFloat(float cursor, Element* element)
 {
 	Vector2f element_size = element->GetBox().GetSize(Box::MARGIN);
 	Style::Float float_property = element->GetComputedValues().float_();
@@ -76,11 +76,11 @@ float LayoutBlockBoxSpace::PositionBox(float cursor, Element* element)
 	}
 
 	// Shift the cursor down past to clear boxes, if necessary.
-	cursor = ClearBoxes(cursor, element->GetComputedValues().clear());
+	cursor = DetermineClearPosition(cursor, element->GetComputedValues().clear());
 
 	// Find a place to put this box.
-	Vector2f element_offset;
-	PositionBox(element_offset, cursor, element_size, float_property);
+	float unused_maximum_box_width = 0;
+	Vector2f element_offset = NextBoxPosition(unused_maximum_box_width, cursor, element_size, float_property);
 
 	// It's been placed, so we can now add it to our list of floating boxes.
 	boxes[float_property == Style::Float::Left ? LEFT : RIGHT].push_back(SpaceBox(element_offset, element_size));
@@ -101,7 +101,7 @@ float LayoutBlockBoxSpace::PositionBox(float cursor, Element* element)
 
 // Determines the appropriate vertical position for an object that is choosing to clear floating elements to the left
 // or right (or both).
-float LayoutBlockBoxSpace::ClearBoxes(float cursor, Style::Clear clear_property) const
+float LayoutBlockBoxSpace::DetermineClearPosition(float cursor, Style::Clear clear_property) const
 {
 	using namespace Style;
 	// Clear left boxes.
@@ -124,7 +124,7 @@ float LayoutBlockBoxSpace::ClearBoxes(float cursor, Style::Clear clear_property)
 }
 
 // Generates the position for an arbitrary box within our space layout, floated against either the left or right edge.
-float LayoutBlockBoxSpace::PositionBox(Vector2f& box_position, float cursor, const Vector2f dimensions, Style::Float float_property) const
+Vector2f LayoutBlockBoxSpace::NextBoxPosition(float& maximum_box_width, float cursor, const Vector2f dimensions, Style::Float float_property) const
 {
 	float parent_scrollbar_width = parent->GetElement()->GetElementScroll()->GetScrollbarSize(ElementScroll::VERTICAL);
 	float parent_origin = parent->GetPosition().x + parent->GetBox().GetPosition(Box::CONTENT).x;
@@ -132,8 +132,7 @@ float LayoutBlockBoxSpace::PositionBox(Vector2f& box_position, float cursor, con
 
 	AnchorEdge box_edge = float_property == Style::Float::Right ? RIGHT : LEFT;
 
-	box_position.y = cursor;
-	box_position.x = parent_origin;
+	Vector2f box_position = {parent_origin, cursor};
 
 	if (box_edge == RIGHT)
 		box_position.x += parent->GetBox().GetSize().x - dimensions.x - parent_scrollbar_width;
@@ -181,13 +180,13 @@ float LayoutBlockBoxSpace::PositionBox(Vector2f& box_position, float cursor, con
 			float normalised_position = box_position.x - parent_origin;
 			if (normalised_position < 0 ||
 				normalised_position + dimensions.x > parent->GetBox().GetSize().x)
-				return PositionBox(box_position, next_cursor + 0.01f, dimensions, float_property);
+				return NextBoxPosition(maximum_box_width, next_cursor + 0.01f, dimensions, float_property);
 		}
 	}
 
 	// Second; we go through all of the boxes on the other edge, checking for horizontal collisions and determining the
 	// maximum width the box can stretch to, if it is placed at this location.
-	float maximum_box_width = box_edge == LEFT ? parent_edge - box_position.x : box_position.x + dimensions.x;
+	maximum_box_width = box_edge == LEFT ? parent_edge - box_position.x : box_position.x + dimensions.x;
 
 	for (size_t i = 0; i < boxes[1 - box_edge].size(); ++i)
 	{
@@ -219,7 +218,7 @@ float LayoutBlockBoxSpace::PositionBox(Vector2f& box_position, float cursor, con
 		if (collision)
 		{
 			next_cursor = Math::Min(next_cursor, fixed_box.offset.y + fixed_box.dimensions.y);
-			return PositionBox(box_position, next_cursor + 0.01f, dimensions, float_property);
+			return NextBoxPosition(maximum_box_width, next_cursor + 0.01f, dimensions, float_property);
 		}
 	}
 
@@ -250,12 +249,12 @@ float LayoutBlockBoxSpace::PositionBox(Vector2f& box_position, float cursor, con
 			// D'oh! We hit this box. Ah well; we'll try again lower down the page, at the highest bottom-edge of any
 			// of the boxes we've been pushed around by so far.
 			next_cursor = Math::Min(next_cursor, fixed_box.offset.y + fixed_box.dimensions.y);
-			return PositionBox(box_position, next_cursor + 0.01f, dimensions, float_property);
+			return NextBoxPosition(maximum_box_width, next_cursor + 0.01f, dimensions, float_property);
 		}
 	}
 
 	// Looks like we've found a winner!
-	return maximum_box_width;
+	return box_position;
 }
 
 // Returns the top-left offset of the boxes within the space.

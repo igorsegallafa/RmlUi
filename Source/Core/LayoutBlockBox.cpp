@@ -90,7 +90,7 @@ LayoutBlockBox::LayoutBlockBox(LayoutBlockBox* _parent, Element* _element, const
 			if (self_offset_parent != this)
 			{
 				// Get the next position within our offset parent's containing block.
-				parent->PositionBlockBox(position, box, element ? element->GetComputedValues().clear() : Style::Clear::None);
+				position = parent->NextBlockBoxPosition(box, element ? element->GetComputedValues().clear() : Style::Clear::None);
 				element->SetOffset(position - (self_offset_parent->GetPosition() - offset_root->GetPosition()), self_offset_parent->GetElement());
 			}
 			else
@@ -153,7 +153,7 @@ LayoutBlockBox::LayoutBlockBox(LayoutBlockBox* _parent) : position(-1, -1)
 
 	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent);
 	box.SetContent(Vector2f(containing_block.x, -1));
-	parent->PositionBlockBox(position, box, Style::Clear::None);
+	position = parent->NextBlockBoxPosition(box, Style::Clear::None);
 
 	// Reset the min and max heights; they're not valid for inline block boxes.
 	min_height = 0;
@@ -353,11 +353,11 @@ LayoutInlineBox* LayoutBlockBox::CloseLineBox(LayoutLineBox* child, UniquePtr<La
 	if (child->GetDimensions().x > 0)
 		box_cursor = (child->GetPosition().y - (box.GetPosition().y + position.y)) + child->GetDimensions().y;
 
-	// If we have any pending floating elements for our parent, then this would be an ideal time to position them.
+	// If we have any pending floating elements for our parent, then this would be an ideal time to place them.
 	if (!float_elements.empty())
 	{
 		for (size_t i = 0; i < float_elements.size(); ++i)
-			parent->PositionFloat(float_elements[i], box_cursor);
+			parent->PlaceFloat(float_elements[i], box_cursor);
 
 		float_elements.clear();
 	}
@@ -484,7 +484,7 @@ bool LayoutBlockBox::AddFloatElement(Element* element)
 
 	// Nope ... just place it!
 	else
-		PositionFloat(element);
+		PlaceFloat(element);
 
 	return true;
 }
@@ -496,8 +496,7 @@ void LayoutBlockBox::AddAbsoluteElement(Element* element)
 
 	AbsoluteElement absolute_element;
 	absolute_element.element = element;
-
-	PositionBox(absolute_element.position, 0);
+	absolute_element.position = NextBoxPosition();
 
 	// If we have an open inline-context block box as our last child, then the absolute element must appear after it,
 	// but not actually close the box.
@@ -550,14 +549,14 @@ void LayoutBlockBox::CloseAbsoluteElements()
 }
 
 // Returns the offset from the top-left corner of this box that the next child box will be positioned at.
-void LayoutBlockBox::PositionBox(Vector2f& box_position, float top_margin, Style::Clear clear_property) const
+Vector2f LayoutBlockBox::NextBoxPosition(float top_margin, Style::Clear clear_property) const
 {
 	// If our element is establishing a new offset hierarchy, then any children of ours don't inherit our offset.
-	box_position = GetPosition();
+	Vector2f box_position = GetPosition();
 	box_position += box.GetPosition();
 	box_position.y += box_cursor;
 
-	float clear_margin = space->ClearBoxes(box_position.y + top_margin, clear_property) - (box_position.y + top_margin);
+	float clear_margin = space->DetermineClearPosition(box_position.y + top_margin, clear_property) - (box_position.y + top_margin);
 	if (clear_margin > 0)
 		box_position.y += clear_margin;
 	else
@@ -585,27 +584,30 @@ void LayoutBlockBox::PositionBox(Vector2f& box_position, float top_margin, Style
 			}
 		}
 	}
+
+	return box_position;
 }
 
 // Returns the offset from the top-left corner of this box's offset element the next child block box, of the given
 // dimensions, will be positioned at. This will include the margins on the new block box.
-void LayoutBlockBox::PositionBlockBox(Vector2f& box_position, const Box& box, Style::Clear clear_property) const
+Vector2f LayoutBlockBox::NextBlockBoxPosition(const Box& box, Style::Clear clear_property) const
 {
-	PositionBox(box_position, box.GetEdge(Box::MARGIN, Box::TOP), clear_property);
+	Vector2f box_position = NextBoxPosition(box.GetEdge(Box::MARGIN, Box::TOP), clear_property);
 	box_position.x += box.GetEdge(Box::MARGIN, Box::LEFT);
 	box_position.y += box.GetEdge(Box::MARGIN, Box::TOP);
+	return box_position;
 }
 
 // Returns the offset from the top-left corner of this box for the next line.
-void LayoutBlockBox::PositionLineBox(Vector2f& box_position, float& box_width, bool& _wrap_content, const Vector2f dimensions) const
+Vector2f LayoutBlockBox::NextLineBoxPosition(float& box_width, bool& _wrap_content, const Vector2f dimensions) const
 {
-	Vector2f cursor;
-	PositionBox(cursor);
-
-	space->PositionBox(box_position, box_width, cursor.y, dimensions);
+	const Vector2f cursor = NextBoxPosition();
+	const Vector2f box_position = space->NextBoxPosition(box_width, cursor.y, dimensions);
 
 	// Also, probably shouldn't check for widths when positioning the box?
 	_wrap_content = wrap_content;
+
+	return box_position;
 }
 
 
@@ -758,12 +760,10 @@ LayoutBlockBox::CloseResult LayoutBlockBox::CloseInlineBlockBox()
 }
 
 // Positions a floating element within this block box.
-void LayoutBlockBox::PositionFloat(Element* element, float offset)
+void LayoutBlockBox::PlaceFloat(Element* element, float offset)
 {
-	Vector2f box_position;
-	PositionBox(box_position);
-
-	space->PositionBox(box_position.y + offset, element);
+	const Vector2f box_position = NextBoxPosition();
+	space->PlaceFloat(box_position.y + offset, element);
 }
 
 // Checks if we have a new vertical overflow on an auto-scrolling element.

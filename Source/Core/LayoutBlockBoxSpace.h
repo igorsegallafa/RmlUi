@@ -55,25 +55,25 @@ public:
 	void ImportSpace(const LayoutBlockBoxSpace& space);
 
 	/// Generates the position for a box of a given size within our block box.
-	/// @param[out] box_position The generated position for the box.
 	/// @param[out] box_width The available width for the box.
 	/// @param[in] cursor The ideal vertical position for the box.
 	/// @param[in] dimensions The minimum available space required for the box.
-	void PositionBox(Vector2f& box_position, float& box_width, float cursor, Vector2f dimensions) const;
+	/// @return The generated position for the box.
+	Vector2f NextBoxPosition(float& box_width, float cursor, Vector2f dimensions) const;
 
 	/// Generates and sets the position for a floating box of a given size within our block box. The element's box
 	/// is then added into our list of floating boxes.
 	/// @param[in] cursor The ideal vertical position for the box.
 	/// @param[in] element The element to position.
 	/// @return The offset of the bottom outer edge of the element.
-	float PositionBox(float cursor, Element* element);
+	float PlaceFloat(float cursor, Element* element);
 
 	/// Determines the appropriate vertical position for an object that is choosing to clear floating elements to
 	/// the left or right (or both).
 	/// @param[in] cursor The ideal vertical position.
 	/// @param[in] clear_property The value of the clear property of the clearing object.
 	/// @return The appropriate vertical position for the clearing object.
-	float ClearBoxes(float cursor, Style::Clear clear_property) const;
+	float DetermineClearPosition(float cursor, Style::Clear clear_property) const;
 
 	/// Returns the top-left corner of the boxes within the space.
 	/// @return The space's offset.
@@ -93,13 +93,12 @@ private:
 		NUM_ANCHOR_EDGES = 2
 	};
 
-	/// Generates the position for an arbitrary box within our space layout, floated against either the left or
-	/// right edge.
-	/// @param box_position[out] The generated position for the box.
-	/// @param cursor[in] The ideal vertical position for the box.
-	/// @param dimensions[in] The size of the box to place.
-	/// @return The maximum width at the box position.
-	float PositionBox(Vector2f& box_position, float cursor, Vector2f dimensions, Style::Float float_property = Style::Float::None) const;
+	/// Generates the position for an arbitrary box within our space layout, floated against either the left or right edge.
+	/// @param[out] maximum_box_width The maximum width at the box position.
+	/// @param[in] cursor The ideal vertical position for the box.
+	/// @param[in] dimensions The size of the box to place.
+	/// @return The generated position for the box.
+	Vector2f NextBoxPosition(float& maximum_box_width, float cursor, Vector2f dimensions, Style::Float float_property) const;
 
 	struct SpaceBox
 	{
