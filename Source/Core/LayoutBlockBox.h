@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -29,30 +29,29 @@
 #ifndef RMLUI_CORE_LAYOUTBLOCKBOX_H
 #define RMLUI_CORE_LAYOUTBLOCKBOX_H
 
-#include "LayoutLineBox.h"
 #include "../../Include/RmlUi/Core/Box.h"
 #include "../../Include/RmlUi/Core/Types.h"
+#include "LayoutLineBox.h"
 
 namespace Rml {
 
 class LayoutBlockBoxSpace;
 class LayoutEngine;
 
-/**
-	@author Peter Curry
- */
-
-enum class BlockBoxContext { BlockContainer, RootInlineBox };
-
-class LayoutBlockBox
-{
+class LayoutBlockLevelBox {
 public:
-	enum CloseResult
-	{
-		OK,
-		LAYOUT_SELF,
-		LAYOUT_PARENT
-	};
+	enum class Type { BlockContainer, InlineContainer, FlexContainer, TableWrapper, Replaced };
+
+private:
+	Type type;
+};
+
+/**
+    @author Peter Curry
+ */
+class LayoutBlockBox {
+public:
+	enum CloseResult { OK, LAYOUT_SELF, LAYOUT_PARENT };
 
 	/// Creates a new block box for rendering a block element.
 	/// @param parent[in] The parent of this block box. This will be nullptr for the root element.
@@ -116,7 +115,7 @@ public:
 	/// @param dimensions[in] The minimum dimensions of the line.
 	/// @return The line box position.
 	Vector2f NextLineBoxPosition(float& out_box_width, bool& out_wrap_content, Vector2f dimensions) const;
-	
+
 	/// Calculate the dimensions of the box's internal content width; i.e. the size used to calculate the shrink-to-fit width.
 	float GetShrinkToFitWidth() const;
 	/// Get the visible overflow size. Note: This is only well-defined after the layout box has been closed.
@@ -155,8 +154,7 @@ public:
 	void operator delete(void* chunk, size_t size);
 
 private:
-	struct AbsoluteElement
-	{
+	struct AbsoluteElement {
 		Element* element;
 		Vector2f position;
 	};
@@ -172,8 +170,8 @@ private:
 	// overflow occured, false if it did.
 	bool CatchVerticalOverflow(float cursor = -1);
 
-	using AbsoluteElementList = Vector< AbsoluteElement >;
-	using BlockBoxList = Vector< UniquePtr<LayoutBlockBox> >;
+	using AbsoluteElementList = Vector<AbsoluteElement>;
+	using BlockBoxList = Vector<UniquePtr<LayoutBlockBox>>;
 
 	// The object managing our space, as occupied by floating elements of this box and our ancestors.
 	LayoutBlockBoxSpace* space;
@@ -217,8 +215,8 @@ private:
 	Style::Overflow overflow_x_property;
 	Style::Overflow overflow_y_property;
 
-	// The outer size of this box including overflowing content. Similar to scroll width, but shrinked if overflow is caught here. 
-	//   This can be wider than the box if we are overflowing. Only available after the box has been closed. 
+	// The outer size of this box including overflowing content. Similar to scroll width, but shrinked if overflow is caught here.
+	//   This can be wider than the box if we are overflowing. Only available after the box has been closed.
 	Vector2f visible_overflow_size;
 	// The inner content size (excluding any padding/border/margins).
 	// This is extended as child block boxes are closed, or from external formatting contexts.
@@ -227,10 +225,6 @@ private:
 	// Used by block contexts only; if true, we've enabled our vertical scrollbar.
 	bool vertical_overflow;
 };
-
-
-
-
 
 class LayoutRootInlineBox {
 public:
@@ -246,8 +240,7 @@ public:
 	/// @return The result of the close; this may request a reformat of this element or our parent.
 	CloseResult Close();
 
-	/// Called by a closing line box child. Increments the cursor, and creates a new line box to fit the overflow
-	/// (if any).
+	/// Called by a closing line box child. Increments the cursor, and creates a new line box to fit the overflow (if any).
 	/// @param child[in] The closing child line box.
 	/// @param overflow[in] The overflow from the closing line box. May be nullptr if there was no overflow.
 	/// @param overflow_chain[in] The end of the chained hierarchy to be spilled over to the new line, as the parent to the overflow box (if one
@@ -327,8 +320,6 @@ private:
 	// Used by inline contexts only; stores any floating elements that are waiting for a line break to be positioned.
 	ElementList float_elements;
 };
-
-
 
 } // namespace Rml
 #endif
