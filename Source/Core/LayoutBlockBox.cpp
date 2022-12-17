@@ -51,7 +51,6 @@ LayoutBlockBox::LayoutBlockBox(LayoutBlockBox* _parent, Element* _element, const
 
 	parent = _parent;
 
-	context = BLOCK;
 	element = _element;
 	interrupted_chain = nullptr;
 
@@ -130,36 +129,6 @@ LayoutBlockBox::LayoutBlockBox(LayoutBlockBox* _parent, Element* _element, const
 	}
 }
 
-// Creates a new block box in an inline context.
-LayoutBlockBox::LayoutBlockBox(LayoutBlockBox* _parent) : position(-1, -1)
-{
-	RMLUI_ASSERT(_parent);
-
-	parent = _parent;
-	offset_parent = parent->offset_parent;
-	offset_root = parent->offset_root;
-
-	space = _parent->space;
-
-	context = INLINE;
-	line_boxes.push_back(MakeUnique<LayoutLineBox>(this));
-	wrap_content = parent->wrap_content;
-
-	element = nullptr;
-	interrupted_chain = nullptr;
-
-	box_cursor = 0;
-	vertical_overflow = false;
-
-	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent);
-	box.SetContent(Vector2f(containing_block.x, -1));
-	position = parent->NextBlockBoxPosition(box, Style::Clear::None);
-
-	// Reset the min and max heights; they're not valid for inline block boxes.
-	min_height = 0;
-	max_height = FLT_MAX;
-}
-
 // Releases the block box.
 LayoutBlockBox::~LayoutBlockBox()
 {
@@ -169,24 +138,9 @@ LayoutBlockBox::~LayoutBlockBox()
 LayoutBlockBox::CloseResult LayoutBlockBox::Close()
 {
 	// If the last child of this block box is an inline box, then we haven't closed it; close it now!
-	if (context == BLOCK)
-	{
 		CloseResult result = CloseInlineBlockBox();
 		if (result != OK)
 			return LAYOUT_SELF;
-	}
-	// Otherwise, we're an inline context box; so close our last line, which will still be open.
-	else
-	{
-		line_boxes.back()->Close();
-
-		// Expand our content area if any line boxes had to push themselves out.
-		Vector2f content_area = box.GetSize();
-		for (size_t i = 0; i < line_boxes.size(); i++)
-			content_area.x = Math::Max(content_area.x, line_boxes[i]->GetDimensions().x);
-
-		box.SetContent(content_area);
-	}
 
 	// Set this box's height, if necessary.
 	if (box.GetSize(Box::CONTENT).y < 0)
@@ -201,10 +155,9 @@ LayoutBlockBox::CloseResult LayoutBlockBox::Close()
 	}
 	
 	visible_overflow_size = Vector2f(0);
-	RMLUI_ASSERTMSG(!(context == INLINE && element), "The following assumes inline contexts do not represent a particular element.");
 
 	// Set the computed box on the element.
-	if (context == BLOCK && element)
+	if (element)
 	{
 		// Calculate the dimensions of the box's *internal* content; this is the tightest-fitting box around all of the
 		// internal elements, plus this element's padding.
@@ -260,15 +213,6 @@ LayoutBlockBox::CloseResult LayoutBlockBox::Close()
 		// Format any scrollbars which were enabled on this element.
 		element->GetElementScroll()->FormatScrollbars();
 	}
-	else if (context == INLINE)
-	{
-		// Find the largest line in this layout block
-		for (size_t i = 0; i < line_boxes.size(); i++)
-		{
-			LayoutLineBox* line_box = line_boxes[i].get();
-			visible_overflow_size.x = Math::Max(visible_overflow_size.x, line_box->GetBoxCursor());
-		}
-	}
 
 	// Increment the parent's cursor.
 	if (parent != nullptr)
@@ -278,7 +222,7 @@ LayoutBlockBox::CloseResult LayoutBlockBox::Close()
 			return LAYOUT_PARENT;
 	}
 
-	if (context == BLOCK && element)
+	if (element)
 	{
 		// If we represent a positioned element, then we can now (as we've been sized) act as the containing block for all
 		// the absolutely-positioned elements of our descendants.
@@ -331,8 +275,6 @@ LayoutBlockBox::CloseResult LayoutBlockBox::Close()
 // Called by a closing block box child.
 bool LayoutBlockBox::CloseBlockBox(LayoutBlockBox* child)
 {
-	RMLUI_ASSERT(context == BLOCK);
-	
 	const float child_position_y = child->GetPosition().y - child->box.GetEdge(Box::MARGIN, Box::TOP) - (box.GetPosition().y + position.y);
 	
 	box_cursor = child_position_y + child->GetBox().GetSize(Box::MARGIN).y;
@@ -344,42 +286,9 @@ bool LayoutBlockBox::CloseBlockBox(LayoutBlockBox* child)
 	return CatchVerticalOverflow();
 }
 
-// Called by a closing line box child.
-LayoutInlineBox* LayoutBlockBox::CloseLineBox(LayoutLineBox* child, UniquePtr<LayoutInlineBox> overflow, LayoutInlineBox* overflow_chain)
-{
-	RMLUI_ZoneScoped;
-
-	RMLUI_ASSERT(context == INLINE);
-	if (child->GetDimensions().x > 0)
-		box_cursor = (child->GetPosition().y - (box.GetPosition().y + position.y)) + child->GetDimensions().y;
-
-	// If we have any pending floating elements for our parent, then this would be an ideal time to place them.
-	if (!float_elements.empty())
-	{
-		for (size_t i = 0; i < float_elements.size(); ++i)
-			parent->PlaceFloat(float_elements[i], box_cursor);
-
-		float_elements.clear();
-	}
-
-	// Add a new line box.
-	line_boxes.push_back(MakeUnique<LayoutLineBox>(this));
-
-	if (overflow_chain)
-		line_boxes.back()->AddChainedBox(overflow_chain);
-
-	if (overflow)
-		return line_boxes.back()->AddBox(std::move(overflow));
-
-	return nullptr;
-}
-
-// Adds a new block element to this block box.
 LayoutBlockBox* LayoutBlockBox::AddBlockElement(Element* element, const Box& box, float min_height, float max_height)
 {
 	RMLUI_ZoneScoped;
-
-	RMLUI_ASSERT(context == BLOCK);
 
 	// Check if our most previous block box is rendering in an inline context.
 	if (!block_boxes.empty() &&
@@ -417,36 +326,27 @@ LayoutInlineBox* LayoutBlockBox::AddInlineElement(Element* element, const Box& b
 {
 	RMLUI_ZoneScoped;
 
-	if (context == BLOCK)
-	{
-		LayoutInlineBox* inline_box;
+	LayoutInlineBox* inline_box;
 
-		// If we have an open child rendering in an inline context, we can add this element into it.
-		if (!block_boxes.empty() &&
-			block_boxes.back()->context == INLINE)
-			inline_box = block_boxes.back()->AddInlineElement(element, box);
+	// If we have an open child rendering in an inline context, we can add this element into it.
+	if (!block_boxes.empty() && block_boxes.back()->context == INLINE)
+		inline_box = block_boxes.back()->AddInlineElement(element, box);
 
-		// No dice! Ah well, nothing for it but to open a new inline context block box.
-		else
-		{
-			block_boxes.push_back(MakeUnique<LayoutBlockBox>(this));
-
-			if (interrupted_chain != nullptr)
-			{
-				block_boxes.back()->line_boxes.back()->AddChainedBox(interrupted_chain);
-				interrupted_chain = nullptr;
-			}
-
-			inline_box = block_boxes.back()->AddInlineElement(element, box);
-		}
-
-		return inline_box;
-	}
+	// No dice! Ah well, nothing for it but to open a new inline context block box.
 	else
 	{
-		// We're an inline context box, so we'll add this new inline element into our line boxes.
-		return line_boxes.back()->AddElement(element, box);
+		block_boxes.push_back(MakeUnique<LayoutBlockBox>(this));
+
+		if (interrupted_chain != nullptr)
+		{
+			block_boxes.back()->line_boxes.back()->AddChainedBox(interrupted_chain);
+			interrupted_chain = nullptr;
+		}
+
+		inline_box = block_boxes.back()->AddInlineElement(element, box);
 	}
+
+	return inline_box;
 }
 
 // Adds a line-break to this block box.
@@ -492,8 +392,6 @@ bool LayoutBlockBox::AddFloatElement(Element* element)
 // Adds an element to this block box to be handled as an absolutely-positioned element.
 void LayoutBlockBox::AddAbsoluteElement(Element* element)
 {
-	RMLUI_ASSERT(context == BLOCK);
-
 	AbsoluteElement absolute_element;
 	absolute_element.element = element;
 	absolute_element.position = NextBoxPosition();
@@ -616,57 +514,42 @@ float LayoutBlockBox::GetShrinkToFitWidth() const
 {
 	float content_width = 0.0f;
 
-	if (context == BLOCK)
-	{
-		auto get_content_width_from_children = [this, &content_width]() {
-			for (size_t i = 0; i < block_boxes.size(); i++)
-			{
-				const Box& box = block_boxes[i]->GetBox();
-				const float edge_size = box.GetCumulativeEdge(Box::PADDING, Box::LEFT) + box.GetCumulativeEdge(Box::PADDING, Box::RIGHT);
-				content_width = Math::Max(content_width, block_boxes[i]->GetShrinkToFitWidth() + edge_size);
-			}
-		};
-
-		// Block boxes with definite sizes should use that size. Otherwise, find the maximum content width of our children.
-		//  Alternative solution: Add some 'intrinsic_width' property to every 'LayoutBlockBox' and have that propagate up.
-		if (element)
+	auto get_content_width_from_children = [this, &content_width]() {
+		for (size_t i = 0; i < block_boxes.size(); i++)
 		{
-			auto& computed = element->GetComputedValues();
-			const float block_width = box.GetSize(Box::CONTENT).x;
-
-			if (computed.width().type == Style::Width::Auto)
-			{
-				get_content_width_from_children();
-			}
-			else
-			{
-				float width_value = ResolveValue(computed.width(), block_width);
-				content_width = Math::Max(content_width, width_value);
-			}
-
-			float min_width, max_width;
-			LayoutDetails::GetMinMaxWidth(min_width, max_width, computed, box, block_width);
-			content_width = Math::Clamp(content_width, min_width, max_width);
+			const Box& box = block_boxes[i]->GetBox();
+			const float edge_size = box.GetCumulativeEdge(Box::PADDING, Box::LEFT) + box.GetCumulativeEdge(Box::PADDING, Box::RIGHT);
+			content_width = Math::Max(content_width, block_boxes[i]->GetShrinkToFitWidth() + edge_size);
 		}
-		else
+	};
+
+	// Block boxes with definite sizes should use that size. Otherwise, find the maximum content width of our children.
+	//  Alternative solution: Add some 'intrinsic_width' property to every 'LayoutBlockBox' and have that propagate up.
+	if (element)
+	{
+		auto& computed = element->GetComputedValues();
+		const float block_width = box.GetSize(Box::CONTENT).x;
+
+		if (computed.width().type == Style::Width::Auto)
 		{
 			get_content_width_from_children();
 		}
+		else
+		{
+			float width_value = ResolveValue(computed.width(), block_width);
+			content_width = Math::Max(content_width, width_value);
+		}
 
-		// Can add the dimensions of floating elements here if we want to support that.
+		float min_width, max_width;
+		LayoutDetails::GetMinMaxWidth(min_width, max_width, computed, box, block_width);
+		content_width = Math::Clamp(content_width, min_width, max_width);
 	}
 	else
 	{
-		// Find the largest line in this layout block
-		for (size_t i = 0; i < line_boxes.size(); i++)
-		{
-			// Perhaps a more robust solution is to modify how we set the line box dimension on 'line_box->close()'
-			// and use that, or add another value in the line_box ... but seems to work for now.
-			LayoutLineBox* line_box = line_boxes[i].get();
-			content_width = Math::Max(content_width, line_box->GetBoxCursor());
-		}
-		content_width = Math::Min(content_width, box.GetSize(Box::CONTENT).x);
+		get_content_width_from_children();
 	}
+
+	// Can add the dimensions of floating elements here if we want to support that.
 
 	return content_width;
 }
@@ -726,14 +609,11 @@ const Box& LayoutBlockBox::GetBox() const
 
 String LayoutBlockBox::DumpTree(int depth) const
 {
-	const String context_str = (context == BLOCK ? "block" : "inline");
+	const String context_str = "block";
 	String value = String(depth * 2, ' ') + "LayoutBlockBox (" + context_str + ")" + " | " + LayoutElementName(element) + '\n';
 
 	for (auto&& block_box : block_boxes)
 		value += block_box->DumpTree(depth + 1);
-
-	for (auto&& line_box : line_boxes)
-		value += line_box->DumpTree(depth + 1);
 
 	return value;
 }
@@ -802,6 +682,191 @@ bool LayoutBlockBox::CatchVerticalOverflow(float cursor)
 	}
 
 	return true;
+}
+
+
+
+
+
+
+
+
+
+
+// Creates a new block box in an inline context.
+LayoutRootInlineBox::LayoutRootInlineBox(LayoutBlockBox* _parent) : position(-1, -1)
+{
+	RMLUI_ASSERT(_parent);
+
+	parent = _parent;
+
+	space = _parent->space;
+
+	line_boxes.push_back(MakeUnique<LayoutLineBox>(this));
+	wrap_content = parent->wrap_content;
+
+	box_cursor = 0;
+
+	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent);
+	box_size = Vector2f(containing_block.x, -1);
+	position = parent->NextBlockBoxPosition(box, Style::Clear::None);
+}
+
+LayoutRootInlineBox::~LayoutRootInlineBox() {}
+
+LayoutRootInlineBox::CloseResult LayoutRootInlineBox::Close()
+{
+	// We're an inline context box; so close our last line, which will still be open.
+	line_boxes.back()->Close();
+
+	// Expand our content area if any line boxes had to push themselves out.
+	for (size_t i = 0; i < line_boxes.size(); i++)
+		box_size.x = Math::Max(box_size.x, line_boxes[i]->GetDimensions().x);
+
+	// Set this box's height, if necessary.
+	if (box_size.y < 0)
+		box_size.y = box_cursor;
+
+	visible_overflow_size = Vector2f(0);
+
+	// Find the largest line in this layout block
+	for (size_t i = 0; i < line_boxes.size(); i++)
+	{
+		LayoutLineBox* line_box = line_boxes[i].get();
+		visible_overflow_size.x = Math::Max(visible_overflow_size.x, line_box->GetBoxCursor());
+	}
+
+	// Increment the parent's cursor.
+	if (parent != nullptr)
+	{
+		// If this close fails, it means this block box has caused our parent block box to generate an automatic vertical scrollbar.
+		if (!parent->CloseBlockBox(this))
+			return LAYOUT_PARENT;
+	}
+
+	return OK;
+}
+
+LayoutInlineBox* LayoutRootInlineBox::CloseLineBox(LayoutLineBox* child, UniquePtr<LayoutInlineBox> overflow, LayoutInlineBox* overflow_chain)
+{
+	RMLUI_ZoneScoped;
+
+	if (child->GetDimensions().x > 0)
+		box_cursor = (child->GetPosition().y - position.y) + child->GetDimensions().y;
+
+	// If we have any pending floating elements for our parent, then this would be an ideal time to place them.
+	if (!float_elements.empty())
+	{
+		for (size_t i = 0; i < float_elements.size(); ++i)
+			parent->PlaceFloat(float_elements[i], box_cursor);
+
+		float_elements.clear();
+	}
+
+	// Add a new line box.
+	line_boxes.push_back(MakeUnique<LayoutLineBox>(this));
+
+	if (overflow_chain)
+		line_boxes.back()->AddChainedBox(overflow_chain);
+
+	if (overflow)
+		return line_boxes.back()->AddBox(std::move(overflow));
+
+	return nullptr;
+}
+
+LayoutInlineBox* LayoutRootInlineBox::AddInlineElement(Element* element, const Box& box)
+{
+	// We're an inline context box, so we'll add this new inline element into our line boxes.
+	return line_boxes.back()->AddElement(element, box);
+}
+
+Vector2f LayoutRootInlineBox::NextBoxPosition(float top_margin, Style::Clear clear_property) const
+{
+	// If our element is establishing a new offset hierarchy, then any children of ours don't inherit our offset.
+	Vector2f box_position = GetPosition();
+	box_position.y += box_cursor;
+
+	float clear_margin = space->DetermineClearPosition(box_position.y + top_margin, clear_property) - (box_position.y + top_margin);
+	if (clear_margin > 0)
+		box_position.y += clear_margin;
+
+	return box_position;
+}
+
+Vector2f LayoutRootInlineBox::NextBlockBoxPosition(const Box& box, Style::Clear clear_property) const
+{
+	Vector2f box_position = NextBoxPosition(box.GetEdge(Box::MARGIN, Box::TOP), clear_property);
+	box_position.x += box.GetEdge(Box::MARGIN, Box::LEFT);
+	box_position.y += box.GetEdge(Box::MARGIN, Box::TOP);
+	return box_position;
+}
+
+Vector2f LayoutRootInlineBox::NextLineBoxPosition(float& box_width, bool& _wrap_content, const Vector2f dimensions) const
+{
+	const Vector2f cursor = NextBoxPosition();
+	const Vector2f box_position = space->NextBoxPosition(box_width, cursor.y, dimensions);
+
+	// Also, probably shouldn't check for widths when positioning the box?
+	_wrap_content = wrap_content;
+
+	return box_position;
+}
+
+float LayoutRootInlineBox::GetShrinkToFitWidth() const
+{
+	float content_width = 0.0f;
+
+	// Find the largest line in this layout block
+	for (size_t i = 0; i < line_boxes.size(); i++)
+	{
+		// Perhaps a more robust solution is to modify how we set the line box dimension on 'line_box->close()'
+		// and use that, or add another value in the line_box ... but seems to work for now.
+		LayoutLineBox* line_box = line_boxes[i].get();
+		content_width = Math::Max(content_width, line_box->GetBoxCursor());
+	}
+	content_width = Math::Min(content_width, box_size.x);
+
+	return content_width;
+}
+
+Vector2f LayoutRootInlineBox::GetVisibleOverflowSize() const
+{
+	return visible_overflow_size;
+}
+
+// Returns the block box's parent.
+LayoutBlockBox* LayoutRootInlineBox::GetParent() const
+{
+	return parent;
+}
+
+// Returns the position of the block box, relative to its parent's content area.
+Vector2f LayoutRootInlineBox::GetPosition() const
+{
+	return position;
+}
+
+String LayoutRootInlineBox::DumpTree(int depth) const
+{
+	const String context_str = "inline";
+	String value = String(depth * 2, ' ') + "LayoutRootInlineBox (" + context_str + ")" + " | " + LayoutElementName(element) + '\n';
+
+	for (auto&& line_box : line_boxes)
+		value += line_box->DumpTree(depth + 1);
+
+	return value;
+}
+
+void* LayoutRootInlineBox::operator new(size_t size)
+{
+	void* memory = LayoutEngine::AllocateLayoutChunk(size);
+	return memory;
+}
+
+void LayoutRootInlineBox::operator delete(void* chunk, size_t size)
+{
+	LayoutEngine::DeallocateLayoutChunk(chunk, size);
 }
 
 } // namespace Rml
