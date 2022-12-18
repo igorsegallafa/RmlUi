@@ -41,13 +41,12 @@
 namespace Rml {
 
 // Creates a new block box for rendering a block element.
-LayoutBlockBox::LayoutBlockBox(LayoutBlockBox* _parent, Element* _element, const Box& _box, float _min_height, float _max_height) :
+BlockContainer::BlockContainer(BlockContainer* _parent, Element* _element, const Box& _box, float _min_height, float _max_height) :
 	BlockLevelBox(Type::BlockContainer), position(0), box(_box), min_height(_min_height), max_height(_max_height)
 {
 	RMLUI_ZoneScoped;
 
-	space_owner = MakeUnique<LayoutBlockBoxSpace>(this);
-	space = space_owner.get();
+	space = MakeUnique<LayoutBlockBoxSpace>(this);
 
 	parent = _parent;
 
@@ -64,7 +63,7 @@ LayoutBlockBox::LayoutBlockBox(LayoutBlockBox* _parent, Element* _element, const
 		offset_root = this;
 
 	// Determine the offset parent for this element.
-	LayoutBlockBox* self_offset_parent;
+	BlockContainer* self_offset_parent;
 	if (parent && parent->offset_parent->GetElement())
 		self_offset_parent = parent->offset_parent;
 	else
@@ -87,7 +86,7 @@ LayoutBlockBox::LayoutBlockBox(LayoutBlockBox* _parent, Element* _element, const
 			if (self_offset_parent != this)
 			{
 				// Get the next position within our offset parent's containing block.
-				position = parent->NextBlockBoxPosition(box, element ? element->GetComputedValues().clear() : Style::Clear::None);
+				position = parent->NextBlockBoxPosition(box, element->GetComputedValues().clear());
 				element->SetOffset(position - (self_offset_parent->GetPosition() - offset_root->GetPosition()), self_offset_parent->GetElement());
 			}
 			else
@@ -128,15 +127,15 @@ LayoutBlockBox::LayoutBlockBox(LayoutBlockBox* _parent, Element* _element, const
 }
 
 // Releases the block box.
-LayoutBlockBox::~LayoutBlockBox() {}
+BlockContainer::~BlockContainer() {}
 
 // Closes the box.
-LayoutBlockBox::CloseResult LayoutBlockBox::Close()
+BlockContainer::CloseResult BlockContainer::Close()
 {
 	// If the last child of this block box is an inline box, then we haven't closed it; close it now!
 	CloseResult result = CloseInlineBlockBox();
 	if (result != CloseResult::OK)
-		return CloseResult::LAYOUT_SELF;
+		return CloseResult::LayoutSelf;
 
 	// Set this box's height, if necessary.
 	if (box.GetSize(Box::CONTENT).y < 0)
@@ -144,7 +143,7 @@ LayoutBlockBox::CloseResult LayoutBlockBox::Close()
 		Vector2f content_area = box.GetSize();
 		content_area.y = Math::Clamp(box_cursor, min_height, max_height);
 
-		if (element != nullptr)
+		if (element)
 			content_area.y = Math::Max(content_area.y, space->GetDimensions().y);
 
 		box.SetContent(content_area);
@@ -175,14 +174,14 @@ LayoutBlockBox::CloseResult LayoutBlockBox::Close()
 				element->GetElementScroll()->EnableScrollbar(ElementScroll::HORIZONTAL, box.GetSize(Box::PADDING).x);
 
 				if (!CatchVerticalOverflow())
-					return CloseResult::LAYOUT_SELF;
+					return CloseResult::LayoutSelf;
 			}
 		}
 
 		content_box.y = Math::Max(content_box.y, box_cursor);
 		content_box.y = Math::Max(content_box.y, space_box.y);
 		if (!CatchVerticalOverflow(content_box.y))
-			return CloseResult::LAYOUT_SELF;
+			return CloseResult::LayoutSelf;
 
 		const Vector2f padding_edges = Vector2f(box.GetEdge(Box::PADDING, Box::LEFT) + box.GetEdge(Box::PADDING, Box::RIGHT),
 			box.GetEdge(Box::PADDING, Box::TOP) + box.GetEdge(Box::PADDING, Box::BOTTOM));
@@ -216,7 +215,7 @@ LayoutBlockBox::CloseResult LayoutBlockBox::Close()
 	{
 		// If this close fails, it means this block box has caused our parent block box to generate an automatic vertical scrollbar.
 		if (!parent->CloseBlockBox(this))
-			return CloseResult::LAYOUT_PARENT;
+			return CloseResult::LayoutParent;
 	}
 
 	if (element)
@@ -272,7 +271,7 @@ LayoutBlockBox::CloseResult LayoutBlockBox::Close()
 }
 
 // Called by a closing block box child.
-bool LayoutBlockBox::CloseBlockBox(LayoutBlockBox* child)
+bool BlockContainer::CloseBlockBox(BlockContainer* child)
 {
 	const float child_position_y = child->GetPosition().y - child->box.GetEdge(Box::MARGIN, Box::TOP) - (box.GetPosition().y + position.y);
 
@@ -285,7 +284,7 @@ bool LayoutBlockBox::CloseBlockBox(LayoutBlockBox* child)
 	return CatchVerticalOverflow();
 }
 
-bool LayoutBlockBox::CloseBlockBox(InlineContainer* child)
+bool BlockContainer::CloseBlockBox(InlineContainer* child)
 {
 	// TODO: Almost same as above
 	const float child_position_y = child->GetPosition().y - (box.GetPosition().y + position.y);
@@ -298,14 +297,14 @@ bool LayoutBlockBox::CloseBlockBox(InlineContainer* child)
 	return CatchVerticalOverflow();
 }
 
-LayoutBlockBox* LayoutBlockBox::AddBlockElement(Element* element, const Box& box, float min_height, float max_height)
+BlockContainer* BlockContainer::AddBlockElement(Element* element, const Box& box, float min_height, float max_height)
 {
 	RMLUI_ZoneScoped;
 
 	// Check if our most previous block box is rendering in an inline context.
 	if (InlineContainer* inline_container = GetOpenInlineContainer())
 	{
-		// TODO: Don't need dynamic cast. Probably want to move this functionality into inline container.
+		// TODO: Probably want to move this functionality into inline container.
 		LayoutInlineBox* open_inline_box = inline_container->line_boxes.back()->GetOpenInlineBox();
 		if (open_inline_box)
 		{
@@ -328,12 +327,12 @@ LayoutBlockBox* LayoutBlockBox::AddBlockElement(Element* element, const Box& box
 		}
 	}
 
-	block_boxes.push_back(MakeUnique<LayoutBlockBox>(this, element, box, min_height, max_height));
-	return static_cast<LayoutBlockBox*>(block_boxes.back().get());
+	block_boxes.push_back(MakeUnique<BlockContainer>(this, element, box, min_height, max_height));
+	return static_cast<BlockContainer*>(block_boxes.back().get());
 }
 
 // Adds a new inline element to this inline box.
-LayoutInlineBox* LayoutBlockBox::AddInlineElement(Element* element, const Box& box)
+LayoutInlineBox* BlockContainer::AddInlineElement(Element* element, const Box& box)
 {
 	RMLUI_ZoneScoped;
 
@@ -342,9 +341,8 @@ LayoutInlineBox* LayoutBlockBox::AddInlineElement(Element* element, const Box& b
 	// If we have an open child rendering in an inline context, we can add this element into it.
 	if (InlineContainer* inline_container = GetOpenInlineContainer())
 	{
-		// TODO: Don't need dynamic cast. Probably want to move this functionality into inline container.
-		InlineContainer* inline_block_box = dynamic_cast<InlineContainer*>(block_boxes.back().get());
-		inline_box = inline_block_box->AddInlineElement(element, box);
+		// TODO: Probably want to move this functionality into inline container.
+		inline_box = inline_container->AddInlineElement(element, box);
 	}
 	// No dice! Ah well, nothing for it but to open a new inline context block box.
 	else
@@ -368,7 +366,7 @@ LayoutInlineBox* LayoutBlockBox::AddInlineElement(Element* element, const Box& b
 }
 
 // Adds a line-break to this block box.
-void LayoutBlockBox::AddBreak()
+void BlockContainer::AddBreak()
 {
 	float line_height = element->GetLineHeight();
 
@@ -390,7 +388,7 @@ void LayoutBlockBox::AddBreak()
 }
 
 // Adds an element to this block box to be handled as a floating element.
-bool LayoutBlockBox::AddFloatElement(Element* element)
+bool BlockContainer::AddFloatElement(Element* element)
 {
 	// If we have an open inline block box, then we have to position the box a little differently.
 	if (InlineContainer* inline_container = GetOpenInlineContainer())
@@ -405,7 +403,7 @@ bool LayoutBlockBox::AddFloatElement(Element* element)
 }
 
 // Adds an element to this block box to be handled as an absolutely-positioned element.
-void LayoutBlockBox::AddAbsoluteElement(Element* element)
+void BlockContainer::AddAbsoluteElement(Element* element)
 {
 	AbsoluteElement absolute_element;
 	absolute_element.element = element;
@@ -421,7 +419,7 @@ void LayoutBlockBox::AddAbsoluteElement(Element* element)
 	}
 
 	// Find the positioned parent for this element.
-	LayoutBlockBox* absolute_parent = this;
+	BlockContainer* absolute_parent = this;
 	while (absolute_parent != absolute_parent->offset_parent)
 		absolute_parent = absolute_parent->parent;
 
@@ -429,7 +427,7 @@ void LayoutBlockBox::AddAbsoluteElement(Element* element)
 }
 
 // Lays out, sizes, and positions all absolute elements in this block relative to the containing block.
-void LayoutBlockBox::CloseAbsoluteElements()
+void BlockContainer::CloseAbsoluteElements()
 {
 	if (!absolute_elements.empty())
 	{
@@ -460,7 +458,7 @@ void LayoutBlockBox::CloseAbsoluteElements()
 }
 
 // Returns the offset from the top-left corner of this box that the next child box will be positioned at.
-Vector2f LayoutBlockBox::NextBoxPosition(float top_margin, Style::Clear clear_property) const
+Vector2f BlockContainer::NextBoxPosition(float top_margin, Style::Clear clear_property) const
 {
 	// If our element is establishing a new offset hierarchy, then any children of ours don't inherit our offset.
 	Vector2f box_position = GetPosition();
@@ -474,7 +472,7 @@ Vector2f LayoutBlockBox::NextBoxPosition(float top_margin, Style::Clear clear_pr
 	{
 		// Check for a collapsing vertical margin.
 
-		if (const LayoutBlockBox* block_box = GetOpenBlockContainer())
+		if (const BlockContainer* block_box = GetOpenBlockContainer())
 		{
 			const float bottom_margin = block_box->GetBox().GetEdge(Box::MARGIN, Box::BOTTOM);
 
@@ -501,7 +499,7 @@ Vector2f LayoutBlockBox::NextBoxPosition(float top_margin, Style::Clear clear_pr
 
 // Returns the offset from the top-left corner of this box's offset element the next child block box, of the given
 // dimensions, will be positioned at. This will include the margins on the new block box.
-Vector2f LayoutBlockBox::NextBlockBoxPosition(const Box& box, Style::Clear clear_property) const
+Vector2f BlockContainer::NextBlockBoxPosition(const Box& box, Style::Clear clear_property) const
 {
 	Vector2f box_position = NextBoxPosition(box.GetEdge(Box::MARGIN, Box::TOP), clear_property);
 	box_position.x += box.GetEdge(Box::MARGIN, Box::LEFT);
@@ -510,7 +508,7 @@ Vector2f LayoutBlockBox::NextBlockBoxPosition(const Box& box, Style::Clear clear
 }
 
 // Returns the offset from the top-left corner of this box for the next line.
-Vector2f LayoutBlockBox::NextLineBoxPosition(float& box_width, bool& _wrap_content, const Vector2f dimensions) const
+Vector2f BlockContainer::NextLineBoxPosition(float& box_width, bool& _wrap_content, const Vector2f dimensions) const
 {
 	const Vector2f cursor = NextBoxPosition();
 	const Vector2f box_position = space->NextBoxPosition(box_width, cursor.y, dimensions);
@@ -522,7 +520,7 @@ Vector2f LayoutBlockBox::NextLineBoxPosition(float& box_width, bool& _wrap_conte
 }
 
 // Calculate the dimensions of the box's internal content width; i.e. the size of the largest line.
-float LayoutBlockBox::GetShrinkToFitWidth() const
+float BlockContainer::GetShrinkToFitWidth() const
 {
 	float content_width = 0.0f;
 
@@ -532,7 +530,7 @@ float LayoutBlockBox::GetShrinkToFitWidth() const
 			// TODO: Ugly design. Doesn't account for all types. Use virtual?
 			if (block_boxes[i]->GetType() == Type::BlockContainer)
 			{
-				LayoutBlockBox* block_child = static_cast<LayoutBlockBox*>(block_boxes[i].get());
+				BlockContainer* block_child = static_cast<BlockContainer*>(block_boxes[i].get());
 				const Box& box = block_child->GetBox();
 				const float edge_size = box.GetSizeAcross(Box::HORIZONTAL, Box::MARGIN, Box::PADDING);
 				content_width = Math::Max(content_width, block_child->GetShrinkToFitWidth() + edge_size);
@@ -546,7 +544,7 @@ float LayoutBlockBox::GetShrinkToFitWidth() const
 	};
 
 	// Block boxes with definite sizes should use that size. Otherwise, find the maximum content width of our children.
-	//  Alternative solution: Add some 'intrinsic_width' property to every 'LayoutBlockBox' and have that propagate up.
+	//  Alternative solution: Add some 'intrinsic_width' property to every 'BlockContainer' and have that propagate up.
 	if (element)
 	{
 		auto& computed = element->GetComputedValues();
@@ -576,60 +574,60 @@ float LayoutBlockBox::GetShrinkToFitWidth() const
 	return content_width;
 }
 
-Vector2f LayoutBlockBox::GetVisibleOverflowSize() const
+Vector2f BlockContainer::GetVisibleOverflowSize() const
 {
 	return visible_overflow_size;
 }
 
-void LayoutBlockBox::ExtendInnerContentSize(Vector2f _inner_content_size)
+void BlockContainer::ExtendInnerContentSize(Vector2f _inner_content_size)
 {
 	inner_content_size.x = Math::Max(inner_content_size.x, _inner_content_size.x);
 	inner_content_size.y = Math::Max(inner_content_size.y, _inner_content_size.y);
 }
 
 // Returns the block box's element.
-Element* LayoutBlockBox::GetElement() const
+Element* BlockContainer::GetElement() const
 {
 	return element;
 }
 
 // Returns the block box's parent.
-LayoutBlockBox* LayoutBlockBox::GetParent() const
+BlockContainer* BlockContainer::GetParent() const
 {
 	return parent;
 }
 
 // Returns the position of the block box, relative to its parent's content area.
-Vector2f LayoutBlockBox::GetPosition() const
+Vector2f BlockContainer::GetPosition() const
 {
 	return position;
 }
 
 // Returns the element against which all positions of boxes in the hierarchy are calculated relative to.
-const LayoutBlockBox* LayoutBlockBox::GetOffsetParent() const
+const BlockContainer* BlockContainer::GetOffsetParent() const
 {
 	return offset_parent;
 }
 
 // Returns the block box against which all positions of boxes in the hierarchy are calculated relative to.
-const LayoutBlockBox* LayoutBlockBox::GetOffsetRoot() const
+const BlockContainer* BlockContainer::GetOffsetRoot() const
 {
 	return offset_root;
 }
 
 // Returns the block box's dimension box.
-Box& LayoutBlockBox::GetBox()
+Box& BlockContainer::GetBox()
 {
 	return box;
 }
 
 // Returns the block box's dimension box.
-const Box& LayoutBlockBox::GetBox() const
+const Box& BlockContainer::GetBox() const
 {
 	return box;
 }
 
-String LayoutBlockBox::DumpTree(int depth) const
+String BlockContainer::DumpTree(int depth) const
 {
 	String value = String(depth * 2, ' ') + "BlockContainer" + " | " + LayoutElementName(element) + '\n';
 
@@ -638,7 +636,7 @@ String LayoutBlockBox::DumpTree(int depth) const
 		// TODO: Ugly design. Doesn't account for all types. Use virtual?
 		if (block_box->GetType() == Type::BlockContainer)
 		{
-			LayoutBlockBox* block_child = static_cast<LayoutBlockBox*>(block_box.get());
+			BlockContainer* block_child = static_cast<BlockContainer*>(block_box.get());
 			value += block_child->DumpTree(depth + 1);
 		}
 		else if (block_box->GetType() == Type::InlineContainer)
@@ -651,33 +649,33 @@ String LayoutBlockBox::DumpTree(int depth) const
 	return value;
 }
 
-void* LayoutBlockBox::operator new(size_t size)
+void* BlockContainer::operator new(size_t size)
 {
 	void* memory = LayoutEngine::AllocateLayoutChunk(size);
 	return memory;
 }
 
-void LayoutBlockBox::operator delete(void* chunk, size_t size)
+void BlockContainer::operator delete(void* chunk, size_t size)
 {
 	LayoutEngine::DeallocateLayoutChunk(chunk, size);
 }
 
-InlineContainer* LayoutBlockBox::GetOpenInlineContainer()
+InlineContainer* BlockContainer::GetOpenInlineContainer()
 {
 	if (!block_boxes.empty() && block_boxes.back()->GetType() == Type::InlineContainer)
 		return static_cast<InlineContainer*>(block_boxes.back().get());
 	return nullptr;
 }
 
-const LayoutBlockBox* LayoutBlockBox::GetOpenBlockContainer() const
+const BlockContainer* BlockContainer::GetOpenBlockContainer() const
 {
 	if (!block_boxes.empty() && block_boxes.back()->GetType() == Type::BlockContainer)
-		return static_cast<LayoutBlockBox*>(block_boxes.back().get());
+		return static_cast<BlockContainer*>(block_boxes.back().get());
 	return nullptr;
 }
 
 // Closes our last block box, if it is an open inline block box.
-LayoutBlockBox::CloseResult LayoutBlockBox::CloseInlineBlockBox()
+BlockContainer::CloseResult BlockContainer::CloseInlineBlockBox()
 {
 	if (InlineContainer* inline_container = GetOpenInlineContainer())
 		return inline_container->Close();
@@ -686,14 +684,14 @@ LayoutBlockBox::CloseResult LayoutBlockBox::CloseInlineBlockBox()
 }
 
 // Positions a floating element within this block box.
-void LayoutBlockBox::PlaceFloat(Element* element, float offset)
+void BlockContainer::PlaceFloat(Element* element, float offset)
 {
 	const Vector2f box_position = NextBoxPosition();
 	space->PlaceFloat(box_position.y + offset, element);
 }
 
 // Checks if we have a new vertical overflow on an auto-scrolling element.
-bool LayoutBlockBox::CatchVerticalOverflow(float cursor)
+bool BlockContainer::CatchVerticalOverflow(float cursor)
 {
 	if (cursor == -1)
 		cursor = Math::Max(box_cursor, inner_content_size.y);
@@ -713,8 +711,7 @@ bool LayoutBlockBox::CatchVerticalOverflow(float cursor)
 
 			block_boxes.clear();
 
-			space_owner = MakeUnique<LayoutBlockBoxSpace>(this);
-			space = space_owner.get();
+			space = MakeUnique<LayoutBlockBoxSpace>(this);
 
 			box_cursor = 0;
 			interrupted_chain = nullptr;
@@ -734,13 +731,13 @@ bool LayoutBlockBox::CatchVerticalOverflow(float cursor)
  *
  */
 
-InlineContainer::InlineContainer(LayoutBlockBox* _parent) : BlockLevelBox(Type::InlineContainer), position(-1, -1)
+InlineContainer::InlineContainer(BlockContainer* _parent) : BlockLevelBox(Type::InlineContainer), position(-1, -1)
 {
 	RMLUI_ASSERT(_parent);
 
 	parent = _parent;
 
-	space = _parent->space;
+	space = _parent->space.get();
 
 	line_boxes.push_back(MakeUnique<LayoutLineBox>(this));
 	wrap_content = _parent->wrap_content;
@@ -781,7 +778,7 @@ InlineContainer::CloseResult InlineContainer::Close()
 	{
 		// If this close fails, it means this block box has caused our parent block box to generate an automatic vertical scrollbar.
 		if (!parent->CloseBlockBox(this))
-			return CloseResult::LAYOUT_PARENT;
+			return CloseResult::LayoutParent;
 	}
 
 	return CloseResult::OK;
@@ -876,7 +873,7 @@ Vector2f InlineContainer::GetVisibleOverflowSize() const
 }
 
 // Returns the block box's parent.
-LayoutBlockBox* InlineContainer::GetParent() const
+BlockContainer* InlineContainer::GetParent() const
 {
 	return parent;
 }

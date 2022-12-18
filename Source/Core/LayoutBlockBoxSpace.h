@@ -35,7 +35,7 @@
 namespace Rml {
 
 class Element;
-class LayoutBlockBox;
+class BlockContainer;
 
 /**
 	Each block box has a space object for managing the space occupied by its floating elements, and those of its
@@ -47,7 +47,7 @@ class LayoutBlockBox;
 class LayoutBlockBoxSpace
 {
 public:
-	LayoutBlockBoxSpace(LayoutBlockBox* parent);
+	LayoutBlockBoxSpace(BlockContainer* parent);
 	~LayoutBlockBoxSpace();
 
 	/// Imports boxes from another block into this space.
@@ -112,7 +112,7 @@ private:
 	using SpaceBoxList = Vector< SpaceBox >;
 
 	// Our block-box parent.
-	LayoutBlockBox* parent;
+	BlockContainer* parent;
 
 	// The boxes floating in our space.
 	SpaceBoxList boxes[NUM_ANCHOR_EDGES];

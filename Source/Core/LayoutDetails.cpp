@@ -130,7 +130,7 @@ void LayoutDetails::BuildBox(Box& box, Vector2f containing_block, Element* eleme
 }
 
 // Generates the box for an element placed in a block box.
-void LayoutDetails::BuildBox(Box& box, float& min_height, float& max_height, LayoutBlockBox* containing_box, Element* element, BoxContext box_context,
+void LayoutDetails::BuildBox(Box& box, float& min_height, float& max_height, BlockContainer* containing_box, Element* element, BoxContext box_context,
 	float override_shrink_to_fit_width)
 {
 	Vector2f containing_block = LayoutDetails::GetContainingBlock(containing_box);
@@ -184,7 +184,7 @@ void LayoutDetails::GetDefiniteMinMaxHeight(float& min_height, float& max_height
 }
 
 // Returns the fully-resolved, fixed-width and -height containing block from a block box.
-Vector2f LayoutDetails::GetContainingBlock(const LayoutBlockBox* containing_box)
+Vector2f LayoutDetails::GetContainingBlock(const BlockContainer* containing_box)
 {
 	RMLUI_ASSERT(containing_box);
 
@@ -250,12 +250,12 @@ float LayoutDetails::GetShrinkToFitWidth(Element* element, Vector2f containing_b
 	LayoutDetails::GetDefiniteMinMaxHeight(min_height, max_height, element->GetComputedValues(), box, containing_block.y);
 
 	// First we need to format the element, then we get the shrink-to-fit width based on the largest line or box.
-	LayoutBlockBox containing_block_box(nullptr, nullptr, Box(containing_block), 0.0f, FLT_MAX);
+	BlockContainer containing_block_box(nullptr, nullptr, Box(containing_block), 0.0f, FLT_MAX);
 
 	// Here we fix the element's width to its containing block so that any content is wrapped at this width.
 	// We can consider to instead set this to infinity and clamp it to the available width later after formatting,
 	// but right now the formatting procedure doesn't work well with such numbers.
-	LayoutBlockBox* block_context_box = containing_block_box.AddBlockElement(element, box, min_height, max_height);
+	BlockContainer* block_context_box = containing_block_box.AddBlockElement(element, box, min_height, max_height);
 
 	// @performance. Some formatting can be simplified, eg. absolute elements do not contribute to the shrink-to-fit width.
 	// Also, children of elements with a fixed width and height don't need to be formatted further.

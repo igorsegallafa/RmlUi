@@ -41,7 +41,7 @@ class InlineContainer;
 
 class BlockLevelBox {
 public:
-	enum class CloseResult { OK, LAYOUT_SELF, LAYOUT_PARENT };
+	enum class CloseResult { OK, LayoutSelf, LayoutParent };
 
 	enum class Type { BlockContainer, InlineContainer, FlexContainer, TableWrapper, Replaced };
 	Type GetType() const { return type; }
@@ -58,8 +58,7 @@ private:
 /**
     @author Peter Curry
  */
-// TODO BlockContainer
-class LayoutBlockBox final : public BlockLevelBox {
+class BlockContainer final : public BlockLevelBox {
 public:
 	/// Creates a new block box for rendering a block element.
 	/// @param parent[in] The parent of this block box. This will be nullptr for the root element.
@@ -67,9 +66,9 @@ public:
 	/// @param box[in] The box used for this block box.
 	/// @param min_height[in] The minimum height of the content box.
 	/// @param max_height[in] The maximum height of the content box.
-	LayoutBlockBox(LayoutBlockBox* parent, Element* element, const Box& box, float min_height, float max_height);
+	BlockContainer(BlockContainer* parent, Element* element, const Box& box, float min_height, float max_height);
 	/// Releases the block box.
-	~LayoutBlockBox();
+	~BlockContainer();
 
 	/// Closes the box. This will determine the element's height (if it was unspecified).
 	/// @return The result of the close; this may request a reformat of this element or our parent.
@@ -78,7 +77,7 @@ public:
 	/// Called by a closing block box child. Increments the cursor.
 	/// @param child[in] The closing child block box.
 	/// @return False if the block box caused an automatic vertical scrollbar to appear, forcing an entire reformat of the block box.
-	bool CloseBlockBox(LayoutBlockBox* child);
+	bool CloseBlockBox(BlockContainer* child);
 	bool CloseBlockBox(InlineContainer* child);
 
 	/// Adds a new block element to this block-context box.
@@ -87,7 +86,7 @@ public:
 	/// @param min_height[in] The minimum height of the content box.
 	/// @param max_height[in] The maximum height of the content box.
 	/// @return The block box representing the element. Once the element's children have been positioned, Close() must be called on it.
-	LayoutBlockBox* AddBlockElement(Element* element, const Box& box, float min_height, float max_height);
+	BlockContainer* AddBlockElement(Element* element, const Box& box, float min_height, float max_height);
 	/// Adds a new inline element to this inline-context box.
 	/// @param element[in] The new inline element.
 	/// @param box[in] The box defining the element's bounds.
@@ -138,7 +137,7 @@ public:
 
 	/// Returns the block box's parent.
 	/// @return The block box's parent.
-	LayoutBlockBox* GetParent() const;
+	BlockContainer* GetParent() const;
 
 	/// Returns the position of the block box, relative to its parent's content area.
 	/// @return The relative position of the block box.
@@ -146,10 +145,10 @@ public:
 
 	/// Returns the block box against which all positions of boxes in the hierarchy are set relative to.
 	/// @return This box's offset parent.
-	const LayoutBlockBox* GetOffsetParent() const;
+	const BlockContainer* GetOffsetParent() const;
 	/// Returns the block box against which all positions of boxes in the hierarchy are calculated relative to.
 	/// @return This box's offset root.
-	const LayoutBlockBox* GetOffsetRoot() const;
+	const BlockContainer* GetOffsetRoot() const;
 
 	/// Returns the block box's dimension box.
 	Box& GetBox();
@@ -169,8 +168,7 @@ private:
 	};
 
 	InlineContainer* GetOpenInlineContainer();
-
-	const LayoutBlockBox* GetOpenBlockContainer() const;
+	const BlockContainer* GetOpenBlockContainer() const;
 
 	// Closes our last block box, if it is an open inline block box.
 	CloseResult CloseInlineBlockBox();
@@ -186,19 +184,16 @@ private:
 	using AbsoluteElementList = Vector<AbsoluteElement>;
 	using BlockBoxList = Vector<UniquePtr<BlockLevelBox>>;
 
-	// The object managing our space, as occupied by floating elements of this box and our ancestors.
-	LayoutBlockBoxSpace* space;
-
 	// The element this box represents. This will be nullptr for boxes rendering in an inline context.
 	Element* element;
 
 	// The element we'll be computing our offset relative to during layout.
-	const LayoutBlockBox* offset_root;
+	const BlockContainer* offset_root;
 	// The element this block box's children are to be offset from.
-	LayoutBlockBox* offset_parent;
+	BlockContainer* offset_parent;
 
 	// The box's block parent. This will be nullptr for the root of the box tree.
-	LayoutBlockBox* parent;
+	BlockContainer* parent;
 
 	// The block box's position.
 	Vector2f position;
@@ -219,8 +214,8 @@ private:
 	AbsoluteElementList absolute_elements;
 	// Used by block contexts only; stores any elements that are relatively positioned and whose containing block is this.
 	ElementList relative_elements;
-	// Used by block contexts only; stores the block box space pointed to by the 'space' member.
-	UniquePtr<LayoutBlockBoxSpace> space_owner;
+	// Used by block contexts only; stores the block box space managing our space, as occupied by floating elements of this box and our ancestors.
+	UniquePtr<LayoutBlockBoxSpace> space;
 	// Used by block contexts only; stores an inline element hierarchy that was interrupted by a child block box.
 	// The hierarchy will be resumed in an inline-context box once the intervening block box is completed.
 	LayoutInlineBox* interrupted_chain;
@@ -245,7 +240,7 @@ class InlineContainer final : public BlockLevelBox {
 public:
 	/// Creates a new block box in an inline context.
 	/// @param parent[in] The parent of this block box.
-	InlineContainer(LayoutBlockBox* parent);
+	InlineContainer(BlockContainer* parent);
 
 	~InlineContainer();
 
@@ -292,7 +287,7 @@ public:
 
 	/// Returns the block box's parent.
 	/// @return The block box's parent.
-	LayoutBlockBox* GetParent() const;
+	BlockContainer* GetParent() const;
 
 	/// Returns the position of the block box, relative to its parent's content area.
 	/// @return The relative position of the block box.
@@ -311,7 +306,7 @@ private:
 	LayoutBlockBoxSpace* space;
 
 	// The box's block parent. This will be nullptr for the root of the box tree.
-	LayoutBlockBox* parent;
+	BlockContainer* parent;
 
 	// The block box's position.
 	Vector2f position;
@@ -333,7 +328,7 @@ private:
 	// Used by inline contexts only; stores any floating elements that are waiting for a line break to be positioned.
 	ElementList float_elements;
 
-	friend class LayoutBlockBox; // TODO remove
+	friend class BlockContainer; // TODO remove
 };
 
 } // namespace Rml

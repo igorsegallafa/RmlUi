@@ -54,7 +54,7 @@ public:
 	/// Positions a single element and its children within a block formatting context.
 	/// @param[in] block_context_box The open block box to layout the element in.
 	/// @param[in] element The element to lay out.
-	static bool FormatElement(LayoutBlockBox* block_context_box, Element* element);
+	static bool FormatElement(BlockContainer* block_context_box, Element* element);
 
 	static void* AllocateLayoutChunk(size_t size);
 	static void DeallocateLayoutChunk(void* chunk, size_t size);
@@ -63,28 +63,28 @@ private:
 	/// Formats and positions an element as a block element.
 	/// @param[in] block_context_box The open block box to layout the element in.
 	/// @param[in] element The block element.
-	static bool FormatElementBlock(LayoutBlockBox* block_context_box, Element* element);
+	static bool FormatElementBlock(BlockContainer* block_context_box, Element* element);
 	/// Formats and positions an element as an inline element.
 	/// @param[in] block_context_box The open block box to layout the element in.
 	/// @param[in] element The inline element.
-	static bool FormatElementInline(LayoutBlockBox* block_context_box, Element* element);
+	static bool FormatElementInline(BlockContainer* block_context_box, Element* element);
 	/// Positions an element as a sized inline element, formatting its internal hierarchy as a block element.
 	/// @param[in] block_context_box The open block box to layout the element in.
 	/// @param[in] element The inline-block element.
-	static bool FormatElementInlineBlock(LayoutBlockBox* block_context_box, Element* element);
+	static bool FormatElementInlineBlock(BlockContainer* block_context_box, Element* element);
 	/// Formats and positions a flexbox.
 	/// @param[in] block_context_box The open block box to layout the element in.
 	/// @param[in] element The flex container element.
-	static bool FormatElementFlex(LayoutBlockBox* block_context_box, Element* element);
+	static bool FormatElementFlex(BlockContainer* block_context_box, Element* element);
 	/// Formats and positions a table, including all table-rows and table-cells contained within.
 	/// @param[in] block_context_box The open block box to layout the element in.
 	/// @param[in] element The table element.
-	static bool FormatElementTable(LayoutBlockBox* block_context_box, Element* element);
+	static bool FormatElementTable(BlockContainer* block_context_box, Element* element);
 	/// Executes any formatting for special elements.
 	/// @param[in] block_context_box The open block box to layout the element in.
 	/// @param[in] element The element to parse.
 	/// @return True if the element was parsed as a special element, false otherwise.
-	static bool FormatElementSpecial(LayoutBlockBox* block_context_box, Element* element);
+	static bool FormatElementSpecial(BlockContainer* block_context_box, Element* element);
 };
 
 

@@ -37,7 +37,7 @@ namespace Rml {
 class Element;
 class ElementText;
 class FontFaceHandleDefault;
-class LayoutBlockBox;
+class BlockContainer;
 class LayoutLineBox;
 
 /**

@@ -49,7 +49,7 @@ struct LayoutChunk {
 	alignas(std::max_align_t) byte buffer[Size];
 };
 
-static constexpr std::size_t ChunkSizeBig = sizeof(LayoutBlockBox);
+static constexpr std::size_t ChunkSizeBig = sizeof(BlockContainer);
 static constexpr std::size_t ChunkSizeMedium = MAX(sizeof(LayoutInlineBox), sizeof(LayoutInlineBoxText));
 static constexpr std::size_t ChunkSizeSmall = MAX(sizeof(LayoutLineBox), sizeof(LayoutBlockBoxSpace));
 
@@ -88,10 +88,10 @@ static inline bool ValidateTopLevelElement(Element* element)
 static bool g_debug_dumping_layout_tree = false;
 struct DebugDumpLayoutTree {
 	Element* element;
-	LayoutBlockBox* block_box;
+	BlockContainer* block_box;
 	bool is_printing_tree_root = false;
 
-	DebugDumpLayoutTree(Element* element, LayoutBlockBox* block_box) : element(element), block_box(block_box)
+	DebugDumpLayoutTree(Element* element, BlockContainer* block_box) : element(element), block_box(block_box)
 	{
 		// When an element with this ID is encountered, dump the formatted layout tree (including all sub-layouts).
 		static const String debug_trigger_id = "rmlui-debug-layout";
@@ -115,7 +115,7 @@ struct DebugDumpLayoutTree {
 };
 #else
 struct DebugDumpLayoutTree {
-	DebugDumpLayoutTree(Element* /*element*/, LayoutBlockBox* /*block_box*/) {}
+	DebugDumpLayoutTree(Element* /*element*/, BlockContainer* /*block_box*/) {}
 };
 #endif
 
@@ -132,7 +132,7 @@ void LayoutEngine::FormatElement(Element* element, Vector2f containing_block, co
 	if (!ValidateTopLevelElement(element))
 		return;
 
-	auto containing_block_box = MakeUnique<LayoutBlockBox>(nullptr, nullptr, Box(containing_block), 0.0f, FLT_MAX);
+	auto containing_block_box = MakeUnique<BlockContainer>(nullptr, nullptr, Box(containing_block), 0.0f, FLT_MAX);
 	DebugDumpLayoutTree debug_dump_tree(element, containing_block_box.get());
 
 	Box box;
@@ -144,7 +144,7 @@ void LayoutEngine::FormatElement(Element* element, Vector2f containing_block, co
 	float min_height, max_height;
 	LayoutDetails::GetDefiniteMinMaxHeight(min_height, max_height, element->GetComputedValues(), box, containing_block.y);
 
-	LayoutBlockBox* block_context_box = containing_block_box->AddBlockElement(element, box, min_height, max_height);
+	BlockContainer* block_context_box = containing_block_box->AddBlockElement(element, box, min_height, max_height);
 
 	for (int layout_iteration = 0; layout_iteration < 2; layout_iteration++)
 	{
@@ -154,7 +154,7 @@ void LayoutEngine::FormatElement(Element* element, Vector2f containing_block, co
 				i = -1;
 		}
 
-		if (block_context_box->Close() == LayoutBlockBox::CloseResult::OK)
+		if (block_context_box->Close() == BlockContainer::CloseResult::OK)
 			break;
 	}
 
@@ -198,7 +198,7 @@ void LayoutEngine::DeallocateLayoutChunk(void* chunk, size_t size)
 }
 
 // Positions a single element and its children within this layout.
-bool LayoutEngine::FormatElement(LayoutBlockBox* block_context_box, Element* element)
+bool LayoutEngine::FormatElement(BlockContainer* block_context_box, Element* element)
 {
 #ifdef RMLUI_ENABLE_PROFILING
 	RMLUI_ZoneScoped;
@@ -285,7 +285,7 @@ bool LayoutEngine::FormatElement(LayoutBlockBox* block_context_box, Element* ele
 }
 
 // Formats and positions an element as a block element.
-bool LayoutEngine::FormatElementBlock(LayoutBlockBox* block_context_box, Element* element)
+bool LayoutEngine::FormatElementBlock(BlockContainer* block_context_box, Element* element)
 {
 	RMLUI_ZoneScopedC(0x2F4F4F);
 
@@ -293,7 +293,7 @@ bool LayoutEngine::FormatElementBlock(LayoutBlockBox* block_context_box, Element
 	float min_height, max_height;
 	LayoutDetails::BuildBox(box, min_height, max_height, block_context_box, element);
 
-	LayoutBlockBox* new_block_context_box = block_context_box->AddBlockElement(element, box, min_height, max_height);
+	BlockContainer* new_block_context_box = block_context_box->AddBlockElement(element, box, min_height, max_height);
 	if (new_block_context_box == nullptr)
 		return false;
 
@@ -309,12 +309,12 @@ bool LayoutEngine::FormatElementBlock(LayoutBlockBox* block_context_box, Element
 	{
 		// We need to reformat ourself; format all of our children again and close the box. No need to check for error
 		// codes, as we already have our vertical slider bar.
-	case LayoutBlockBox::CloseResult::LAYOUT_SELF:
+	case BlockContainer::CloseResult::LayoutSelf:
 		{
 			for (int i = 0; i < element->GetNumChildren(); i++)
 				FormatElement(new_block_context_box, element->GetChild(i));
 
-			if (new_block_context_box->Close() == LayoutBlockBox::CloseResult::OK)
+			if (new_block_context_box->Close() == BlockContainer::CloseResult::OK)
 			{
 				element->OnLayout();
 				break;
@@ -322,7 +322,7 @@ bool LayoutEngine::FormatElementBlock(LayoutBlockBox* block_context_box, Element
 		}
 		//-fallthrough
 		// We caused our parent to add a vertical scrollbar; bail out!
-		case LayoutBlockBox::CloseResult::LAYOUT_PARENT: return false;
+		case BlockContainer::CloseResult::LayoutParent: return false;
 
 		default: element->OnLayout(); break;
 		}
@@ -331,7 +331,7 @@ bool LayoutEngine::FormatElementBlock(LayoutBlockBox* block_context_box, Element
 }
 
 // Formats and positions an element as an inline element.
-bool LayoutEngine::FormatElementInline(LayoutBlockBox* block_context_box, Element* element)
+bool LayoutEngine::FormatElementInline(BlockContainer* block_context_box, Element* element)
 {
 	RMLUI_ZoneScopedC(0x3F6F6F);
 
@@ -354,7 +354,7 @@ bool LayoutEngine::FormatElementInline(LayoutBlockBox* block_context_box, Elemen
 }
 
 // Positions an element as a sized inline element, formatting its internal hierarchy as a block element.
-bool LayoutEngine::FormatElementInlineBlock(LayoutBlockBox* block_context_box, Element* element)
+bool LayoutEngine::FormatElementInlineBlock(BlockContainer* block_context_box, Element* element)
 {
 	RMLUI_ZoneScopedC(0x1F2F2F);
 
@@ -368,7 +368,7 @@ bool LayoutEngine::FormatElementInlineBlock(LayoutBlockBox* block_context_box, E
 	return true;
 }
 
-bool LayoutEngine::FormatElementFlex(LayoutBlockBox* block_context_box, Element* element)
+bool LayoutEngine::FormatElementFlex(BlockContainer* block_context_box, Element* element)
 {
 	const ComputedValues& computed = element->GetComputedValues();
 	const Vector2f containing_block = LayoutDetails::GetContainingBlock(block_context_box);
@@ -383,7 +383,7 @@ bool LayoutEngine::FormatElementFlex(LayoutBlockBox* block_context_box, Element*
 	LayoutDetails::GetMinMaxHeight(min_size.y, max_size.y, computed, box, containing_block.y);
 
 	// Add the flex container element as if it was a normal block element.
-	LayoutBlockBox* flex_block_context_box = block_context_box->AddBlockElement(element, box, min_size.y, max_size.y);
+	BlockContainer* flex_block_context_box = block_context_box->AddBlockElement(element, box, min_size.y, max_size.y);
 	if (!flex_block_context_box)
 		return false;
 
@@ -404,12 +404,12 @@ bool LayoutEngine::FormatElementFlex(LayoutBlockBox* block_context_box, Element*
 
 	// Close the block box, this may result in scrollbars being added to ourself or our parent.
 	const auto close_result = flex_block_context_box->Close();
-	if (close_result == LayoutBlockBox::CloseResult::LAYOUT_PARENT)
+	if (close_result == BlockContainer::CloseResult::LayoutParent)
 	{
 		// Scollbars added to parent, bail out to reformat all its children.
 		return false;
 	}
-	else if (close_result == LayoutBlockBox::CloseResult::LAYOUT_SELF)
+	else if (close_result == BlockContainer::CloseResult::LayoutSelf)
 	{
 		// Scrollbars added to flex container, it needs to be formatted again to account for changed width or height.
 		absolutely_positioned_elements.clear();
@@ -420,7 +420,7 @@ bool LayoutEngine::FormatElementFlex(LayoutBlockBox* block_context_box, Element*
 		flex_block_context_box->GetBox().SetContent(formatted_content_size);
 		flex_block_context_box->ExtendInnerContentSize(content_overflow_size);
 
-		if (flex_block_context_box->Close() == LayoutBlockBox::CloseResult::LAYOUT_PARENT)
+		if (flex_block_context_box->Close() == BlockContainer::CloseResult::LayoutParent)
 			return false;
 	}
 
@@ -430,7 +430,7 @@ bool LayoutEngine::FormatElementFlex(LayoutBlockBox* block_context_box, Element*
 }
 
 
-bool LayoutEngine::FormatElementTable(LayoutBlockBox* block_context_box, Element* element_table)
+bool LayoutEngine::FormatElementTable(BlockContainer* block_context_box, Element* element_table)
 {
 	const ComputedValues& computed_table = element_table->GetComputedValues();
 
@@ -459,7 +459,7 @@ bool LayoutEngine::FormatElementTable(LayoutBlockBox* block_context_box, Element
 
 	// Now that the box is finalized, we can add table as a block element. If we did it earlier, eg. just before formatting the table,
 	// then the table element's offset would not be correct in cases where table size and auto-margins were adjusted.
-	LayoutBlockBox* table_block_context_box = block_context_box->AddBlockElement(element_table, box, final_content_size.y, final_content_size.y);
+	BlockContainer* table_block_context_box = block_context_box->AddBlockElement(element_table, box, final_content_size.y, final_content_size.y);
 	if (!table_block_context_box)
 		return false;
 
@@ -467,14 +467,14 @@ bool LayoutEngine::FormatElementTable(LayoutBlockBox* block_context_box, Element
 	table_block_context_box->ExtendInnerContentSize(table_content_overflow_size);
 
 	// If the close failed, it probably means that its parent produced scrollbars.
-	if (table_block_context_box->Close() != LayoutBlockBox::CloseResult::OK)
+	if (table_block_context_box->Close() != BlockContainer::CloseResult::OK)
 		return false;
 
 	return true;
 }
 
 // Executes any special formatting for special elements.
-bool LayoutEngine::FormatElementSpecial(LayoutBlockBox* block_context_box, Element* element)
+bool LayoutEngine::FormatElementSpecial(BlockContainer* block_context_box, Element* element)
 {
 	static const String br("br");
 	

@@ -134,7 +134,7 @@ LayoutInlineBox* LayoutLineBox::Close(UniquePtr<LayoutInlineBox> overflow)
 
 	// Position all the boxes horizontally in the line. We only need to reposition the elements if they're set to
 	// centre or right; the element are already placed left-aligned, and justification occurs at the text level.
-	Style::TextAlign text_align_property = parent->GetParent()->GetElement()->GetComputedValues().text_align();
+	Style::TextAlign text_align_property = GetBlockContainer()->GetElement()->GetComputedValues().text_align();
 	if (text_align_property == Style::TextAlign::Center || text_align_property == Style::TextAlign::Right)
 	{
 		float element_offset = 0;
@@ -334,7 +334,7 @@ Vector2f LayoutLineBox::GetPosition() const
 
 Vector2f LayoutLineBox::GetRelativePosition() const
 {
-	const LayoutBlockBox* block_container = GetBlockContainer();
+	const BlockContainer* block_container = GetBlockContainer();
 	return position - (block_container->GetOffsetParent()->GetPosition() - block_container->GetOffsetRoot()->GetPosition());
 }
 
@@ -353,7 +353,7 @@ InlineContainer* LayoutLineBox::GetBlockBox()
 	return parent;
 }
 
-const LayoutBlockBox* LayoutLineBox::GetBlockContainer() const
+const BlockContainer* LayoutLineBox::GetBlockContainer() const
 {
 	return parent->GetParent();
 }

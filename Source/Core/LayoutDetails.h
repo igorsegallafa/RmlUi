@@ -35,7 +35,7 @@
 namespace Rml {
 
 class Box;
-class LayoutBlockBox;
+class BlockContainer;
 
 /**
     ComputedAxisSize is an abstraction of an element's computed size properties along a single axis, either horizontally or vertically,
@@ -77,7 +77,7 @@ public:
 	/// @param[in] box_context The formatting context in which the box is generated.
 	/// @param[in] override_shrink_to_fit_width Provide a fixed shrink-to-fit width instead of formatting the element when its properties allow
 	/// shrinking.
-	static void BuildBox(Box& box, float& min_height, float& max_height, LayoutBlockBox* containing_box, Element* element,
+	static void BuildBox(Box& box, float& min_height, float& max_height, BlockContainer* containing_box, Element* element,
 		BoxContext box_context = BoxContext::Block, float override_shrink_to_fit_width = -1);
 
 	// Retrieves the minimum and maximum width from an element's computed values.
@@ -94,7 +94,7 @@ public:
 	/// Returns the fully-resolved, fixed-width and -height containing block from a block box.
 	/// @param[in] containing_box The leaf box.
 	/// @return The dimensions of the content area, using the latest fixed dimensions for width and height in the hierarchy.
-	static Vector2f GetContainingBlock(const LayoutBlockBox* containing_box);
+	static Vector2f GetContainingBlock(const BlockContainer* containing_box);
 
 	/// Builds margins of a Box, and resolves any auto width or height for non-inline elements. The height may be left unresolved if it depends on the
 	/// element's children.

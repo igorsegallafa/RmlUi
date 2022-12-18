@@ -87,7 +87,7 @@ public:
 	/// @return The line's block box.
 	InlineContainer* GetBlockBox();
 	// Returns the line's block container.
-	const LayoutBlockBox* GetBlockContainer() const;
+	const BlockContainer* GetBlockContainer() const;
 
 	float GetBoxCursor() const;
 
