@@ -154,7 +154,7 @@ void LayoutEngine::FormatElement(Element* element, Vector2f containing_block, co
 				i = -1;
 		}
 
-		if (block_context_box->Close() == LayoutBlockBox::OK)
+		if (block_context_box->Close() == LayoutBlockBox::CloseResult::OK)
 			break;
 	}
 
@@ -309,12 +309,12 @@ bool LayoutEngine::FormatElementBlock(LayoutBlockBox* block_context_box, Element
 	{
 		// We need to reformat ourself; format all of our children again and close the box. No need to check for error
 		// codes, as we already have our vertical slider bar.
-		case LayoutBlockBox::LAYOUT_SELF:
+	case LayoutBlockBox::CloseResult::LAYOUT_SELF:
 		{
 			for (int i = 0; i < element->GetNumChildren(); i++)
 				FormatElement(new_block_context_box, element->GetChild(i));
 
-			if (new_block_context_box->Close() == LayoutBlockBox::OK)
+			if (new_block_context_box->Close() == LayoutBlockBox::CloseResult::OK)
 			{
 				element->OnLayout();
 				break;
@@ -322,7 +322,7 @@ bool LayoutEngine::FormatElementBlock(LayoutBlockBox* block_context_box, Element
 		}
 		//-fallthrough
 		// We caused our parent to add a vertical scrollbar; bail out!
-		case LayoutBlockBox::LAYOUT_PARENT: return false;
+		case LayoutBlockBox::CloseResult::LAYOUT_PARENT: return false;
 
 		default: element->OnLayout(); break;
 		}
@@ -404,12 +404,12 @@ bool LayoutEngine::FormatElementFlex(LayoutBlockBox* block_context_box, Element*
 
 	// Close the block box, this may result in scrollbars being added to ourself or our parent.
 	const auto close_result = flex_block_context_box->Close();
-	if (close_result == LayoutBlockBox::LAYOUT_PARENT)
+	if (close_result == LayoutBlockBox::CloseResult::LAYOUT_PARENT)
 	{
 		// Scollbars added to parent, bail out to reformat all its children.
 		return false;
 	}
-	else if (close_result == LayoutBlockBox::LAYOUT_SELF)
+	else if (close_result == LayoutBlockBox::CloseResult::LAYOUT_SELF)
 	{
 		// Scrollbars added to flex container, it needs to be formatted again to account for changed width or height.
 		absolutely_positioned_elements.clear();
@@ -420,7 +420,7 @@ bool LayoutEngine::FormatElementFlex(LayoutBlockBox* block_context_box, Element*
 		flex_block_context_box->GetBox().SetContent(formatted_content_size);
 		flex_block_context_box->ExtendInnerContentSize(content_overflow_size);
 
-		if (flex_block_context_box->Close() == LayoutBlockBox::LAYOUT_PARENT)
+		if (flex_block_context_box->Close() == LayoutBlockBox::CloseResult::LAYOUT_PARENT)
 			return false;
 	}
 
@@ -467,7 +467,7 @@ bool LayoutEngine::FormatElementTable(LayoutBlockBox* block_context_box, Element
 	table_block_context_box->ExtendInnerContentSize(table_content_overflow_size);
 
 	// If the close failed, it probably means that its parent produced scrollbars.
-	if (table_block_context_box->Close() != LayoutBlockBox::OK)
+	if (table_block_context_box->Close() != LayoutBlockBox::CloseResult::OK)
 		return false;
 
 	return true;

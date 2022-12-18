@@ -37,10 +37,19 @@ namespace Rml {
 
 class LayoutBlockBoxSpace;
 class LayoutEngine;
+class InlineContainer;
 
-class LayoutBlockLevelBox {
+class BlockLevelBox {
 public:
+	enum class CloseResult { OK, LAYOUT_SELF, LAYOUT_PARENT };
+
 	enum class Type { BlockContainer, InlineContainer, FlexContainer, TableWrapper, Replaced };
+	Type GetType() const { return type; }
+
+	virtual ~BlockLevelBox() = default;
+
+protected:
+	BlockLevelBox(Type type) : type(type) {}
 
 private:
 	Type type;
@@ -49,10 +58,9 @@ private:
 /**
     @author Peter Curry
  */
-class LayoutBlockBox {
+// TODO BlockContainer
+class LayoutBlockBox final : public BlockLevelBox {
 public:
-	enum CloseResult { OK, LAYOUT_SELF, LAYOUT_PARENT };
-
 	/// Creates a new block box for rendering a block element.
 	/// @param parent[in] The parent of this block box. This will be nullptr for the root element.
 	/// @param element[in] The element this block box is laying out.
@@ -71,6 +79,7 @@ public:
 	/// @param child[in] The closing child block box.
 	/// @return False if the block box caused an automatic vertical scrollbar to appear, forcing an entire reformat of the block box.
 	bool CloseBlockBox(LayoutBlockBox* child);
+	bool CloseBlockBox(InlineContainer* child);
 
 	/// Adds a new block element to this block-context box.
 	/// @param element[in] The new block element.
@@ -159,6 +168,10 @@ private:
 		Vector2f position;
 	};
 
+	InlineContainer* GetOpenInlineContainer();
+
+	const LayoutBlockBox* GetOpenBlockContainer() const;
+
 	// Closes our last block box, if it is an open inline block box.
 	CloseResult CloseInlineBlockBox();
 
@@ -171,7 +184,7 @@ private:
 	bool CatchVerticalOverflow(float cursor = -1);
 
 	using AbsoluteElementList = Vector<AbsoluteElement>;
-	using BlockBoxList = Vector<UniquePtr<LayoutBlockBox>>;
+	using BlockBoxList = Vector<UniquePtr<BlockLevelBox>>;
 
 	// The object managing our space, as occupied by floating elements of this box and our ancestors.
 	LayoutBlockBoxSpace* space;
@@ -224,17 +237,17 @@ private:
 
 	// Used by block contexts only; if true, we've enabled our vertical scrollbar.
 	bool vertical_overflow;
+
+	friend class InlineContainer; // TODO remove
 };
 
-class LayoutRootInlineBox {
+class InlineContainer final : public BlockLevelBox {
 public:
-	enum CloseResult { OK, LAYOUT_SELF, LAYOUT_PARENT };
-
 	/// Creates a new block box in an inline context.
 	/// @param parent[in] The parent of this block box.
-	LayoutRootInlineBox(LayoutBlockBox* parent);
+	InlineContainer(LayoutBlockBox* parent);
 
-	~LayoutRootInlineBox();
+	~InlineContainer();
 
 	/// Closes the box. This will determine the element's height (if it was unspecified).
 	/// @return The result of the close; this may request a reformat of this element or our parent.
@@ -319,6 +332,8 @@ private:
 	LineBoxList line_boxes;
 	// Used by inline contexts only; stores any floating elements that are waiting for a line break to be positioned.
 	ElementList float_elements;
+
+	friend class LayoutBlockBox; // TODO remove
 };
 
 } // namespace Rml

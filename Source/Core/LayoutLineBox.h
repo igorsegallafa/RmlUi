@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -33,16 +33,15 @@
 
 namespace Rml {
 
-class LayoutBlockBox;
+class InlineContainer;
 
 /**
-	@author Peter Curry
+    @author Peter Curry
  */
 
-class LayoutLineBox
-{
+class LayoutLineBox {
 public:
-	LayoutLineBox(LayoutBlockBox* parent);
+	LayoutLineBox(InlineContainer* parent);
 	~LayoutLineBox();
 
 	/// Closes the line box, positioning all inline elements within it.
@@ -86,7 +85,9 @@ public:
 	LayoutInlineBox* GetOpenInlineBox();
 	/// Returns the line's containing block box.
 	/// @return The line's block box.
-	LayoutBlockBox* GetBlockBox();
+	InlineContainer* GetBlockBox();
+	// Returns the line's block container.
+	const LayoutBlockBox* GetBlockContainer() const;
 
 	float GetBoxCursor() const;
 
@@ -102,10 +103,10 @@ private:
 	/// Appends an inline box to the end of the line box's list of inline boxes. Returns a pointer to the appended box.
 	LayoutInlineBox* AppendBox(UniquePtr<LayoutInlineBox> box);
 
-	using InlineBoxList = Vector< UniquePtr<LayoutInlineBox> >;
+	using InlineBoxList = Vector<UniquePtr<LayoutInlineBox>>;
 
-	// The block box containing this line.
-	LayoutBlockBox* parent;
+	// The block-level box containing this line.
+	InlineContainer* parent;
 
 	// The top-left position of the line box; this is set when the first inline box is placed.
 	Vector2f position;

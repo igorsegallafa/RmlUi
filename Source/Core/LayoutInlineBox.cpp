@@ -315,7 +315,7 @@ void LayoutInlineBox::PositionElement()
 		position.y += box.GetEdge(Box::MARGIN, Box::TOP);
 
 	if (!chained)
-		element->SetOffset(line->GetRelativePosition() + position, line->GetBlockBox()->GetOffsetParent()->GetElement());
+		element->SetOffset(line->GetRelativePosition() + position, line->GetBlockContainer()->GetOffsetParent()->GetElement());
 }
 
 // Sizes the inline box's element.
@@ -419,7 +419,7 @@ void LayoutInlineBox::operator delete(void* chunk, size_t size)
 FontFaceHandle LayoutInlineBox::GetParentFont() const
 {
 	if (parent == nullptr)
-		return line->GetBlockBox()->GetParent()->GetElement()->GetFontFaceHandle();
+		return line->GetBlockContainer()->GetElement()->GetFontFaceHandle();
 	else
 		return parent->GetElement()->GetFontFaceHandle();
 }
