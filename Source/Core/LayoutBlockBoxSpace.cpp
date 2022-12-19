@@ -63,7 +63,7 @@ Vector2f LayoutBlockBoxSpace::NextBoxPosition(float& box_width, float cursor, co
 }
 
 // Generates and sets the position for a floating box of a given size within our block box.
-float LayoutBlockBoxSpace::PlaceFloat(float cursor, Element* element)
+float LayoutBlockBoxSpace::PlaceFloat(Element* element, float cursor)
 {
 	Vector2f element_size = element->GetBox().GetSize(Box::MARGIN);
 	Style::Float float_property = element->GetComputedValues().float_();

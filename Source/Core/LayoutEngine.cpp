@@ -104,7 +104,7 @@ struct DebugDumpLayoutTree {
 		if (g_debug_dumping_layout_tree)
 		{
 			const String header = ":: " + LayoutElementName(element) + " ::\n";
-			const String layout_tree = header + block_box->DumpTree();
+			const String layout_tree = header + block_box->DumpLayoutTree();
 			if (SystemInterface* system_interface = GetSystemInterface())
 				system_interface->LogMessage(Log::LT_INFO, layout_tree);
 

@@ -63,10 +63,10 @@ public:
 
 	/// Generates and sets the position for a floating box of a given size within our block box. The element's box
 	/// is then added into our list of floating boxes.
-	/// @param[in] cursor The ideal vertical position for the box.
 	/// @param[in] element The element to position.
+	/// @param[in] cursor The ideal vertical position for the box.
 	/// @return The offset of the bottom outer edge of the element.
-	float PlaceFloat(float cursor, Element* element);
+	float PlaceFloat(Element* element, float cursor);
 
 	/// Determines the appropriate vertical position for an object that is choosing to clear floating elements to
 	/// the left or right (or both).

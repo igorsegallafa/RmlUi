@@ -149,7 +149,7 @@ BlockContainer::CloseResult BlockContainer::Close()
 		box.SetContent(content_area);
 	}
 
-	visible_overflow_size = Vector2f(0);
+	Vector2f visible_overflow_size;
 
 	// Set the computed box on the element.
 	if (element)
@@ -210,11 +210,14 @@ BlockContainer::CloseResult BlockContainer::Close()
 		element->GetElementScroll()->FormatScrollbars();
 	}
 
+	SetVisibleOverflowSize(visible_overflow_size);
+
 	// Increment the parent's cursor.
 	if (parent)
 	{
 		// If this close fails, it means this block box has caused our parent block box to generate an automatic vertical scrollbar.
-		if (!parent->CloseBlockBox(this))
+		const float self_position_top = position.y - box.GetEdge(Box::MARGIN, Box::TOP);
+		if (!parent->CloseBlockBox(this, self_position_top, box.GetSize(Box::MARGIN).y))
 			return CloseResult::LayoutParent;
 	}
 
@@ -234,7 +237,6 @@ BlockContainer::CloseResult BlockContainer::Close()
 		// This is a special rule for inline-blocks (see CSS 2.1 Sec. 10.8.1).
 		if (element->GetDisplay() == Style::Display::InlineBlock)
 		{
-			// TODO: Move this into InlineContainer
 			bool found_baseline = false;
 			float baseline = 0;
 
@@ -243,13 +245,7 @@ BlockContainer::CloseResult BlockContainer::Close()
 				if (block_boxes[i]->GetType() == Type::InlineContainer)
 				{
 					InlineContainer* inline_container = static_cast<InlineContainer*>(block_boxes[i].get());
-					const auto& line_boxes = inline_container->line_boxes;
-					for (int j = (int)line_boxes.size() - 1; j >= 0; j--)
-					{
-						found_baseline = line_boxes[j]->GetBaselineOfLastLine(baseline);
-						if (found_baseline)
-							break;
-					}
+					found_baseline = inline_container->GetBaselineOfLastLine(baseline);
 					if (found_baseline)
 						break;
 				}
@@ -270,29 +266,14 @@ BlockContainer::CloseResult BlockContainer::Close()
 	return CloseResult::OK;
 }
 
-// Called by a closing block box child.
-bool BlockContainer::CloseBlockBox(BlockContainer* child)
+bool BlockContainer::CloseBlockBox(BlockLevelBox* child, float child_position_top, float child_size_y)
 {
-	const float child_position_y = child->GetPosition().y - child->box.GetEdge(Box::MARGIN, Box::TOP) - (box.GetPosition().y + position.y);
-
-	box_cursor = child_position_y + child->GetBox().GetSize(Box::MARGIN).y;
+	const float child_position_y = child_position_top - (box.GetPosition().y + position.y);
+	box_cursor = child_position_y + child_size_y;
 
 	// Extend the inner content size. The vertical size can be larger than the box_cursor due to overflow.
-	inner_content_size.x = Math::Max(inner_content_size.x, child->visible_overflow_size.x);
-	inner_content_size.y = Math::Max(inner_content_size.y, child_position_y + child->visible_overflow_size.y);
-
-	return CatchVerticalOverflow();
-}
-
-bool BlockContainer::CloseBlockBox(InlineContainer* child)
-{
-	// TODO: Almost same as above
-	const float child_position_y = child->GetPosition().y - (box.GetPosition().y + position.y);
-	box_cursor = child_position_y + child->box_size.y;
-
-	// Extend the inner content size. The vertical size can be larger than the box_cursor due to overflow.
-	inner_content_size.x = Math::Max(inner_content_size.x, child->visible_overflow_size.x);
-	inner_content_size.y = Math::Max(inner_content_size.y, child_position_y + child->visible_overflow_size.y);
+	inner_content_size.x = Math::Max(inner_content_size.x, child->GetVisibleOverflowSize().x);
+	inner_content_size.y = Math::Max(inner_content_size.y, child_position_y + child->GetVisibleOverflowSize().y);
 
 	return CatchVerticalOverflow();
 }
@@ -301,11 +282,14 @@ BlockContainer* BlockContainer::AddBlockElement(Element* element, const Box& box
 {
 	RMLUI_ZoneScoped;
 
-	// Check if our most previous block box is rendering in an inline context.
+	// Close the inline container if there is one open.
 	if (InlineContainer* inline_container = GetOpenInlineContainer())
 	{
-		// TODO: Probably want to move this functionality into inline container.
-		LayoutInlineBox* open_inline_box = inline_container->line_boxes.back()->GetOpenInlineBox();
+		LayoutInlineBox* open_inline_box = nullptr;
+
+		if (inline_container->Close(&open_inline_box) != CloseResult::OK)
+			return nullptr;
+
 		if (open_inline_box)
 		{
 			// There's an open inline box chain, which means this block element is parented to it. The chain needs to
@@ -314,16 +298,7 @@ BlockContainer* BlockContainer::AddBlockElement(Element* element, const Box& box
 			// all, we need to close the inline box; this will position the last line if necessary, but it will also
 			// create a new line in the inline block box; we want this line to be in an inline box after our block
 			// element.
-			if (inline_container->Close() != CloseResult::OK)
-				return nullptr;
-
 			interrupted_chain = open_inline_box;
-		}
-		else
-		{
-			// There are no open inline boxes, so this inline box just needs to be closed.
-			if (CloseInlineBlockBox() != CloseResult::OK)
-				return nullptr;
 		}
 	}
 
@@ -336,31 +311,24 @@ LayoutInlineBox* BlockContainer::AddInlineElement(Element* element, const Box& b
 {
 	RMLUI_ZoneScoped;
 
-	LayoutInlineBox* inline_box;
-
 	// If we have an open child rendering in an inline context, we can add this element into it.
-	if (InlineContainer* inline_container = GetOpenInlineContainer())
+	InlineContainer* inline_container = GetOpenInlineContainer();
+
+	// Otherwise, we open a new inline container.
+	if (!inline_container)
 	{
-		// TODO: Probably want to move this functionality into inline container.
-		inline_box = inline_container->AddInlineElement(element, box);
-	}
-	// No dice! Ah well, nothing for it but to open a new inline context block box.
-	else
-	{
-		auto inline_container_ptr = MakeUnique<InlineContainer>(this);
+		auto inline_container_ptr = MakeUnique<InlineContainer>(this, wrap_content);
 		inline_container = inline_container_ptr.get();
 		block_boxes.push_back(std::move(inline_container_ptr));
 
 		if (interrupted_chain)
 		{
-			// TODO: Move into inline container
-			inline_container->line_boxes.back()->AddChainedBox(interrupted_chain);
+			inline_container->AddChainedBox(interrupted_chain);
 			interrupted_chain = nullptr;
 		}
-
-		// TODO: Move into inline container
-		inline_box = inline_container->AddInlineElement(element, box);
 	}
+
+	LayoutInlineBox* inline_box = inline_container->AddInlineElement(element, box);
 
 	return inline_box;
 }
@@ -368,18 +336,12 @@ LayoutInlineBox* BlockContainer::AddInlineElement(Element* element, const Box& b
 // Adds a line-break to this block box.
 void BlockContainer::AddBreak()
 {
-	float line_height = element->GetLineHeight();
+	const float line_height = element->GetLineHeight();
 
 	// Check for an inline box as our last child; if so, we can simply end its line and bail.
 	if (InlineContainer* inline_container = GetOpenInlineContainer())
 	{
-		// TODO: Move into inline container
-		LayoutLineBox* last_line = inline_container->line_boxes.back().get();
-		if (last_line->GetDimensions().y < 0)
-			inline_container->box_cursor += line_height;
-		else
-			last_line->Close();
-
+		inline_container->AddBreak(line_height);
 		return;
 	}
 
@@ -390,11 +352,9 @@ void BlockContainer::AddBreak()
 // Adds an element to this block box to be handled as a floating element.
 bool BlockContainer::AddFloatElement(Element* element)
 {
-	// If we have an open inline block box, then we have to position the box a little differently.
+	// If we have an open inline block box, then we have to position the box a little differently, queue it for later.
 	if (InlineContainer* inline_container = GetOpenInlineContainer())
-		// TODO: Move into inline container
-		inline_container->float_elements.push_back(element);
-
+		queued_float_elements.push_back(element);
 	// Nope ... just place it!
 	else
 		PlaceFloat(element);
@@ -412,11 +372,7 @@ void BlockContainer::AddAbsoluteElement(Element* element)
 	// If we have an open inline-context block box as our last child, then the absolute element must appear after it,
 	// but not actually close the box.
 	if (InlineContainer* inline_container = GetOpenInlineContainer())
-	{
-		// TODO: Move into inline container
-		float last_line_height = inline_container->line_boxes.back()->GetDimensions().y;
-		absolute_element.position.y += (inline_container->box_cursor + Math::Max(0.0f, last_line_height));
-	}
+		absolute_element.position.y += inline_container->GetHeightIncludingOpenLine();
 
 	// Find the positioned parent for this element.
 	BlockContainer* absolute_parent = this;
@@ -519,6 +475,17 @@ Vector2f BlockContainer::NextLineBoxPosition(float& box_width, bool& _wrap_conte
 	return box_position;
 }
 
+void BlockContainer::PlaceQueuedFloats(float vertical_offset)
+{
+	if (!queued_float_elements.empty())
+	{
+		for (Element* float_element : queued_float_elements)
+			PlaceFloat(float_element, vertical_offset);
+
+		queued_float_elements.clear();
+	}
+}
+
 // Calculate the dimensions of the box's internal content width; i.e. the size of the largest line.
 float BlockContainer::GetShrinkToFitWidth() const
 {
@@ -527,7 +494,7 @@ float BlockContainer::GetShrinkToFitWidth() const
 	auto get_content_width_from_children = [this, &content_width]() {
 		for (size_t i = 0; i < block_boxes.size(); i++)
 		{
-			// TODO: Ugly design. Doesn't account for all types. Use virtual?
+			// TODO: Bad design. Doesn't account for all types. Use virtual?
 			if (block_boxes[i]->GetType() == Type::BlockContainer)
 			{
 				BlockContainer* block_child = static_cast<BlockContainer*>(block_boxes[i].get());
@@ -574,11 +541,6 @@ float BlockContainer::GetShrinkToFitWidth() const
 	return content_width;
 }
 
-Vector2f BlockContainer::GetVisibleOverflowSize() const
-{
-	return visible_overflow_size;
-}
-
 void BlockContainer::ExtendInnerContentSize(Vector2f _inner_content_size)
 {
 	inner_content_size.x = Math::Max(inner_content_size.x, _inner_content_size.x);
@@ -595,6 +557,11 @@ Element* BlockContainer::GetElement() const
 BlockContainer* BlockContainer::GetParent() const
 {
 	return parent;
+}
+
+LayoutBlockBoxSpace* BlockContainer::GetBlockBoxSpace() const
+{
+	return space.get();
 }
 
 // Returns the position of the block box, relative to its parent's content area.
@@ -632,19 +599,7 @@ String BlockContainer::DumpTree(int depth) const
 	String value = String(depth * 2, ' ') + "BlockContainer" + " | " + LayoutElementName(element) + '\n';
 
 	for (auto&& block_box : block_boxes)
-	{
-		// TODO: Ugly design. Doesn't account for all types. Use virtual?
-		if (block_box->GetType() == Type::BlockContainer)
-		{
-			BlockContainer* block_child = static_cast<BlockContainer*>(block_box.get());
-			value += block_child->DumpTree(depth + 1);
-		}
-		else if (block_box->GetType() == Type::InlineContainer)
-		{
-			InlineContainer* block_child = static_cast<InlineContainer*>(block_box.get());
-			value += block_child->DumpTree(depth + 1);
-		}
-	}
+		value += block_box->DumpLayoutTree(depth + 1);
 
 	return value;
 }
@@ -687,7 +642,7 @@ BlockContainer::CloseResult BlockContainer::CloseInlineBlockBox()
 void BlockContainer::PlaceFloat(Element* element, float offset)
 {
 	const Vector2f box_position = NextBoxPosition();
-	space->PlaceFloat(box_position.y + offset, element);
+	space->PlaceFloat(element, box_position.y + offset);
 }
 
 // Checks if we have a new vertical overflow on an auto-scrolling element.
@@ -731,16 +686,14 @@ bool BlockContainer::CatchVerticalOverflow(float cursor)
  *
  */
 
-InlineContainer::InlineContainer(BlockContainer* _parent) : BlockLevelBox(Type::InlineContainer), position(-1, -1)
+InlineContainer::InlineContainer(BlockContainer* _parent, bool _wrap_content) : BlockLevelBox(Type::InlineContainer), position(-1, -1)
 {
 	RMLUI_ASSERT(_parent);
 
 	parent = _parent;
 
-	space = _parent->space.get();
-
 	line_boxes.push_back(MakeUnique<LayoutLineBox>(this));
-	wrap_content = _parent->wrap_content;
+	wrap_content = _wrap_content;
 
 	box_cursor = 0;
 
@@ -751,8 +704,12 @@ InlineContainer::InlineContainer(BlockContainer* _parent) : BlockLevelBox(Type::
 
 InlineContainer::~InlineContainer() {}
 
-InlineContainer::CloseResult InlineContainer::Close()
+InlineContainer::CloseResult InlineContainer::Close(LayoutInlineBox** out_open_inline_box)
 {
+	// The parent container may need the open inline box to be split and resumed.
+	if (out_open_inline_box)
+		*out_open_inline_box = line_boxes.back()->GetOpenInlineBox();
+
 	// We're an inline context box; so close our last line, which will still be open.
 	line_boxes.back()->Close();
 
@@ -764,7 +721,7 @@ InlineContainer::CloseResult InlineContainer::Close()
 	if (box_size.y < 0)
 		box_size.y = Math::Max(box_cursor, 0.f);
 
-	visible_overflow_size = Vector2f(0);
+	Vector2f visible_overflow_size;
 
 	// Find the largest line in this layout block
 	for (size_t i = 0; i < line_boxes.size(); i++)
@@ -773,11 +730,13 @@ InlineContainer::CloseResult InlineContainer::Close()
 		visible_overflow_size.x = Math::Max(visible_overflow_size.x, line_box->GetBoxCursor());
 	}
 
+	SetVisibleOverflowSize(visible_overflow_size);
+
 	// Increment the parent's cursor.
 	if (parent)
 	{
 		// If this close fails, it means this block box has caused our parent block box to generate an automatic vertical scrollbar.
-		if (!parent->CloseBlockBox(this))
+		if (!parent->CloseBlockBox(this, position.y, box_size.y))
 			return CloseResult::LayoutParent;
 	}
 
@@ -792,13 +751,7 @@ LayoutInlineBox* InlineContainer::CloseLineBox(LayoutLineBox* child, UniquePtr<L
 		box_cursor = (child->GetPosition().y - position.y) + child->GetDimensions().y;
 
 	// If we have any pending floating elements for our parent, then this would be an ideal time to place them.
-	if (!float_elements.empty())
-	{
-		for (size_t i = 0; i < float_elements.size(); ++i)
-			parent->PlaceFloat(float_elements[i], box_cursor);
-
-		float_elements.clear();
-	}
+	parent->PlaceQueuedFloats(box_cursor);
 
 	// Add a new line box.
 	line_boxes.push_back(MakeUnique<LayoutLineBox>(this));
@@ -818,13 +771,29 @@ LayoutInlineBox* InlineContainer::AddInlineElement(Element* element, const Box& 
 	return line_boxes.back()->AddElement(element, box);
 }
 
+void InlineContainer::AddBreak(float line_height)
+{
+	// Increment by the line height if no line is open, otherwise simply end the line.
+	LayoutLineBox* last_line = line_boxes.back().get();
+	if (last_line->GetDimensions().y < 0)
+		box_cursor += line_height;
+	else
+		last_line->Close();
+}
+
+void InlineContainer::AddChainedBox(LayoutInlineBox* chained_box)
+{
+	line_boxes.back()->AddChainedBox(chained_box);
+}
+
 Vector2f InlineContainer::NextBoxPosition(float top_margin, Style::Clear clear_property) const
 {
 	// If our element is establishing a new offset hierarchy, then any children of ours don't inherit our offset.
 	Vector2f box_position = GetPosition();
 	box_position.y += box_cursor;
 
-	float clear_margin = space->DetermineClearPosition(box_position.y + top_margin, clear_property) - (box_position.y + top_margin);
+	float clear_margin =
+		parent->GetBlockBoxSpace()->DetermineClearPosition(box_position.y + top_margin, clear_property) - (box_position.y + top_margin);
 	if (clear_margin > 0)
 		box_position.y += clear_margin;
 
@@ -842,7 +811,7 @@ Vector2f InlineContainer::NextBlockBoxPosition(const Box& box, Style::Clear clea
 Vector2f InlineContainer::NextLineBoxPosition(float& box_width, bool& _wrap_content, const Vector2f dimensions) const
 {
 	const Vector2f cursor = NextBoxPosition();
-	const Vector2f box_position = space->NextBoxPosition(box_width, cursor.y, dimensions);
+	const Vector2f box_position = parent->GetBlockBoxSpace()->NextBoxPosition(box_width, cursor.y, dimensions);
 
 	// Also, probably shouldn't check for widths when positioning the box?
 	_wrap_content = wrap_content;
@@ -867,11 +836,6 @@ float InlineContainer::GetShrinkToFitWidth() const
 	return content_width;
 }
 
-Vector2f InlineContainer::GetVisibleOverflowSize() const
-{
-	return visible_overflow_size;
-}
-
 // Returns the block box's parent.
 BlockContainer* InlineContainer::GetParent() const
 {
@@ -882,6 +846,24 @@ BlockContainer* InlineContainer::GetParent() const
 Vector2f InlineContainer::GetPosition() const
 {
 	return position;
+}
+
+float InlineContainer::GetHeightIncludingOpenLine() const
+{
+	float last_line_height = line_boxes.back()->GetDimensions().y;
+	return box_cursor + Math::Max(0.0f, last_line_height);
+}
+
+bool InlineContainer::GetBaselineOfLastLine(float& out_baseline) const
+{
+	bool found_baseline = false;
+	for (int j = (int)line_boxes.size() - 1; j >= 0; j--)
+	{
+		found_baseline = line_boxes[j]->GetBaselineOfLastLine(out_baseline);
+		if (found_baseline)
+			break;
+	}
+	return found_baseline;
 }
 
 String InlineContainer::DumpTree(int depth) const

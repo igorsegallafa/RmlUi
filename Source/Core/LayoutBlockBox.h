@@ -41,18 +41,33 @@ class InlineContainer;
 
 class BlockLevelBox {
 public:
+	enum class Type { BlockContainer, InlineContainer, FlexContainer, TableWrapper, Replaced };
 	enum class CloseResult { OK, LayoutSelf, LayoutParent };
 
-	enum class Type { BlockContainer, InlineContainer, FlexContainer, TableWrapper, Replaced };
 	Type GetType() const { return type; }
+
+	// Returns the outer size of this box including overflowing content. Similar to scroll width, but shrinked if overflow is caught
+	// here. This can be wider than the box if we are overflowing.
+	// @note Only available after the box has been closed.
+	Vector2f GetVisibleOverflowSize() const { return visible_overflow_size; }
+
+	// Debug dump layout tree.
+	String DumpLayoutTree(int depth = 0) const { return DumpTree(depth); }
 
 	virtual ~BlockLevelBox() = default;
 
 protected:
 	BlockLevelBox(Type type) : type(type) {}
 
+	void SetVisibleOverflowSize(Vector2f new_visible_overflow_size) { visible_overflow_size = new_visible_overflow_size; }
+
+	// Debug dump layout tree.
+	virtual String DumpTree(int depth) const = 0;
+
 private:
 	Type type;
+
+	Vector2f visible_overflow_size;
 };
 
 /**
@@ -75,10 +90,11 @@ public:
 	CloseResult Close();
 
 	/// Called by a closing block box child. Increments the cursor.
-	/// @param child[in] The closing child block box.
+	/// @param[in] child The closing child block-level box.
+	/// @param[in] child_position_top The position of the child, relative to this container.
+	/// @param[in] child_size_y The vertical margin size of the child.
 	/// @return False if the block box caused an automatic vertical scrollbar to appear, forcing an entire reformat of the block box.
-	bool CloseBlockBox(BlockContainer* child);
-	bool CloseBlockBox(InlineContainer* child);
+	bool CloseBlockBox(BlockLevelBox* child, float child_position_top, float child_size_y);
 
 	/// Adds a new block element to this block-context box.
 	/// @param element[in] The new block element.
@@ -124,20 +140,22 @@ public:
 	/// @return The line box position.
 	Vector2f NextLineBoxPosition(float& out_box_width, bool& out_wrap_content, Vector2f dimensions) const;
 
+	// Places all queued floating elements.
+	void PlaceQueuedFloats(float vertical_offset);
+
 	/// Calculate the dimensions of the box's internal content width; i.e. the size used to calculate the shrink-to-fit width.
 	float GetShrinkToFitWidth() const;
-	/// Get the visible overflow size. Note: This is only well-defined after the layout box has been closed.
-	Vector2f GetVisibleOverflowSize() const;
 	/// Set the inner content size if it is larger than the current value on each axis individually.
 	void ExtendInnerContentSize(Vector2f inner_content_size);
 
 	/// Returns the block box's element.
-	/// @return The block box's element.
 	Element* GetElement() const;
 
 	/// Returns the block box's parent.
-	/// @return The block box's parent.
 	BlockContainer* GetParent() const;
+
+	/// Returns the block box space.
+	LayoutBlockBoxSpace* GetBlockBoxSpace() const;
 
 	/// Returns the position of the block box, relative to its parent's content area.
 	/// @return The relative position of the block box.
@@ -154,9 +172,6 @@ public:
 	Box& GetBox();
 	/// Returns the block box's dimension box.
 	const Box& GetBox() const;
-
-	// Debug dump layout tree.
-	String DumpTree(int depth = 0) const;
 
 	void* operator new(size_t size);
 	void operator delete(void* chunk, size_t size);
@@ -180,6 +195,9 @@ private:
 	// be enabled and our block boxes will be destroyed. All content will need to re-formatted. Returns true if no
 	// overflow occured, false if it did.
 	bool CatchVerticalOverflow(float cursor = -1);
+
+	// Debug dump layout tree.
+	String DumpTree(int depth) const override;
 
 	using AbsoluteElementList = Vector<AbsoluteElement>;
 	using BlockBoxList = Vector<UniquePtr<BlockLevelBox>>;
@@ -216,6 +234,8 @@ private:
 	ElementList relative_elements;
 	// Used by block contexts only; stores the block box space managing our space, as occupied by floating elements of this box and our ancestors.
 	UniquePtr<LayoutBlockBoxSpace> space;
+	// Stores any floating elements that are waiting for a line break to be positioned.
+	ElementList queued_float_elements;
 	// Used by block contexts only; stores an inline element hierarchy that was interrupted by a child block box.
 	// The hierarchy will be resumed in an inline-context box once the intervening block box is completed.
 	LayoutInlineBox* interrupted_chain;
@@ -223,30 +243,25 @@ private:
 	Style::Overflow overflow_x_property;
 	Style::Overflow overflow_y_property;
 
-	// The outer size of this box including overflowing content. Similar to scroll width, but shrinked if overflow is caught here.
-	//   This can be wider than the box if we are overflowing. Only available after the box has been closed.
-	Vector2f visible_overflow_size;
 	// The inner content size (excluding any padding/border/margins).
 	// This is extended as child block boxes are closed, or from external formatting contexts.
 	Vector2f inner_content_size;
 
 	// Used by block contexts only; if true, we've enabled our vertical scrollbar.
 	bool vertical_overflow;
-
-	friend class InlineContainer; // TODO remove
 };
 
 class InlineContainer final : public BlockLevelBox {
 public:
 	/// Creates a new block box in an inline context.
-	/// @param parent[in] The parent of this block box.
-	InlineContainer(BlockContainer* parent);
+	InlineContainer(BlockContainer* parent, bool wrap_content);
 
 	~InlineContainer();
 
 	/// Closes the box. This will determine the element's height (if it was unspecified).
+	/// @param[out] Optionally, output the open inline box.
 	/// @return The result of the close; this may request a reformat of this element or our parent.
-	CloseResult Close();
+	CloseResult Close(LayoutInlineBox** out_open_inline_box = nullptr);
 
 	/// Called by a closing line box child. Increments the cursor, and creates a new line box to fit the overflow (if any).
 	/// @param child[in] The closing child line box.
@@ -261,6 +276,13 @@ public:
 	/// @param box[in] The box defining the element's bounds.
 	/// @return The inline box representing the element. Once the element's children have been positioned, Close() must be called on it.
 	LayoutInlineBox* AddInlineElement(Element* element, const Box& box);
+
+	/// Add a break to the last line.
+	void AddBreak(float line_height);
+
+	/// Adds an inline box for resuming an inline box that has been split.
+	/// @param[in] chained_box The box overflowed from a previous line.
+	void AddChainedBox(LayoutInlineBox* chained_box);
 
 	/// Returns the offset from the top-left corner of this box's offset element the next child box will be positioned at.
 	/// @param[in] top_margin The top margin of the box. This will be collapsed as appropriate against other block boxes.
@@ -282,28 +304,29 @@ public:
 
 	/// Calculate the dimensions of the box's internal content width; i.e. the size used to calculate the shrink-to-fit width.
 	float GetShrinkToFitWidth() const;
-	/// Get the visible overflow size. Note: This is only well-defined after the layout box has been closed.
-	Vector2f GetVisibleOverflowSize() const;
 
 	/// Returns the block box's parent.
-	/// @return The block box's parent.
 	BlockContainer* GetParent() const;
 
 	/// Returns the position of the block box, relative to its parent's content area.
-	/// @return The relative position of the block box.
 	Vector2f GetPosition() const;
 
+	/// Returns the height of this inline container, including the last line even if it is still open.
+	float GetHeightIncludingOpenLine() const;
+
+	/// Get the baseline of the last line.
+	/// @param[out] out_baseline
+	/// @return True if the baseline was found.
+	bool GetBaselineOfLastLine(float& out_baseline) const;
+
 	// Debug dump layout tree.
-	String DumpTree(int depth = 0) const;
+	String DumpTree(int depth) const override;
 
 	void* operator new(size_t size);
 	void operator delete(void* chunk, size_t size);
 
 private:
 	using LineBoxList = Vector<UniquePtr<LayoutLineBox>>;
-
-	// The object managing our space, as occupied by floating elements of this box and our ancestors.
-	LayoutBlockBoxSpace* space;
 
 	// The box's block parent. This will be nullptr for the root of the box tree.
 	BlockContainer* parent;
@@ -319,16 +342,8 @@ private:
 	// The vertical position of the next block box to be added to this box, relative to the top of this box.
 	float box_cursor;
 
-	// The outer size of this box including overflowing content. Similar to scroll width, but shrinked if overflow is caught here.
-	//   This can be wider than the box if we are overflowing. Only available after the box has been closed.
-	Vector2f visible_overflow_size;
-
 	// Used by inline contexts only; stores the list of line boxes flowing inline content.
 	LineBoxList line_boxes;
-	// Used by inline contexts only; stores any floating elements that are waiting for a line break to be positioned.
-	ElementList float_elements;
-
-	friend class BlockContainer; // TODO remove
 };
 
 } // namespace Rml
