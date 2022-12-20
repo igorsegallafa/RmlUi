@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -46,7 +46,9 @@ Vector2f LayoutTable::FormatTable(Box& box, Vector2f min_size, Vector2f max_size
 	if (!(computed_table.overflow_x() == Style::Overflow::Visible || computed_table.overflow_x() == Style::Overflow::Hidden) ||
 		!(computed_table.overflow_y() == Style::Overflow::Visible || computed_table.overflow_y() == Style::Overflow::Hidden))
 	{
-		Log::Message(Log::LT_WARNING, "Table elements can only have 'overflow' property values of 'visible' or 'hidden'. Table will not be formatted: %s.", element_table->GetAddress().c_str());
+		Log::Message(Log::LT_WARNING,
+			"Table elements can only have 'overflow' property values of 'visible' or 'hidden'. Table will not be formatted: %s.",
+			element_table->GetAddress().c_str());
 		return Vector2f(0);
 	}
 
@@ -64,10 +66,8 @@ Vector2f LayoutTable::FormatTable(Box& box, Vector2f min_size, Vector2f max_size
 	if (computed_table.height().type != Style::Height::Auto)
 		min_size.y = Math::Max(min_size.y, table_initial_content_size.y);
 
-	const Vector2f table_gap = Vector2f(
-		ResolveValue(computed_table.column_gap(), table_initial_content_size.x), 
-		ResolveValue(computed_table.row_gap(), table_initial_content_size.y)
-	);
+	const Vector2f table_gap = Vector2f(ResolveValue(computed_table.column_gap(), table_initial_content_size.x),
+		ResolveValue(computed_table.row_gap(), table_initial_content_size.y));
 
 	TableGrid grid;
 	grid.Build(element_table);
@@ -83,11 +83,11 @@ Vector2f LayoutTable::FormatTable(Box& box, Vector2f min_size, Vector2f max_size
 	return layout_table.table_content_overflow_size;
 }
 
-
 LayoutTable::LayoutTable(Element* element_table, const TableGrid& grid, Vector2f table_gap, Vector2f table_content_offset,
-	Vector2f table_initial_content_size, bool table_auto_height, Vector2f table_min_size, Vector2f table_max_size)
-	: element_table(element_table), grid(grid), table_auto_height(table_auto_height), table_min_size(table_min_size), table_max_size(table_max_size),
-	table_gap(table_gap), table_content_offset(table_content_offset), table_initial_content_size(table_initial_content_size)
+	Vector2f table_initial_content_size, bool table_auto_height, Vector2f table_min_size, Vector2f table_max_size) :
+	element_table(element_table),
+	grid(grid), table_auto_height(table_auto_height), table_min_size(table_min_size), table_max_size(table_max_size), table_gap(table_gap),
+	table_content_offset(table_content_offset), table_initial_content_size(table_initial_content_size)
 {
 	table_resulting_content_size = table_initial_content_size;
 }
@@ -112,7 +112,7 @@ void LayoutTable::DetermineColumnWidths()
 	// The column widths are determined entirely by any <col> elements preceding the first row, and <td> elements in the first row.
 	// If <col> has a fixed width, that is used. Otherwise, if <td> has a fixed width, that is used. Otherwise the column is 'flexible' width.
 	// All flexible widths are then sized to evenly fill the width of the table.
-	
+
 	// Both <col> and <colgroup> can have border/padding which extend beyond the size of <td> and <col>, respectively.
 	// Margins for <td>, <col>, <colgroup> are merged to produce a single left/right margin for each column, located outside <colgroup>.
 
@@ -196,19 +196,19 @@ void LayoutTable::InitializeCellBoxes()
 void LayoutTable::DetermineRowHeights()
 {
 	/*
-		The table height algorithm works similar to the table width algorithm. The major difference is that 'auto' row height
-		will use the height of the largest formatted cell in the row.
-		
-		Table row height: 
-		  auto: Height of largest cell in row.
-		  length: Fixed size.
-		  percentage < 100%: Fixed size, resolved against table initial height.
-		  percentage >= 100%: Flexible size.
+	    The table height algorithm works similar to the table width algorithm. The major difference is that 'auto' row height
+	    will use the height of the largest formatted cell in the row.
 
-		Table height:
-		  auto: Height is sum of all rows.
-		  length/percentage: Fixed minimum size. If row height sum is larger, increase table size. If row sum is smaller, try to increase
-		                     row heights, but respect max-heights. If table is still larger than row-sum, leave empty space.
+	    Table row height:
+	      auto: Height of largest cell in row.
+	      length: Fixed size.
+	      percentage < 100%: Fixed size, resolved against table initial height.
+	      percentage >= 100%: Flexible size.
+
+	    Table height:
+	      auto: Height is sum of all rows.
+	      length/percentage: Fixed minimum size. If row height sum is larger, increase table size. If row sum is smaller, try to increase
+	                         row heights, but respect max-heights. If table is still larger than row-sum, leave empty space.
 	*/
 
 	// Requires that cell boxes have been initialized.
@@ -234,7 +234,7 @@ void LayoutTable::DetermineRowHeights()
 		{
 			// The padding/border/margin and widths of columns are used.
 			const ComputedAxisSize computed = LayoutDetails::BuildComputedVerticalSize(element_row->GetComputedValues());
-			
+
 			if (computed.size.type == Style::LengthPercentageAuto::Percentage)
 				percentage_size_used = true;
 
@@ -244,11 +244,10 @@ void LayoutTable::DetermineRowHeights()
 
 	if (table_auto_height && percentage_size_used)
 	{
-		Log::Message(Log::LT_WARNING, 
+		Log::Message(Log::LT_WARNING,
 			"Table has one or more rows that use percentages for height. However, initial table height is undefined, thus "
 			"these rows will become flattened. Set a fixed height on the table, or use fixed or 'auto' row heights. In element: %s.",
-			element_table->GetAddress().c_str()
-		);
+			element_table->GetAddress().c_str());
 	}
 
 	// Next, find the height of rows that use auto height.
@@ -260,8 +259,8 @@ void LayoutTable::DetermineRowHeights()
 		if (row_metric.sizing_mode == TrackSizingMode::Auto)
 		{
 			struct CellLastRowComp {
-				bool operator() (const TableGrid::Cell& cell, int i) const { return cell.row_last < i; }
-				bool operator() (int i, const TableGrid::Cell& cell) const { return i < cell.row_last; }
+				bool operator()(const TableGrid::Cell& cell, int i) const { return cell.row_last < i; }
+				bool operator()(int i, const TableGrid::Cell& cell) const { return i < cell.row_last; }
 			};
 
 			// Determine which cells end at this row.
@@ -282,15 +281,16 @@ void LayoutTable::DetermineRowHeights()
 					box.SetContent(element_cell->GetBox().GetSize());
 				}
 
-				// Find the height of the cell which applies only to this row. 
+				// Find the height of the cell which applies only to this row.
 				// In case it spans multiple rows, we must first subtract the height of any previous rows it spans. It is
 				// unsupported if any spanning rows are flexibly sized, in which case we consider their size to be zero.
 				const float gap_from_spanning_rows = table_gap.y * float(grid_cell.row_last - grid_cell.row_begin);
 
-				const float height_from_spanning_rows = std::accumulate(row_metrics.begin() + grid_cell.row_begin, row_metrics.begin() + grid_cell.row_last, gap_from_spanning_rows, [](float acc_height, const TrackMetric& metric) {
-					return acc_height + metric.fixed_size + metric.column_padding_border_a + metric.column_padding_border_b
-						+ metric.group_padding_border_a + metric.group_padding_border_b + metric.sum_margin_a + metric.sum_margin_b;
-				});
+				const float height_from_spanning_rows = std::accumulate(row_metrics.begin() + grid_cell.row_begin,
+					row_metrics.begin() + grid_cell.row_last, gap_from_spanning_rows, [](float acc_height, const TrackMetric& metric) {
+						return acc_height + metric.fixed_size + metric.column_padding_border_a + metric.column_padding_border_b +
+							metric.group_padding_border_a + metric.group_padding_border_b + metric.sum_margin_a + metric.sum_margin_b;
+					});
 
 				const float cell_inrow_height = box.GetSizeAcross(Box::VERTICAL, Box::BORDER) - height_from_spanning_rows;
 
@@ -323,10 +323,7 @@ void LayoutTable::FormatRows()
 		Box box;
 		// We use inline context here because we only care about padding, border, and (non-auto) margin.
 		LayoutDetails::BuildBox(box, table_initial_content_size, element, BoxContext::Inline, 0.0f);
-		const Vector2f content_size(
-			table_resulting_content_size.x - box.GetSizeAcross(Box::HORIZONTAL, Box::MARGIN, Box::PADDING),
-			content_height
-		);
+		const Vector2f content_size(table_resulting_content_size.x - box.GetSizeAcross(Box::HORIZONTAL, Box::MARGIN, Box::PADDING), content_height);
 		box.SetContent(content_size);
 		element->SetBox(box);
 
@@ -355,10 +352,7 @@ void LayoutTable::FormatColumns()
 		Box box;
 		// We use inline context here because we only care about padding, border, and (non-auto) margin.
 		LayoutDetails::BuildBox(box, table_initial_content_size, element, BoxContext::Inline, 0.0f);
-		const Vector2f content_size(
-			content_width,
-			table_resulting_content_size.y - box.GetSizeAcross(Box::VERTICAL, Box::MARGIN, Box::PADDING)
-		);
+		const Vector2f content_size(content_width, table_resulting_content_size.y - box.GetSizeAcross(Box::VERTICAL, Box::MARGIN, Box::PADDING));
 		box.SetContent(content_size);
 		element->SetBox(box);
 
@@ -391,11 +385,9 @@ void LayoutTable::FormatCells()
 		Style::VerticalAlign vertical_align = element_cell->GetComputedValues().vertical_align();
 
 		const float cell_border_height = GetSpanningCellBorderSize(rows, grid_cell.row_begin, grid_cell.row_last);
-		const Vector2f cell_offset = table_content_offset + Vector2f(
-			columns[grid_cell.column_begin].cell_offset,
-			rows[grid_cell.row_begin].cell_offset
-		);
-		
+		const Vector2f cell_offset =
+			table_content_offset + Vector2f(columns[grid_cell.column_begin].cell_offset, rows[grid_cell.row_begin].cell_offset);
+
 		// Determine the height of the cell.
 		if (box.GetSize().y < 0)
 		{
@@ -409,7 +401,8 @@ void LayoutTable::FormatCells()
 			else
 			{
 				// We don't need to add any padding and can thus avoid formatting, just set the height to the row height.
-				box.SetContent(Vector2f(box.GetSize().x, Math::Max(0.0f, cell_border_height - box.GetSizeAcross(Box::VERTICAL, Box::BORDER, Box::PADDING))));
+				box.SetContent(
+					Vector2f(box.GetSize().x, Math::Max(0.0f, cell_border_height - box.GetSizeAcross(Box::VERTICAL, Box::BORDER, Box::PADDING))));
 			}
 		}
 
@@ -435,6 +428,7 @@ void LayoutTable::FormatCells()
 			default:
 				add_padding_top = 0.0f;
 				add_padding_bottom = available_height;
+				break;
 			}
 
 			box.SetEdge(Box::PADDING, Box::TOP, box.GetEdge(Box::PADDING, Box::TOP) + add_padding_top);
@@ -452,10 +446,11 @@ void LayoutTable::FormatCells()
 		element_cell->SetOffset(cell_offset, element_table);
 
 		// The cell contents may overflow, propagate this to the table.
-		table_content_overflow_size.x = Math::Max(table_content_overflow_size.x, cell_offset.x - table_content_offset.x + cell_visible_overflow_size.x);
-		table_content_overflow_size.y = Math::Max(table_content_overflow_size.y, cell_offset.y - table_content_offset.y + cell_visible_overflow_size.y);
+		table_content_overflow_size.x =
+			Math::Max(table_content_overflow_size.x, cell_offset.x - table_content_offset.x + cell_visible_overflow_size.x);
+		table_content_overflow_size.y =
+			Math::Max(table_content_overflow_size.y, cell_offset.y - table_content_offset.y + cell_visible_overflow_size.y);
 	}
 }
-
 
 } // namespace Rml

@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -99,9 +99,7 @@ LayoutInlineBox::LayoutInlineBox(LayoutInlineBox* _chain) : position(0, 0), box(
 	box.SetContent(Vector2f(-1, -1));
 }
 
-LayoutInlineBox::~LayoutInlineBox()
-{
-}
+LayoutInlineBox::~LayoutInlineBox() {}
 
 // Sets the inline box's line.
 void LayoutInlineBox::SetLine(LayoutLineBox* _line)
@@ -163,76 +161,77 @@ void LayoutInlineBox::CalculateBaseline(float& ascender, float& descender)
 	// We're vertically-aligned with one of the standard types.
 	switch (vertical_align_property.type)
 	{
-		// Aligned with our parent box's baseline, our relative vertical position is set to 0.
-		case VerticalAlign::Baseline:
-		{
+	// Aligned with our parent box's baseline, our relative vertical position is set to 0.
+	case VerticalAlign::Baseline:
+	{
+		SetVerticalPosition(0);
+	}
+	break;
+
+	// The middle of this box is aligned with the baseline of its parent's plus half an ex.
+	case VerticalAlign::Middle:
+	{
+		FontFaceHandle parent_font = GetParentFont();
+		int x_height = 0;
+		if (parent_font != 0)
+			x_height = GetFontEngineInterface()->GetXHeight(parent_font) / -2;
+
+		SetVerticalPosition(x_height + (height / 2 - baseline));
+	}
+	break;
+
+	// This box's baseline is offset from its parent's so it is appropriate for rendering subscript.
+	case VerticalAlign::Sub:
+	{
+		FontFaceHandle parent_font = GetParentFont();
+		if (parent_font == 0)
 			SetVerticalPosition(0);
-		}
-		break;
+		else
+			SetVerticalPosition(float(GetFontEngineInterface()->GetLineHeight(parent_font)) * 0.2f);
+	}
+	break;
 
-		// The middle of this box is aligned with the baseline of its parent's plus half an ex.
-		case VerticalAlign::Middle:
-		{
-			FontFaceHandle parent_font = GetParentFont();
-			int x_height = 0;
-			if (parent_font != 0)
-				x_height = GetFontEngineInterface()->GetXHeight(parent_font) / -2;
+	// This box's baseline is offset from its parent's so it is appropriate for rendering superscript.
+	case VerticalAlign::Super:
+	{
+		FontFaceHandle parent_font = GetParentFont();
+		if (parent_font == 0)
+			SetVerticalPosition(0);
+		else
+			SetVerticalPosition(float(-1 * GetFontEngineInterface()->GetLineHeight(parent_font)) * 0.4f);
+	}
+	break;
 
-			SetVerticalPosition(x_height + (height / 2 - baseline));
-		}
-		break;
+	// The top of this box is aligned to the top of its parent's font.
+	case VerticalAlign::TextTop:
+	{
+		FontFaceHandle parent_font = GetParentFont();
+		if (parent_font == 0)
+			SetVerticalPosition(0);
+		else
+			SetVerticalPosition(
+				(height - baseline) - (GetFontEngineInterface()->GetLineHeight(parent_font) - GetFontEngineInterface()->GetBaseline(parent_font)));
+	}
+	break;
 
-		// This box's baseline is offset from its parent's so it is appropriate for rendering subscript.
-		case VerticalAlign::Sub:
-		{
-			FontFaceHandle parent_font = GetParentFont();
-			if (parent_font == 0)
-				SetVerticalPosition(0);
-			else
-				SetVerticalPosition(float(GetFontEngineInterface()->GetLineHeight(parent_font)) * 0.2f);
-		}
-		break;
+	// The bottom of this box is aligned to the bottom of its parent's font (not the baseline).
+	case VerticalAlign::TextBottom:
+	{
+		FontFaceHandle parent_font = GetParentFont();
+		if (parent_font == 0)
+			SetVerticalPosition(0);
+		else
+			SetVerticalPosition(GetFontEngineInterface()->GetBaseline(parent_font) - baseline);
+	}
+	break;
 
-		// This box's baseline is offset from its parent's so it is appropriate for rendering superscript.
-		case VerticalAlign::Super:
-		{
-			FontFaceHandle parent_font = GetParentFont();
-			if (parent_font == 0)
-				SetVerticalPosition(0);
-			else
-				SetVerticalPosition(float(-1 * GetFontEngineInterface()->GetLineHeight(parent_font)) * 0.4f);
-		}
-		break;
+	// This box is aligned with the line box, not an inline box, so we can't position it yet.
+	case VerticalAlign::Top:
+	case VerticalAlign::Bottom: break;
 
-		// The top of this box is aligned to the top of its parent's font.
-		case VerticalAlign::TextTop:
-		{
-			FontFaceHandle parent_font = GetParentFont();
-			if (parent_font == 0)
-				SetVerticalPosition(0);
-			else
-				SetVerticalPosition((height - baseline) - (GetFontEngineInterface()->GetLineHeight(parent_font) - GetFontEngineInterface()->GetBaseline(parent_font)));
-		}
-		break;
-
-		// The bottom of this box is aligned to the bottom of its parent's font (not the baseline).
-		case VerticalAlign::TextBottom:
-		{
-			FontFaceHandle parent_font = GetParentFont();
-			if (parent_font == 0)
-				SetVerticalPosition(0);
-			else
-				SetVerticalPosition(GetFontEngineInterface()->GetBaseline(parent_font) - baseline);
-		}
-		break;
-
-		// This box is aligned with the line box, not an inline box, so we can't position it yet.
-		case VerticalAlign::Top:
-		case VerticalAlign::Bottom: break;
-
-		// The baseline of this box is offset by a fixed amount from its parent's baseline.
-		case VerticalAlign::Length: SetVerticalPosition(-1.f * vertical_align_property.value); break;
-		}
+	// The baseline of this box is offset by a fixed amount from its parent's baseline.
+	case VerticalAlign::Length: SetVerticalPosition(-1.f * vertical_align_property.value); break;
+	}
 
 	// Set the ascender and descender relative to this element. If we're an unsized element (span, em, etc) then we
 	// have no dimensions ourselves.
@@ -251,14 +250,13 @@ void LayoutInlineBox::CalculateBaseline(float& ascender, float& descender)
 	{
 		// Don't include any of our children that are aligned relative to the line box; the line box treats them
 		// separately.
-		if (child->GetVerticalAlignProperty().type != VerticalAlign::Top &&
-			child->GetVerticalAlignProperty().type != VerticalAlign::Bottom)
+		if (child->GetVerticalAlignProperty().type != VerticalAlign::Top && child->GetVerticalAlignProperty().type != VerticalAlign::Bottom)
 		{
 			float child_ascender, child_descender;
-				child->CalculateBaseline(child_ascender, child_descender);
+			child->CalculateBaseline(child_ascender, child_descender);
 
 			ascender = Math::Max(ascender, child_ascender - child->GetPosition().y);
-				descender = Math::Max(descender, child_descender + child->GetPosition().y);
+			descender = Math::Max(descender, child_descender + child->GetPosition().y);
 		}
 	}
 }

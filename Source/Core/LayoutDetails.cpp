@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -90,14 +90,8 @@ void LayoutDetails::BuildBox(Box& box, Vector2f containing_block, Element* eleme
 		if (content_area.y < 0 && computed.height().type != Style::Width::Auto)
 			content_area.y = ResolveValue(computed.height(), containing_block.y);
 
-		min_size = Vector2f(
-			ResolveValue(computed.min_width(), containing_block.x),
-			ResolveValue(computed.min_height(), containing_block.y)
-		);
-		max_size = Vector2f(
-			ResolveValue(computed.max_width(), containing_block.x),
-			ResolveValue(computed.max_height(), containing_block.y)
-		);
+		min_size = Vector2f(ResolveValue(computed.min_width(), containing_block.x), ResolveValue(computed.min_height(), containing_block.y));
+		max_size = Vector2f(ResolveValue(computed.max_width(), containing_block.x), ResolveValue(computed.max_height(), containing_block.y));
 
 		// Adjust sizes for the given box sizing model.
 		if (computed.box_sizing() == Style::BoxSizing::BorderBox)
@@ -156,7 +150,8 @@ void LayoutDetails::GetMinMaxWidth(float& min_width, float& max_width, const Com
 	}
 }
 
-void LayoutDetails::GetMinMaxHeight(float& min_height, float& max_height, const ComputedValues& computed, const Box& box, float containing_block_height)
+void LayoutDetails::GetMinMaxHeight(float& min_height, float& max_height, const ComputedValues& computed, const Box& box,
+	float containing_block_height)
 {
 	min_height = ResolveValue(computed.min_height(), containing_block_height);
 	max_height = ResolveValue(computed.max_height(), containing_block_height);
@@ -169,7 +164,8 @@ void LayoutDetails::GetMinMaxHeight(float& min_height, float& max_height, const 
 	}
 }
 
-void LayoutDetails::GetDefiniteMinMaxHeight(float& min_height, float& max_height, const ComputedValues& computed, const Box& box, float containing_block_height)
+void LayoutDetails::GetDefiniteMinMaxHeight(float& min_height, float& max_height, const ComputedValues& computed, const Box& box,
+	float containing_block_height)
 {
 	const float box_height = box.GetSize().y;
 	if (box_height < 0)
@@ -207,8 +203,8 @@ Vector2f LayoutDetails::GetContainingBlock(const BlockContainer* containing_box)
 
 	if (containing_box)
 	{
-	    if (Element* element = containing_box->GetElement())
-	        containing_block.y -= element->GetElementScroll()->GetScrollbarSize(ElementScroll::HORIZONTAL);
+		if (Element* element = containing_box->GetElement())
+			containing_block.y -= element->GetElementScroll()->GetScrollbarSize(ElementScroll::HORIZONTAL);
 	}
 
 	containing_block.x = Math::Max(0.0f, containing_block.x);
@@ -216,7 +212,6 @@ Vector2f LayoutDetails::GetContainingBlock(const BlockContainer* containing_box)
 
 	return containing_block;
 }
-
 
 void LayoutDetails::BuildBoxSizeAndMargins(Box& box, Vector2f min_size, Vector2f max_size, Vector2f containing_block, Element* element,
 	BoxContext box_context, bool replaced_element, float override_shrink_to_fit_width)
@@ -267,7 +262,7 @@ float LayoutDetails::GetShrinkToFitWidth(Element* element, Vector2f containing_b
 
 	// We only do layouting to get the fit-to-shrink width here, and for this purpose we may get
 	// away with not closing the boxes. This is avoided for performance reasons.
-	//block_context_box->Close();
+	// block_context_box->Close();
 
 	return Math::Min(containing_block.x, block_context_box->GetShrinkToFitWidth());
 }
@@ -294,7 +289,8 @@ void LayoutDetails::GetEdgeSizes(float& margin_a, float& margin_b, float& paddin
 	padding_border_b = Math::Max(0.0f, ResolveValue(computed_size.padding_b, base_value)) + Math::Max(0.0f, computed_size.border_b);
 }
 
-Vector2f LayoutDetails::CalculateSizeForReplacedElement(const Vector2f specified_content_size, const Vector2f min_size, const Vector2f max_size, const Vector2f intrinsic_size, const float intrinsic_ratio)
+Vector2f LayoutDetails::CalculateSizeForReplacedElement(const Vector2f specified_content_size, const Vector2f min_size, const Vector2f max_size,
+	const Vector2f intrinsic_size, const float intrinsic_ratio)
 {
 	// Start with the element's specified width and height. If any of them are auto, use the element's intrinsic
 	// dimensions and ratio to find a suitable content size.
@@ -382,7 +378,8 @@ Vector2f LayoutDetails::CalculateSizeForReplacedElement(const Vector2f specified
 }
 
 // Builds the block-specific width and horizontal margins of a Box.
-void LayoutDetails::BuildBoxWidth(Box& box, const ComputedValues& computed, float min_width, float max_width, Vector2f containing_block, Element* element, bool replaced_element, float override_shrink_to_fit_width)
+void LayoutDetails::BuildBoxWidth(Box& box, const ComputedValues& computed, float min_width, float max_width, Vector2f containing_block,
+	Element* element, bool replaced_element, float override_shrink_to_fit_width)
 {
 	RMLUI_ZoneScoped;
 
@@ -444,10 +441,8 @@ void LayoutDetails::BuildBoxWidth(Box& box, const ComputedValues& computed, floa
 		else
 		{
 			// We resolve any auto margins to 0 and the width is set to whatever is left of the containing block.
-			content_area.x = containing_block.x - (left +
-				box.GetCumulativeEdge(Box::CONTENT, Box::LEFT) +
-				box.GetCumulativeEdge(Box::CONTENT, Box::RIGHT) +
-				right);
+			content_area.x = containing_block.x -
+				(left + box.GetCumulativeEdge(Box::CONTENT, Box::LEFT) + box.GetCumulativeEdge(Box::CONTENT, Box::RIGHT) + right);
 			content_area.x = Math::Max(0.0f, content_area.x);
 		}
 	}
@@ -524,10 +519,8 @@ void LayoutDetails::BuildBoxHeight(Box& box, const ComputedValues& computed, flo
 				bottom = ResolveValue(computed.bottom(), containing_block_height);
 
 				// The height gets resolved to whatever is left of the containing block
-				content_area.y = containing_block_height - (top +
-				                                            box.GetCumulativeEdge(Box::CONTENT, Box::TOP) +
-				                                            box.GetCumulativeEdge(Box::CONTENT, Box::BOTTOM) +
-				                                            bottom);
+				content_area.y = containing_block_height -
+					(top + box.GetCumulativeEdge(Box::CONTENT, Box::TOP) + box.GetCumulativeEdge(Box::CONTENT, Box::BOTTOM) + bottom);
 				content_area.y = Math::Max(0.0f, content_area.y);
 			}
 		}

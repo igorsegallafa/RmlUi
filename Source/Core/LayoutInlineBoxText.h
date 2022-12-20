@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -34,11 +34,10 @@
 namespace Rml {
 
 /**
-	@author Peter Curry
+    @author Peter Curry
  */
 
-class LayoutInlineBoxText : public LayoutInlineBox
-{
+class LayoutInlineBoxText : public LayoutInlineBox {
 public:
 	/// Constructs a new inline box for a text element.
 	/// @param[in] element The text element this inline box is flowing.
@@ -52,7 +51,8 @@ public:
 	/// Flows the inline box's content into its parent line.
 	/// @param[in] first_box True if this box is the first box containing content to be flowed into this line.
 	/// @param available_width[in] The width available for flowing this box's content. This is measured from the left side of this box's content area.
-	/// @param right_spacing_width[in] The width of the spacing that must be left on the right of the element if no overflow occurs. If overflow occurs, then the entire width can be used.
+	/// @param right_spacing_width[in] The width of the spacing that must be left on the right of the element if no overflow occurs. If overflow
+	/// occurs, then the entire width can be used.
 	/// @return The overflow box containing any content that spilled over from the flow. This must be nullptr if no overflow occured.
 	UniquePtr<LayoutInlineBox> FlowContent(bool first_box, float available_width, float right_spacing_width) override;
 
@@ -93,9 +93,7 @@ private:
 	bool line_segmented;
 };
 
-
 String FontFaceDescription(const String& font_family, Style::FontStyle style, Style::FontWeight weight);
-
 
 } // namespace Rml
 #endif

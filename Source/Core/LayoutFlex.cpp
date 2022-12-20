@@ -512,12 +512,8 @@ void LayoutFlex::Format()
 						break;
 					}
 					//-fallthrough
-				case JustifyContent::FlexStart:
-					line.items.back().main_auto_margin_size_b = remaining_free_space;
-					break;
-				case JustifyContent::FlexEnd:
-					line.items.front().main_auto_margin_size_a = remaining_free_space;
-					break;
+				case JustifyContent::FlexStart: line.items.back().main_auto_margin_size_b = remaining_free_space; break;
+				case JustifyContent::FlexEnd: line.items.front().main_auto_margin_size_a = remaining_free_space; break;
 				case JustifyContent::Center:
 					line.items.front().main_auto_margin_size_a = 0.5f * remaining_free_space;
 					line.items.back().main_auto_margin_size_b = 0.5f * remaining_free_space;
@@ -684,12 +680,8 @@ void LayoutFlex::Format()
 				case AlignSelf::FlexStart:
 					// Do nothing, cross offset set above with this behavior.
 					break;
-				case AlignSelf::FlexEnd:
-					item.cross_offset = item.cross.margin_a + remaining_space;
-					break;
-				case AlignSelf::Center:
-					item.cross_offset = item.cross.margin_a + 0.5f * remaining_space;
-					break;
+				case AlignSelf::FlexEnd: item.cross_offset = item.cross.margin_a + remaining_space; break;
+				case AlignSelf::Center: item.cross_offset = item.cross.margin_a + 0.5f * remaining_space; break;
 				case AlignSelf::Baseline:
 				{
 					// We don't currently have a good way to get the true baseline here, so we make a very rough zero-effort approximation.
@@ -774,12 +766,8 @@ void LayoutFlex::Format()
 					}
 				}
 				//-fallthrough
-			case AlignContent::FlexStart:
-				container.lines.back().cross_spacing_b = remaining_free_space;
-				break;
-			case AlignContent::FlexEnd:
-				container.lines.front().cross_spacing_a = remaining_free_space;
-				break;
+			case AlignContent::FlexStart: container.lines.back().cross_spacing_b = remaining_free_space; break;
+			case AlignContent::FlexEnd: container.lines.front().cross_spacing_a = remaining_free_space; break;
 			case AlignContent::Center:
 				container.lines.front().cross_spacing_a = 0.5f * remaining_free_space;
 				container.lines.back().cross_spacing_b = 0.5f * remaining_free_space;

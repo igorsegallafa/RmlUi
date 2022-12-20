@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -38,7 +38,6 @@ class TableGrid;
 struct TrackBox;
 using TrackBoxList = Vector<TrackBox>;
 
-
 class LayoutTable {
 public:
 	/// Formats and positions a table, including all elements contained within.
@@ -50,8 +49,8 @@ public:
 	static Vector2f FormatTable(Box& box, Vector2f min_size, Vector2f max_size, Element* element_table);
 
 private:
-	LayoutTable(Element* element_table, const TableGrid& grid, Vector2f table_gap, Vector2f table_content_offset,
-		Vector2f table_initial_content_size, bool table_auto_height, Vector2f table_min_size, Vector2f table_max_size);
+	LayoutTable(Element* element_table, const TableGrid& grid, Vector2f table_gap, Vector2f table_content_offset, Vector2f table_initial_content_size,
+		bool table_auto_height, Vector2f table_min_size, Vector2f table_max_size);
 
 	// Format the table.
 	void FormatTable();

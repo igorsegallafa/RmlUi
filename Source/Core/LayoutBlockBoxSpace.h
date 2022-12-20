@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -38,14 +38,13 @@ class Element;
 class BlockContainer;
 
 /**
-	Each block box has a space object for managing the space occupied by its floating elements, and those of its
-	ancestors as relevant.
+    Each block box has a space object for managing the space occupied by its floating elements, and those of its
+    ancestors as relevant.
 
-	@author Peter Curry
+    @author Peter Curry
  */
 
-class LayoutBlockBoxSpace
-{
+class LayoutBlockBoxSpace {
 public:
 	LayoutBlockBoxSpace(BlockContainer* parent);
 	~LayoutBlockBoxSpace();
@@ -86,12 +85,7 @@ public:
 	void operator delete(void* chunk, size_t size);
 
 private:
-	enum AnchorEdge
-	{
-		LEFT = 0,
-		RIGHT = 1,
-		NUM_ANCHOR_EDGES = 2
-	};
+	enum AnchorEdge { LEFT = 0, RIGHT = 1, NUM_ANCHOR_EDGES = 2 };
 
 	/// Generates the position for an arbitrary box within our space layout, floated against either the left or right edge.
 	/// @param[out] maximum_box_width The maximum width at the box position.
@@ -100,8 +94,7 @@ private:
 	/// @return The generated position for the box.
 	Vector2f NextBoxPosition(float& maximum_box_width, float cursor, Vector2f dimensions, Style::Float float_property) const;
 
-	struct SpaceBox
-	{
+	struct SpaceBox {
 		SpaceBox();
 		SpaceBox(Vector2f offset, Vector2f dimensions);
 
@@ -109,7 +102,7 @@ private:
 		Vector2f dimensions;
 	};
 
-	using SpaceBoxList = Vector< SpaceBox >;
+	using SpaceBoxList = Vector<SpaceBox>;
 
 	// Our block-box parent.
 	BlockContainer* parent;

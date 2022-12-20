@@ -119,6 +119,40 @@ struct DebugDumpLayoutTree {
 };
 #endif
 
+UniquePtr<FormattingContext> CreateFormattingContext(Element* element)
+{
+	// auto& computed = element->GetComputedValues();
+
+	// const Style::Display display = element->GetDisplay();
+
+	//// The element is nothing exceptional, so format it according to its display property.
+	// switch (display)
+	//{
+	// case Style::Display::Block: return FormatElementBlock(block_context_box, element);
+	// case Style::Display::Inline: return FormatElementInline(block_context_box, element);
+	// case Style::Display::InlineBlock: return FormatElementInlineBlock(block_context_box, element);
+	// case Style::Display::Flex: return FormatElementFlex(block_context_box, element);
+	// case Style::Display::Table: return FormatElementTable(block_context_box, element);
+
+	// case Style::Display::TableRow:
+	// case Style::Display::TableRowGroup:
+	// case Style::Display::TableColumn:
+	// case Style::Display::TableColumnGroup:
+	// case Style::Display::TableCell:
+	//{
+	//	// These elements should have been handled within FormatElementTable, seems like we're encountering table parts in the wild.
+	//	const Property* display_property = element->GetProperty(PropertyId::Display);
+	//	Log::Message(Log::LT_WARNING, "Element has a display type '%s', but is not located in a table. Element will not be formatted: %s",
+	//		display_property ? display_property->ToString().c_str() : "*unknown*", element->GetAddress().c_str());
+	//	return true;
+	// }
+	// case Style::Display::None:
+	//	RMLUI_ERROR; /* handled above */
+	//	break;
+	// }
+	return nullptr;
+}
+
 // Formats the contents for a root-level element (usually a document or floating element).
 void LayoutEngine::FormatElement(Element* element, Vector2f containing_block, const Box* override_initial_box, Vector2f* out_visible_overflow_size)
 {
@@ -333,40 +367,6 @@ bool LayoutEngine::FormatElementBlock(BlockContainer* block_context_box, Element
 	}
 
 	return true;
-}
-
-UniquePtr<FormattingContext> CreateFormattingContext(Element* element)
-{
-	// auto& computed = element->GetComputedValues();
-
-	// const Style::Display display = element->GetDisplay();
-
-	//// The element is nothing exceptional, so format it according to its display property.
-	// switch (display)
-	//{
-	// case Style::Display::Block: return FormatElementBlock(block_context_box, element);
-	// case Style::Display::Inline: return FormatElementInline(block_context_box, element);
-	// case Style::Display::InlineBlock: return FormatElementInlineBlock(block_context_box, element);
-	// case Style::Display::Flex: return FormatElementFlex(block_context_box, element);
-	// case Style::Display::Table: return FormatElementTable(block_context_box, element);
-
-	// case Style::Display::TableRow:
-	// case Style::Display::TableRowGroup:
-	// case Style::Display::TableColumn:
-	// case Style::Display::TableColumnGroup:
-	// case Style::Display::TableCell:
-	//{
-	//	// These elements should have been handled within FormatElementTable, seems like we're encountering table parts in the wild.
-	//	const Property* display_property = element->GetProperty(PropertyId::Display);
-	//	Log::Message(Log::LT_WARNING, "Element has a display type '%s', but is not located in a table. Element will not be formatted: %s",
-	//		display_property ? display_property->ToString().c_str() : "*unknown*", element->GetAddress().c_str());
-	//	return true;
-	// }
-	// case Style::Display::None:
-	//	RMLUI_ERROR; /* handled above */
-	//	break;
-	// }
-	return nullptr;
 }
 
 // Formats and positions an element as an inline element.

@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -41,9 +41,7 @@ LayoutBlockBoxSpace::LayoutBlockBoxSpace(BlockContainer* _parent) : offset(0, 0)
 	parent = _parent;
 }
 
-LayoutBlockBoxSpace::~LayoutBlockBoxSpace()
-{
-}
+LayoutBlockBoxSpace::~LayoutBlockBoxSpace() {}
 
 // Imports boxes from another block into this space.
 void LayoutBlockBoxSpace::ImportSpace(const LayoutBlockBoxSpace& space)
@@ -105,16 +103,14 @@ float LayoutBlockBoxSpace::DetermineClearPosition(float cursor, Style::Clear cle
 {
 	using namespace Style;
 	// Clear left boxes.
-	if (clear_property == Clear::Left ||
-		clear_property == Clear::Both)
+	if (clear_property == Clear::Left || clear_property == Clear::Both)
 	{
 		for (size_t i = 0; i < boxes[LEFT].size(); ++i)
 			cursor = Math::Max(cursor, boxes[LEFT][i].offset.y + boxes[LEFT][i].dimensions.y);
 	}
 
 	// Clear right boxes.
-	if (clear_property == Clear::Right ||
-		clear_property == Clear::Both)
+	if (clear_property == Clear::Right || clear_property == Clear::Both)
 	{
 		for (size_t i = 0; i < boxes[RIGHT].size(); ++i)
 			cursor = Math::Max(cursor, boxes[RIGHT][i].offset.y + boxes[RIGHT][i].dimensions.y);
@@ -178,8 +174,7 @@ Vector2f LayoutBlockBoxSpace::NextBoxPosition(float& maximum_box_width, float cu
 
 			// Were we pushed out of our containing box? If so, try again at the next cursor position.
 			float normalised_position = box_position.x - parent_origin;
-			if (normalised_position < 0 ||
-				normalised_position + dimensions.x > parent->GetBox().GetSize().x)
+			if (normalised_position < 0 || normalised_position + dimensions.x > parent->GetBox().GetSize().x)
 				return NextBoxPosition(maximum_box_width, next_cursor + 0.01f, dimensions, float_property);
 		}
 	}
@@ -279,12 +274,8 @@ void LayoutBlockBoxSpace::operator delete(void* chunk, size_t size)
 	LayoutEngine::DeallocateLayoutChunk(chunk, size);
 }
 
-LayoutBlockBoxSpace::SpaceBox::SpaceBox() : offset(0, 0), dimensions(0, 0)
-{
-}
+LayoutBlockBoxSpace::SpaceBox::SpaceBox() : offset(0, 0), dimensions(0, 0) {}
 
-LayoutBlockBoxSpace::SpaceBox::SpaceBox(const Vector2f offset, const Vector2f dimensions) : offset(offset), dimensions(dimensions)
-{
-}
+LayoutBlockBoxSpace::SpaceBox::SpaceBox(const Vector2f offset, const Vector2f dimensions) : offset(offset), dimensions(dimensions) {}
 
 } // namespace Rml

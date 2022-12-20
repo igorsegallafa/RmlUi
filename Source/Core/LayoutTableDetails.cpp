@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -81,7 +81,8 @@ bool TableGrid::Build(Element* element_table)
 				{
 					if (display_row != Display::None)
 					{
-						Log::Message(Log::LT_WARNING, "Only table rows are valid children of table row groups. Ignoring element %s.", element_row->GetAddress().c_str());
+						Log::Message(Log::LT_WARNING, "Only table rows are valid children of table row groups. Ignoring element %s.",
+							element_row->GetAddress().c_str());
 					}
 					continue;
 				}
@@ -108,9 +109,12 @@ bool TableGrid::Build(Element* element_table)
 		else
 		{
 			if (display == Display::TableColumn || display == Display::TableColumnGroup)
-				Log::Message(Log::LT_WARNING, "Table columns and column groups must precede any table rows. Ignoring element %s.", element->GetAddress().c_str());
+				Log::Message(Log::LT_WARNING, "Table columns and column groups must precede any table rows. Ignoring element %s.",
+					element->GetAddress().c_str());
 			else
-				Log::Message(Log::LT_WARNING, "Only table columns, column groups, rows, row groups, and cells are valid children of tables. Ignoring element %s.", element->GetAddress().c_str());
+				Log::Message(Log::LT_WARNING,
+					"Only table columns, column groups, rows, row groups, and cells are valid children of tables. Ignoring element %s.",
+					element->GetAddress().c_str());
 		}
 	}
 
@@ -121,20 +125,20 @@ bool TableGrid::Build(Element* element_table)
 	}
 
 	// Sort cells by the last row they span.
-	std::sort(cells.begin(), cells.end(), [](const Cell& a, const Cell& b) {
-		return a.row_last < b.row_last;
-	});
+	std::sort(cells.begin(), cells.end(), [](const Cell& a, const Cell& b) { return a.row_last < b.row_last; });
 
 	if (!open_cells.empty())
 	{
-		Log::Message(Log::LT_WARNING, "One or more cells span below the last row in table %s. They will not be formatted. Add additional rows, or adjust the rowspan attribute.", element_table->GetAddress().c_str());
+		Log::Message(Log::LT_WARNING,
+			"One or more cells span below the last row in table %s. They will not be formatted. Add additional rows, or adjust the rowspan "
+		    "attribute.",
+			element_table->GetAddress().c_str());
 	}
 	open_cells.clear();
 	open_cells.shrink_to_fit();
 
 	return true;
 }
-
 
 void TableGrid::PushColumn(Element* element_column, int span)
 {
@@ -233,7 +237,7 @@ void TableGrid::PushRow(Element* element_row, ElementList cell_elements)
 		}
 	}
 
-	rows.push_back(Row{ element_row, nullptr, 0 });
+	rows.push_back(Row{element_row, nullptr, 0});
 
 	const int num_cells_spanning_this_row = (int)open_cells.size();
 
@@ -252,7 +256,7 @@ void TableGrid::PushRow(Element* element_row, ElementList cell_elements)
 		}
 
 		// Offset the column if we have any rowspan elements from previous rows overlapping with the current column.
-		for (bool continue_offset_column = true; continue_offset_column; )
+		for (bool continue_offset_column = true; continue_offset_column;)
 		{
 			continue_offset_column = false;
 			for (int k = 0; k < num_cells_spanning_this_row; k++)
@@ -270,7 +274,9 @@ void TableGrid::PushRow(Element* element_row, ElementList cell_elements)
 
 		if (column_last >= (int)columns.size())
 		{
-			Log::Message(Log::LT_WARNING, "Too many columns in table row %d while encountering cell: %s\nThe number of columns is %d, as determined by the table columns or the first table row.",
+			Log::Message(Log::LT_WARNING,
+				"Too many columns in table row %d while encountering cell: %s\nThe number of columns is %d, as determined by the table columns or "
+			    "the first table row.",
 				row_index + 1, element_cell->GetAddress().c_str(), (int)columns.size());
 			break;
 		}
@@ -288,17 +294,17 @@ void TableGrid::PushRow(Element* element_row, ElementList cell_elements)
 		column += col_span;
 	}
 
-
 	// Partition the cells to determine those who end at this row.
-	const auto it_cells_in_row_end = std::partition(open_cells.begin(), open_cells.end(), [row_index](const Cell& cell) { return cell.row_last == row_index; });
-
+	const auto it_cells_in_row_end =
+		std::partition(open_cells.begin(), open_cells.end(), [row_index](const Cell& cell) { return cell.row_last == row_index; });
 
 	// Close cells ending at this row.
 	cells.insert(cells.end(), open_cells.begin(), it_cells_in_row_end);
 	open_cells.erase(open_cells.begin(), it_cells_in_row_end);
 }
 
-void TracksSizing::GetEdgeSizes(float& margin_a, float& margin_b, float& padding_border_a, float& padding_border_b, const ComputedAxisSize& computed) const
+void TracksSizing::GetEdgeSizes(float& margin_a, float& margin_b, float& padding_border_a, float& padding_border_b,
+	const ComputedAxisSize& computed) const
 {
 	LayoutDetails::GetEdgeSizes(margin_a, margin_b, padding_border_a, padding_border_b, computed, table_initial_content_size);
 }
@@ -401,7 +407,8 @@ void TracksSizing::ApplyCellElement(const int index, const int span, const Compu
 	}
 }
 
-void TracksSizing::InitializeSize(TrackMetric& metric, float& margin_a, float& margin_b, float& padding_border_a, float& padding_border_b, const ComputedAxisSize& computed, const int span, const Style::BoxSizing target_box) const
+void TracksSizing::InitializeSize(TrackMetric& metric, float& margin_a, float& margin_b, float& padding_border_a, float& padding_border_b,
+	const ComputedAxisSize& computed, const int span, const Style::BoxSizing target_box) const
 {
 	RMLUI_ASSERT(span >= 1);
 
@@ -483,15 +490,15 @@ void TracksSizing::ResolveFlexibleSize()
 	float table_available_size = 0.0f;
 
 	// Convert any flexible sizes to fixed sizes by filling up the size of the table.
-	for (bool continue_iteration = true; continue_iteration; )
+	for (bool continue_iteration = true; continue_iteration;)
 	{
 		continue_iteration = false;
 		float fr_to_px_ratio = 0;
 
 		// Calculate the fr/px-ratio. [fr] is here the unit for flexible width.
 		{
-			float sum_fixed_size = sum_fixed_spacing;  // [px]
-			float sum_flex_size = 0;                   // [fr]
+			float sum_fixed_size = sum_fixed_spacing; // [px]
+			float sum_flex_size = 0;                  // [fr]
 
 			for (const TrackMetric& metric : metrics)
 			{
@@ -544,9 +551,8 @@ void TracksSizing::ResolveFlexibleSize()
 		}
 
 		// Sort the tracks by available size, smallest to largest. This lets us "fill up" the most constrained tracks first.
-		std::sort(track_available_sizes.begin(), track_available_sizes.end(), [](const TrackAvailableSize& c1, const TrackAvailableSize& c2) {
-			return c1.available_size < c2.available_size;
-		});
+		std::sort(track_available_sizes.begin(), track_available_sizes.end(),
+			[](const TrackAvailableSize& c1, const TrackAvailableSize& c2) { return c1.available_size < c2.available_size; });
 
 		for (int i = 0; i < num_tracks; i++)
 		{
@@ -564,8 +570,6 @@ void TracksSizing::ResolveFlexibleSize()
 		}
 	}
 }
-
-
 
 static float InitializeTrackBoxes(TrackBoxList& boxes, const TrackMetricList& metrics, const float table_gap)
 {
@@ -606,7 +610,8 @@ static void SnapTrackBoxesToPixelGrid(TrackBoxList& boxes)
 	}
 }
 
-float BuildColumnBoxes(TrackBoxList& column_boxes, const TrackMetricList& column_metrics, const TableGrid::ColumnList& grid_columns, const float table_gap_x)
+float BuildColumnBoxes(TrackBoxList& column_boxes, const TrackMetricList& column_metrics, const TableGrid::ColumnList& grid_columns,
+	const float table_gap_x)
 {
 	const float columns_width = InitializeTrackBoxes(column_boxes, column_metrics, table_gap_x);
 	const int num_columns = (int)column_metrics.size();
@@ -659,6 +664,5 @@ float BuildRowBoxes(TrackBoxList& row_boxes, const TrackMetricList& row_metrics,
 
 	return rows_height;
 }
-
 
 } // namespace Rml

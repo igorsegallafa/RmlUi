@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -68,9 +68,7 @@ LayoutInlineBoxText::LayoutInlineBoxText(ElementText* element, int _line_begin) 
 	BuildWordBox();
 }
 
-LayoutInlineBoxText::~LayoutInlineBoxText()
-{
-}
+LayoutInlineBoxText::~LayoutInlineBoxText() {}
 
 // Returns true if this box is capable of overflowing, or if it must be rendered on a single line.
 bool LayoutInlineBoxText::CanOverflow() const
@@ -86,7 +84,8 @@ UniquePtr<LayoutInlineBox> LayoutInlineBoxText::FlowContent(bool first_box, floa
 
 	int line_length;
 	float line_width;
-	bool overflow = !text_element->GenerateLine(line_contents, line_length, line_width, line_begin, available_width, right_spacing_width, first_box, true);
+	bool overflow =
+		!text_element->GenerateLine(line_contents, line_length, line_width, line_begin, available_width, right_spacing_width, first_box, true);
 
 	Vector2f content_area;
 	content_area.x = line_width;
@@ -168,7 +167,7 @@ ElementText* LayoutInlineBoxText::GetTextElement()
 {
 	RMLUI_ASSERT(rmlui_dynamic_cast<ElementText*>(element));
 
-	return static_cast< ElementText* >(element);
+	return static_cast<ElementText*>(element);
 }
 
 // Builds a box for the first word of the element.
@@ -190,24 +189,18 @@ void LayoutInlineBoxText::BuildWordBox()
 
 		if (font_family_property.empty())
 		{
-			Log::Message(
-				Log::LT_WARNING,
-				"No font face defined. Missing 'font-family' property, please add it to your RCSS. On element %s",
-				text_element->GetAddress().c_str()
-			);
+			Log::Message(Log::LT_WARNING, "No font face defined. Missing 'font-family' property, please add it to your RCSS. On element %s",
+				text_element->GetAddress().c_str());
 		}
 		else
 		{
 			const String font_face_description = FontFaceDescription(font_family_property, computed.font_style(), computed.font_weight());
 
-			Log::Message(
-				Log::LT_WARNING,
+			Log::Message(Log::LT_WARNING,
 				"No font face defined. Ensure (1) that Context::Update is run after new elements are constructed, before Context::Render, "
 				"and (2) that the specified font face %s has been successfully loaded. "
 				"Please see previous log messages for all successfully loaded fonts. On element %s",
-				font_face_description.c_str(),
-				text_element->GetAddress().c_str()
-			);
+				font_face_description.c_str(), text_element->GetAddress().c_str());
 		}
 
 		return;
