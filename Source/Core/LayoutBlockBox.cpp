@@ -413,7 +413,6 @@ void BlockContainer::CloseAbsoluteElements()
 	}
 }
 
-// Returns the offset from the top-left corner of this box that the next child box will be positioned at.
 Vector2f BlockContainer::NextBoxPosition(float top_margin, Style::Clear clear_property) const
 {
 	// If our element is establishing a new offset hierarchy, then any children of ours don't inherit our offset.
@@ -427,7 +426,6 @@ Vector2f BlockContainer::NextBoxPosition(float top_margin, Style::Clear clear_pr
 	else
 	{
 		// Check for a collapsing vertical margin.
-
 		if (const BlockContainer* block_box = GetOpenBlockContainer())
 		{
 			const float bottom_margin = block_box->GetBox().GetEdge(Box::MARGIN, Box::BOTTOM);
@@ -453,25 +451,11 @@ Vector2f BlockContainer::NextBoxPosition(float top_margin, Style::Clear clear_pr
 	return box_position;
 }
 
-// Returns the offset from the top-left corner of this box's offset element the next child block box, of the given
-// dimensions, will be positioned at. This will include the margins on the new block box.
 Vector2f BlockContainer::NextBlockBoxPosition(const Box& box, Style::Clear clear_property) const
 {
 	Vector2f box_position = NextBoxPosition(box.GetEdge(Box::MARGIN, Box::TOP), clear_property);
 	box_position.x += box.GetEdge(Box::MARGIN, Box::LEFT);
 	box_position.y += box.GetEdge(Box::MARGIN, Box::TOP);
-	return box_position;
-}
-
-// Returns the offset from the top-left corner of this box for the next line.
-Vector2f BlockContainer::NextLineBoxPosition(float& box_width, bool& _wrap_content, const Vector2f dimensions) const
-{
-	const Vector2f cursor = NextBoxPosition();
-	const Vector2f box_position = space->NextBoxPosition(box_width, cursor.y, dimensions);
-
-	// Also, probably shouldn't check for widths when positioning the box?
-	_wrap_content = wrap_content;
-
 	return box_position;
 }
 
@@ -789,22 +773,14 @@ void InlineContainer::AddChainedBox(LayoutInlineBox* chained_box)
 Vector2f InlineContainer::NextBoxPosition(float top_margin, Style::Clear clear_property) const
 {
 	// If our element is establishing a new offset hierarchy, then any children of ours don't inherit our offset.
-	Vector2f box_position = GetPosition();
+	Vector2f box_position = position;
 	box_position.y += box_cursor;
 
-	float clear_margin =
+	const float clear_margin =
 		parent->GetBlockBoxSpace()->DetermineClearPosition(box_position.y + top_margin, clear_property) - (box_position.y + top_margin);
 	if (clear_margin > 0)
 		box_position.y += clear_margin;
 
-	return box_position;
-}
-
-Vector2f InlineContainer::NextBlockBoxPosition(const Box& box, Style::Clear clear_property) const
-{
-	Vector2f box_position = NextBoxPosition(box.GetEdge(Box::MARGIN, Box::TOP), clear_property);
-	box_position.x += box.GetEdge(Box::MARGIN, Box::LEFT);
-	box_position.y += box.GetEdge(Box::MARGIN, Box::TOP);
 	return box_position;
 }
 

@@ -133,12 +133,6 @@ public:
 	/// @param[in] clear_property The value of the underlying element's clear property.
 	/// @return The block box cursor position.
 	Vector2f NextBlockBoxPosition(const Box& box, Style::Clear clear_property) const;
-	/// Returns the offset from the top-left corner of this box for the next line.
-	/// @param box_width[out] The available width for the line box.
-	/// @param wrap_content[out] Set to true if the line box should grow to fit inline boxes, false if it should wrap them.
-	/// @param dimensions[in] The minimum dimensions of the line.
-	/// @return The line box position.
-	Vector2f NextLineBoxPosition(float& out_box_width, bool& out_wrap_content, Vector2f dimensions) const;
 
 	// Places all queued floating elements.
 	void PlaceQueuedFloats(float vertical_offset);
@@ -289,16 +283,10 @@ public:
 	/// @param[in] clear_property The value of the underlying element's clear property.
 	/// @return The box cursor position.
 	Vector2f NextBoxPosition(float top_margin = 0, Style::Clear clear_property = Style::Clear::None) const;
-	/// Returns the offset from the top-left corner of this box's offset element the next child block box, of the given dimensions,
-	/// will be positioned at. This will include the margins on the new block box.
-	/// @param[in] box The dimensions of the new box.
-	/// @param[in] clear_property The value of the underlying element's clear property.
-	/// @return The block box cursor position.
-	Vector2f NextBlockBoxPosition(const Box& box, Style::Clear clear_property) const;
 	/// Returns the offset from the top-left corner of this box for the next line.
-	/// @param box_width[out] The available width for the line box.
-	/// @param wrap_content[out] Set to true if the line box should grow to fit inline boxes, false if it should wrap them.
-	/// @param dimensions[in] The minimum dimensions of the line.
+	/// @param[out] box_width The available width for the line box.
+	/// @param[out] wrap_content Set to true if the line box should grow to fit inline boxes, false if it should wrap them.
+	/// @param[in] dimensions The minimum dimensions of the line.
 	/// @return The line box position.
 	Vector2f NextLineBoxPosition(float& out_box_width, bool& out_wrap_content, Vector2f dimensions) const;
 
