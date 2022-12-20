@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -29,19 +29,18 @@
 #ifndef RMLUI_CORE_LAYOUTENGINE_H
 #define RMLUI_CORE_LAYOUTENGINE_H
 
-#include "LayoutBlockBox.h"
 #include "../../Include/RmlUi/Core/Types.h"
+#include "LayoutBlockBox.h"
 
 namespace Rml {
 
 class Box;
 
 /**
-	@author Robert Curry
+    @author Robert Curry
  */
 
-class LayoutEngine
-{
+class LayoutEngine {
 public:
 	/// Formats the contents for a root-level element, usually a document, absolutely positioned, floating, or replaced element. Establishes a new
 	/// block formatting context.
@@ -49,7 +48,8 @@ public:
 	/// @param[in] containing_block The size of the containing block.
 	/// @param[in] override_initial_box Optional pointer to a box to override the generated box for the element.
 	/// @param[out] visible_overflow_size Optionally output the overflow size of the element.
-	static void FormatElement(Element* element, Vector2f containing_block, const Box* override_initial_box = nullptr, Vector2f* out_visible_overflow_size = nullptr);
+	static void FormatElement(Element* element, Vector2f containing_block, const Box* override_initial_box = nullptr,
+		Vector2f* out_visible_overflow_size = nullptr);
 
 	/// Positions a single element and its children within a block formatting context.
 	/// @param[in] block_context_box The open block box to layout the element in.
@@ -86,10 +86,6 @@ private:
 	/// @return True if the element was parsed as a special element, false otherwise.
 	static bool FormatElementSpecial(BlockContainer* block_context_box, Element* element);
 };
-
-
-
-
 
 namespace NewLayoutEngine {
 
@@ -165,7 +161,6 @@ namespace NewLayoutEngine {
 		Vector<Element*> absolutely_positioned_elements;
 	};
 
-
 	// We probably don't need a separate data structure for this?
 	struct PrincipalBlockLevelBox : BlockLevelBox {
 		Vector<Box> children;
@@ -179,17 +174,7 @@ namespace NewLayoutEngine {
 		Vector<BlockLevelBox> additional_boxes;
 	};
 
-}
-
-
-
-
-
-
-
-
-
-
+} // namespace NewLayoutEngine
 
 } // namespace Rml
 #endif

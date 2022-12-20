@@ -40,6 +40,17 @@
 
 namespace Rml {
 
+void* LayoutBox::operator new(size_t size)
+{
+	void* memory = LayoutEngine::AllocateLayoutChunk(size);
+	return memory;
+}
+
+void LayoutBox::operator delete(void* chunk, size_t size)
+{
+	LayoutEngine::DeallocateLayoutChunk(chunk, size);
+}
+
 // Creates a new block box for rendering a block element.
 BlockContainer::BlockContainer(BlockContainer* _parent, Element* _element, const Box& _box, float _min_height, float _max_height) :
 	BlockLevelBox(Type::BlockContainer), position(0), box(_box), min_height(_min_height), max_height(_max_height)
@@ -217,7 +228,7 @@ BlockContainer::CloseResult BlockContainer::Close()
 	{
 		// If this close fails, it means this block box has caused our parent block box to generate an automatic vertical scrollbar.
 		const float self_position_top = position.y - box.GetEdge(Box::MARGIN, Box::TOP);
-		if (!parent->CloseBlockBox(this, self_position_top, box.GetSize(Box::MARGIN).y))
+		if (!parent->CloseChildBox(this, self_position_top, box.GetSize(Box::MARGIN).y))
 			return CloseResult::LayoutParent;
 	}
 
@@ -266,7 +277,7 @@ BlockContainer::CloseResult BlockContainer::Close()
 	return CloseResult::OK;
 }
 
-bool BlockContainer::CloseBlockBox(BlockLevelBox* child, float child_position_top, float child_size_y)
+bool BlockContainer::CloseChildBox(BlockLevelBox* child, float child_position_top, float child_size_y)
 {
 	const float child_position_y = child_position_top - (box.GetPosition().y + position.y);
 	box_cursor = child_position_y + child_size_y;
@@ -588,17 +599,6 @@ String BlockContainer::DumpTree(int depth) const
 	return value;
 }
 
-void* BlockContainer::operator new(size_t size)
-{
-	void* memory = LayoutEngine::AllocateLayoutChunk(size);
-	return memory;
-}
-
-void BlockContainer::operator delete(void* chunk, size_t size)
-{
-	LayoutEngine::DeallocateLayoutChunk(chunk, size);
-}
-
 InlineContainer* BlockContainer::GetOpenInlineContainer()
 {
 	if (!block_boxes.empty() && block_boxes.back()->GetType() == Type::InlineContainer)
@@ -720,7 +720,7 @@ InlineContainer::CloseResult InlineContainer::Close(LayoutInlineBox** out_open_i
 	if (parent)
 	{
 		// If this close fails, it means this block box has caused our parent block box to generate an automatic vertical scrollbar.
-		if (!parent->CloseBlockBox(this, position.y, box_size.y))
+		if (!parent->CloseChildBox(this, position.y, box_size.y))
 			return CloseResult::LayoutParent;
 	}
 
@@ -826,7 +826,7 @@ Vector2f InlineContainer::GetPosition() const
 
 float InlineContainer::GetHeightIncludingOpenLine() const
 {
-	float last_line_height = line_boxes.back()->GetDimensions().y;
+	const float last_line_height = line_boxes.back()->GetDimensions().y;
 	return box_cursor + Math::Max(0.0f, last_line_height);
 }
 
@@ -850,17 +850,6 @@ String InlineContainer::DumpTree(int depth) const
 		value += line_box->DumpTree(depth + 1);
 
 	return value;
-}
-
-void* InlineContainer::operator new(size_t size)
-{
-	void* memory = LayoutEngine::AllocateLayoutChunk(size);
-	return memory;
-}
-
-void InlineContainer::operator delete(void* chunk, size_t size)
-{
-	LayoutEngine::DeallocateLayoutChunk(chunk, size);
 }
 
 } // namespace Rml

@@ -160,7 +160,7 @@ LayoutInlineBox* LayoutLineBox::Close(UniquePtr<LayoutInlineBox> overflow)
 		// Check if this inline box is part of the open box chain.
 		bool inline_box_open = false;
 		LayoutInlineBox* open_box = open_inline_box;
-		while (open_box != nullptr && !inline_box_open)
+		while (open_box && !inline_box_open)
 		{
 			if (inline_boxes[i].get() == open_box)
 				inline_box_open = true;

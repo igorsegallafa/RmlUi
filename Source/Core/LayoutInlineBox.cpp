@@ -146,15 +146,10 @@ bool LayoutInlineBox::IsLastChild() const
 }
 
 // Flows the inline box's content into its parent line.
-UniquePtr<LayoutInlineBox> LayoutInlineBox::FlowContent(bool RMLUI_UNUSED_PARAMETER(first_box), float RMLUI_UNUSED_PARAMETER(available_width), float RMLUI_UNUSED_PARAMETER(right_spacing_width))
+UniquePtr<LayoutInlineBox> LayoutInlineBox::FlowContent(bool /*first_box*/, float /*available_width*/, float /*right_spacing_width*/)
 {
-	RMLUI_UNUSED(first_box);
-	RMLUI_UNUSED(available_width);
-	RMLUI_UNUSED(right_spacing_width);
-
 	// If we're representing a sized element, then add our element's width onto our parent's.
-	if (parent != nullptr &&
-		box.GetSize().x > 0)
+	if (parent && box.GetSize().x > 0)
 		parent->width += box.GetSize(Box::MARGIN).x;
 
 	// Nothing else to do here; static elements will automatically be 'flowed' into their lines when they are placed.
@@ -252,18 +247,18 @@ void LayoutInlineBox::CalculateBaseline(float& ascender, float& descender)
 		descender = height - ascender;
 	}
 
-	for (size_t i = 0; i < children.size(); ++i)
+	for (LayoutInlineBox* child : children)
 	{
 		// Don't include any of our children that are aligned relative to the line box; the line box treats them
 		// separately.
-		if (children[i]->GetVerticalAlignProperty().type != Style::VerticalAlign::Top &&
-			children[i]->GetVerticalAlignProperty().type != Style::VerticalAlign::Bottom)
+		if (child->GetVerticalAlignProperty().type != VerticalAlign::Top &&
+			child->GetVerticalAlignProperty().type != VerticalAlign::Bottom)
 		{
 			float child_ascender, child_descender;
-			children[i]->CalculateBaseline(child_ascender, child_descender);
+				child->CalculateBaseline(child_ascender, child_descender);
 
-			ascender = Math::Max(ascender, child_ascender - children[i]->GetPosition().y);
-			descender = Math::Max(descender, child_descender + children[i]->GetPosition().y);
+			ascender = Math::Max(ascender, child_ascender - child->GetPosition().y);
+				descender = Math::Max(descender, child_descender + child->GetPosition().y);
 		}
 	}
 }
@@ -271,13 +266,13 @@ void LayoutInlineBox::CalculateBaseline(float& ascender, float& descender)
 // Offsets the baseline of this box, and all of its children, by the ascender of the parent line box.
 void LayoutInlineBox::OffsetBaseline(float ascender)
 {
-	for (size_t i = 0; i < children.size(); ++i)
+	for (LayoutInlineBox* child : children)
 	{
 		// Don't offset any of our children that are aligned relative to the line box; the line box will take care of
 		// them separately.
-		if (children[i]->GetVerticalAlignProperty().type != Style::VerticalAlign::Top &&
-			children[i]->GetVerticalAlignProperty().type != Style::VerticalAlign::Bottom)
-			children[i]->OffsetBaseline(ascender + position.y);
+		if (child->GetVerticalAlignProperty().type != Style::VerticalAlign::Top &&
+			child->GetVerticalAlignProperty().type != Style::VerticalAlign::Bottom)
+			child->OffsetBaseline(ascender + position.y);
 	}
 
 	position.y += (ascender - (height - baseline));

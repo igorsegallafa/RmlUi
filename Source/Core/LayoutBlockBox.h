@@ -39,35 +39,74 @@ class LayoutBlockBoxSpace;
 class LayoutEngine;
 class InlineContainer;
 
-class BlockLevelBox {
+class LayoutBox {
 public:
 	enum class Type { BlockContainer, InlineContainer, FlexContainer, TableWrapper, Replaced };
+	enum class OuterType { BlockLevel, InlineLevel };
 	enum class CloseResult { OK, LayoutSelf, LayoutParent };
 
 	Type GetType() const { return type; }
 
-	// Returns the outer size of this box including overflowing content. Similar to scroll width, but shrinked if overflow is caught
-	// here. This can be wider than the box if we are overflowing.
-	// @note Only available after the box has been closed.
-	Vector2f GetVisibleOverflowSize() const { return visible_overflow_size; }
-
 	// Debug dump layout tree.
 	String DumpLayoutTree(int depth = 0) const { return DumpTree(depth); }
 
-	virtual ~BlockLevelBox() = default;
+	virtual ~LayoutBox() = default;
+
+	void* operator new(size_t size);
+	void operator delete(void* chunk, size_t size);
 
 protected:
-	BlockLevelBox(Type type) : type(type) {}
-
-	void SetVisibleOverflowSize(Vector2f new_visible_overflow_size) { visible_overflow_size = new_visible_overflow_size; }
+	LayoutBox(OuterType outer_type, Type type) : outer_type(outer_type), type(type) {}
 
 	// Debug dump layout tree.
 	virtual String DumpTree(int depth) const = 0;
 
 private:
+	OuterType outer_type;
 	Type type;
+};
 
+
+
+class BlockLevelBox : public LayoutBox {
+public:
+	// Returns the outer size of this box including overflowing content. Similar to scroll width, but shrinked if overflow is caught
+	// here. This can be wider than the box if we are overflowing.
+	// @note Only available after the box has been closed.
+	Vector2f GetVisibleOverflowSize() const { return visible_overflow_size; }
+
+protected:
+	BlockLevelBox(Type type) : LayoutBox(OuterType::BlockLevel, type) {}
+
+	void SetVisibleOverflowSize(Vector2f new_visible_overflow_size) { visible_overflow_size = new_visible_overflow_size; }
+
+private:
 	Vector2f visible_overflow_size;
+};
+
+class InlineLevelBox : public LayoutBox {
+public:
+protected:
+	InlineLevelBox(Type type) : LayoutBox(OuterType::InlineLevel, type) {}
+};
+
+class FormattingContext {
+public:
+private:
+	// Contains absolute elements.
+};
+
+class BlockFlexContainer : public BlockLevelBox {
+public:
+	BlockFlexContainer() : BlockLevelBox(Type::FlexContainer) {}
+
+private:
+};
+class InlineFlexContainer : public InlineLevelBox {
+public:
+	InlineFlexContainer() : InlineLevelBox(Type::FlexContainer) {}
+
+private:
 };
 
 /**
@@ -94,7 +133,7 @@ public:
 	/// @param[in] child_position_top The position of the child, relative to this container.
 	/// @param[in] child_size_y The vertical margin size of the child.
 	/// @return False if the block box caused an automatic vertical scrollbar to appear, forcing an entire reformat of the block box.
-	bool CloseBlockBox(BlockLevelBox* child, float child_position_top, float child_size_y);
+	bool CloseChildBox(BlockLevelBox* child, float child_position_top, float child_size_y);
 
 	/// Adds a new block element to this block-context box.
 	/// @param element[in] The new block element.
@@ -166,9 +205,6 @@ public:
 	Box& GetBox();
 	/// Returns the block box's dimension box.
 	const Box& GetBox() const;
-
-	void* operator new(size_t size);
-	void operator delete(void* chunk, size_t size);
 
 private:
 	struct AbsoluteElement {
@@ -309,9 +345,6 @@ public:
 
 	// Debug dump layout tree.
 	String DumpTree(int depth) const override;
-
-	void* operator new(size_t size);
-	void operator delete(void* chunk, size_t size);
 
 private:
 	using LineBoxList = Vector<UniquePtr<LayoutLineBox>>;

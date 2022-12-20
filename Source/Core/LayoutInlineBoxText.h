@@ -47,7 +47,6 @@ public:
 	virtual ~LayoutInlineBoxText();
 
 	/// Returns true if this box is capable of overflowing, or if it must be rendered on a single line.
-	/// @return True if this box can overflow, false otherwise.
 	bool CanOverflow() const override;
 
 	/// Flows the inline box's content into its parent line.

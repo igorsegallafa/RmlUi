@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -53,9 +53,9 @@ static constexpr std::size_t ChunkSizeBig = sizeof(BlockContainer);
 static constexpr std::size_t ChunkSizeMedium = MAX(sizeof(LayoutInlineBox), sizeof(LayoutInlineBoxText));
 static constexpr std::size_t ChunkSizeSmall = MAX(sizeof(LayoutLineBox), sizeof(LayoutBlockBoxSpace));
 
-static Pool< LayoutChunk<ChunkSizeBig> > layout_chunk_pool_big(50, true);
-static Pool< LayoutChunk<ChunkSizeMedium> > layout_chunk_pool_medium(50, true);
-static Pool< LayoutChunk<ChunkSizeSmall> > layout_chunk_pool_small(50, true);
+static Pool<LayoutChunk<ChunkSizeBig>> layout_chunk_pool_big(50, true);
+static Pool<LayoutChunk<ChunkSizeMedium>> layout_chunk_pool_medium(50, true);
+static Pool<LayoutChunk<ChunkSizeSmall>> layout_chunk_pool_small(50, true);
 
 static inline bool ValidateTopLevelElement(Element* element)
 {
@@ -75,7 +75,7 @@ static inline bool ValidateTopLevelElement(Element* element)
 		const Property* display_property = element->GetProperty(PropertyId::Display);
 		Log::Message(Log::LT_WARNING,
 			"Element with display type '%s' cannot be %s. Instead, wrap it within a parent block element such as a <div>. Element will not be "
-		    "formatted: %s",
+			"formatted: %s",
 			display_property ? display_property->ToString().c_str() : "*unknown*", error_msg, element->GetAddress().c_str());
 
 		return false;
@@ -129,8 +129,11 @@ void LayoutEngine::FormatElement(Element* element, Vector2f containing_block, co
 	RMLUI_ZoneName(name.c_str(), name.size());
 #endif
 
-	if (!ValidateTopLevelElement(element))
-		return;
+	if (element && element->GetId() == "absolute")
+		int x = 0;
+
+	// if (!ValidateTopLevelElement(element))
+	//	return;
 
 	auto containing_block_box = MakeUnique<BlockContainer>(nullptr, nullptr, Box(containing_block), 0.0f, FLT_MAX);
 	DebugDumpLayoutTree debug_dump_tree(element, containing_block_box.get());
@@ -141,6 +144,8 @@ void LayoutEngine::FormatElement(Element* element, Vector2f containing_block, co
 	else
 		LayoutDetails::BuildBox(box, containing_block, element);
 
+	// TODO: This is basically the same as FormatElementBlock with some more stuff... Can we merge them and just use FormatElement(block, element)?
+	// That way perhaps we're able to consider e.g. both absolute and flex box simultaneously.
 	float min_height, max_height;
 	LayoutDetails::GetDefiniteMinMaxHeight(min_height, max_height, element->GetComputedValues(), box, containing_block.y);
 
@@ -237,8 +242,8 @@ bool LayoutEngine::FormatElement(BlockContainer* block_context_box, Element* ele
 	// block box to be laid out and positioned once the block has been closed and sized.
 	if (computed.position() == Style::Position::Absolute || computed.position() == Style::Position::Fixed)
 	{
-		if (uses_unsupported_display_position_float_combination("absolutely positioned"))
-			return true;
+		// if (uses_unsupported_display_position_float_combination("absolutely positioned"))
+		//	return true;
 
 		// Display the element as a block element.
 		block_context_box->AddAbsoluteElement(element);
@@ -248,8 +253,8 @@ bool LayoutEngine::FormatElement(BlockContainer* block_context_box, Element* ele
 	// If the element is floating, we remove it from the flow.
 	if (computed.float_() != Style::Float::None)
 	{
-		if (uses_unsupported_display_position_float_combination("floated"))
-			return true;
+		// if (uses_unsupported_display_position_float_combination("floated"))
+		//	return true;
 
 		LayoutEngine::FormatElement(element, LayoutDetails::GetContainingBlock(block_context_box));
 		return block_context_box->AddFloatElement(element);
@@ -258,27 +263,27 @@ bool LayoutEngine::FormatElement(BlockContainer* block_context_box, Element* ele
 	// The element is nothing exceptional, so format it according to its display property.
 	switch (display)
 	{
-		case Style::Display::Block:       return FormatElementBlock(block_context_box, element);
-		case Style::Display::Inline:      return FormatElementInline(block_context_box, element);
-		case Style::Display::InlineBlock: return FormatElementInlineBlock(block_context_box, element);
-		case Style::Display::Flex:        return FormatElementFlex(block_context_box, element);
-		case Style::Display::Table:       return FormatElementTable(block_context_box, element);
+	case Style::Display::Block: return FormatElementBlock(block_context_box, element);
+	case Style::Display::Inline: return FormatElementInline(block_context_box, element);
+	case Style::Display::InlineBlock: return FormatElementInlineBlock(block_context_box, element);
+	case Style::Display::Flex: return FormatElementFlex(block_context_box, element);
+	case Style::Display::Table: return FormatElementTable(block_context_box, element);
 
-		case Style::Display::TableRow:
-		case Style::Display::TableRowGroup:
-		case Style::Display::TableColumn:
-		case Style::Display::TableColumnGroup:
-		case Style::Display::TableCell:
-		{
-			// These elements should have been handled within FormatElementTable, seems like we're encountering table parts in the wild.
-			const Property* display_property = element->GetProperty(PropertyId::Display);
-			Log::Message(Log::LT_WARNING, "Element has a display type '%s', but is not located in a table. Element will not be formatted: %s",
-				display_property ? display_property->ToString().c_str() : "*unknown*",
-				element->GetAddress().c_str()
-			);
-			return true;
-		}
-		case Style::Display::None:        RMLUI_ERROR; /* handled above */ break;
+	case Style::Display::TableRow:
+	case Style::Display::TableRowGroup:
+	case Style::Display::TableColumn:
+	case Style::Display::TableColumnGroup:
+	case Style::Display::TableCell:
+	{
+		// These elements should have been handled within FormatElementTable, seems like we're encountering table parts in the wild.
+		const Property* display_property = element->GetProperty(PropertyId::Display);
+		Log::Message(Log::LT_WARNING, "Element has a display type '%s', but is not located in a table. Element will not be formatted: %s",
+			display_property ? display_property->ToString().c_str() : "*unknown*", element->GetAddress().c_str());
+		return true;
+	}
+	case Style::Display::None:
+		RMLUI_ERROR; /* handled above */
+		break;
 	}
 
 	return true;
@@ -310,24 +315,58 @@ bool LayoutEngine::FormatElementBlock(BlockContainer* block_context_box, Element
 		// We need to reformat ourself; format all of our children again and close the box. No need to check for error
 		// codes, as we already have our vertical slider bar.
 	case BlockContainer::CloseResult::LayoutSelf:
+	{
+		for (int i = 0; i < element->GetNumChildren(); i++)
+			FormatElement(new_block_context_box, element->GetChild(i));
+
+		if (new_block_context_box->Close() == BlockContainer::CloseResult::OK)
 		{
-			for (int i = 0; i < element->GetNumChildren(); i++)
-				FormatElement(new_block_context_box, element->GetChild(i));
-
-			if (new_block_context_box->Close() == BlockContainer::CloseResult::OK)
-			{
-				element->OnLayout();
-				break;
-			}
+			element->OnLayout();
+			break;
 		}
-		//-fallthrough
-		// We caused our parent to add a vertical scrollbar; bail out!
-		case BlockContainer::CloseResult::LayoutParent: return false;
+	}
+	//-fallthrough
+	// We caused our parent to add a vertical scrollbar; bail out!
+	case BlockContainer::CloseResult::LayoutParent: return false;
 
-		default: element->OnLayout(); break;
-		}
+	default: element->OnLayout(); break;
+	}
 
 	return true;
+}
+
+UniquePtr<FormattingContext> CreateFormattingContext(Element* element)
+{
+	// auto& computed = element->GetComputedValues();
+
+	// const Style::Display display = element->GetDisplay();
+
+	//// The element is nothing exceptional, so format it according to its display property.
+	// switch (display)
+	//{
+	// case Style::Display::Block: return FormatElementBlock(block_context_box, element);
+	// case Style::Display::Inline: return FormatElementInline(block_context_box, element);
+	// case Style::Display::InlineBlock: return FormatElementInlineBlock(block_context_box, element);
+	// case Style::Display::Flex: return FormatElementFlex(block_context_box, element);
+	// case Style::Display::Table: return FormatElementTable(block_context_box, element);
+
+	// case Style::Display::TableRow:
+	// case Style::Display::TableRowGroup:
+	// case Style::Display::TableColumn:
+	// case Style::Display::TableColumnGroup:
+	// case Style::Display::TableCell:
+	//{
+	//	// These elements should have been handled within FormatElementTable, seems like we're encountering table parts in the wild.
+	//	const Property* display_property = element->GetProperty(PropertyId::Display);
+	//	Log::Message(Log::LT_WARNING, "Element has a display type '%s', but is not located in a table. Element will not be formatted: %s",
+	//		display_property ? display_property->ToString().c_str() : "*unknown*", element->GetAddress().c_str());
+	//	return true;
+	// }
+	// case Style::Display::None:
+	//	RMLUI_ERROR; /* handled above */
+	//	break;
+	// }
+	return nullptr;
 }
 
 // Formats and positions an element as an inline element.
@@ -390,8 +429,8 @@ bool LayoutEngine::FormatElementFlex(BlockContainer* block_context_box, Element*
 	// Format the flexbox and all its children.
 	ElementList absolutely_positioned_elements;
 	Vector2f formatted_content_size, content_overflow_size;
-	LayoutFlex::Format(
-		box, min_size, max_size, containing_block, element, formatted_content_size, content_overflow_size, absolutely_positioned_elements);
+	LayoutFlex::Format(box, min_size, max_size, containing_block, element, formatted_content_size, content_overflow_size,
+		absolutely_positioned_elements);
 
 	// Set the box content size to match the one determined by the formatting procedure.
 	flex_block_context_box->GetBox().SetContent(formatted_content_size);
@@ -414,8 +453,8 @@ bool LayoutEngine::FormatElementFlex(BlockContainer* block_context_box, Element*
 		// Scrollbars added to flex container, it needs to be formatted again to account for changed width or height.
 		absolutely_positioned_elements.clear();
 
-		LayoutFlex::Format(
-			box, min_size, max_size, containing_block, element, formatted_content_size, content_overflow_size, absolutely_positioned_elements);
+		LayoutFlex::Format(box, min_size, max_size, containing_block, element, formatted_content_size, content_overflow_size,
+			absolutely_positioned_elements);
 
 		flex_block_context_box->GetBox().SetContent(formatted_content_size);
 		flex_block_context_box->ExtendInnerContentSize(content_overflow_size);
@@ -428,7 +467,6 @@ bool LayoutEngine::FormatElementFlex(BlockContainer* block_context_box, Element*
 
 	return true;
 }
-
 
 bool LayoutEngine::FormatElementTable(BlockContainer* block_context_box, Element* element_table)
 {
@@ -473,11 +511,10 @@ bool LayoutEngine::FormatElementTable(BlockContainer* block_context_box, Element
 	return true;
 }
 
-// Executes any special formatting for special elements.
 bool LayoutEngine::FormatElementSpecial(BlockContainer* block_context_box, Element* element)
 {
 	static const String br("br");
-	
+
 	// Check for a <br> tag.
 	if (element->GetTagName() == br)
 	{
