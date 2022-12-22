@@ -311,14 +311,13 @@ void LayoutInlineBox::PositionElement()
 		element->SetOffset(line->GetRelativePosition() + position, line->GetBlockContainer()->GetOffsetParent()->GetElement());
 }
 
-// Sizes the inline box's element.
-void LayoutInlineBox::SizeElement(bool split)
+void LayoutInlineBox::SizeElement(bool split, Vector2f line_position)
 {
 	// Resize the box for an unsized inline element.
 	if (box.GetSize() == Vector2f(-1, -1))
 	{
 		box.SetContent(Vector2f(width, element->GetLineHeight()));
-		if (parent != nullptr)
+		if (parent)
 			parent->width += width;
 	}
 
@@ -333,10 +332,10 @@ void LayoutInlineBox::SizeElement(bool split)
 	// The elements of a chained box have already had their positions set by the first link.
 	if (chained)
 	{
-		const Vector2f box_offset = (line->GetPosition() + position) - element->GetRelativeOffset(Box::BORDER);
+		const Vector2f box_offset = (line_position + position) - element->GetRelativeOffset(Box::BORDER);
 		element->AddBox(element_box, box_offset);
 
-		if (chain != nullptr)
+		if (chain)
 			element->OnLayout();
 	}
 	else
@@ -358,7 +357,11 @@ Element* LayoutInlineBox::GetElement()
 	return element;
 }
 
-// Returns the inline box's parent.
+const LayoutInlineBox* LayoutInlineBox::GetParent() const
+{
+	return parent;
+}
+
 LayoutInlineBox* LayoutInlineBox::GetParent()
 {
 	return parent;

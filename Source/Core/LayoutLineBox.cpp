@@ -159,7 +159,7 @@ LayoutInlineBox* LayoutLineBox::Close(UniquePtr<LayoutInlineBox> overflow)
 
 		// Check if this inline box is part of the open box chain.
 		bool inline_box_open = false;
-		LayoutInlineBox* open_box = open_inline_box;
+		const LayoutInlineBox* open_box = open_inline_box;
 		while (open_box && !inline_box_open)
 		{
 			if (inline_boxes[i].get() == open_box)
@@ -168,10 +168,10 @@ LayoutInlineBox* LayoutLineBox::Close(UniquePtr<LayoutInlineBox> overflow)
 			open_box = open_box->GetParent();
 		}
 
-		inline_boxes[i]->SizeElement(inline_box_open);
+		inline_boxes[i]->SizeElement(inline_box_open, position);
 	}
 
-	return parent->CloseLineBox(this, std::move(overflow), open_inline_box);
+	return parent->CloseLineBox(position.y, dimensions, std::move(overflow), open_inline_box);
 }
 
 // Closes one of the line box's inline boxes.
@@ -228,7 +228,7 @@ LayoutInlineBox* LayoutLineBox::AddBox(UniquePtr<LayoutInlineBox> box_ptr)
 			// Calculate the right spacing for the element.
 			right_spacing = GetSpacing(box->GetBox(), Box::RIGHT);
 			// Add the right spacing for any ancestor elements that must close immediately after it.
-			LayoutInlineBox* closing_box = box;
+			const LayoutInlineBox* closing_box = box;
 			while (closing_box && closing_box->IsLastChild())
 			{
 				closing_box = closing_box->GetParent();
@@ -257,13 +257,13 @@ LayoutInlineBox* LayoutLineBox::AddBox(UniquePtr<LayoutInlineBox> box_ptr)
 		// Build up the spacing required on the right side of this element. This consists of the right spacing on the
 		// new element, and the right spacing on all parent element that will close next.
 		right_spacing = GetSpacing(box->GetBox(), Box::RIGHT);
-		if (open_inline_box != nullptr && box->IsLastChild())
+		if (open_inline_box && box->IsLastChild())
 		{
-			LayoutInlineBox* closing_box = open_inline_box;
-			while (closing_box != nullptr && closing_box->IsLastChild())
+			const LayoutInlineBox* closing_box = open_inline_box;
+			while (closing_box && closing_box->IsLastChild())
 			{
 				closing_box = closing_box->GetParent();
-				if (closing_box != nullptr)
+				if (closing_box)
 					right_spacing += GetSpacing(closing_box->GetBox(), Box::RIGHT);
 			}
 		}
@@ -314,7 +314,7 @@ void LayoutLineBox::AddChainedBox(LayoutInlineBox* chained_box)
 {
 	Stack<LayoutInlineBox*> hierarchy;
 	LayoutInlineBox* chain = chained_box;
-	while (chain != nullptr)
+	while (chain)
 	{
 		hierarchy.push(chain);
 		chain = chain->GetParent();
@@ -325,11 +325,6 @@ void LayoutLineBox::AddChainedBox(LayoutInlineBox* chained_box)
 		AddBox(MakeUnique<LayoutInlineBox>(hierarchy.top()));
 		hierarchy.pop();
 	}
-}
-
-Vector2f LayoutLineBox::GetPosition() const
-{
-	return position;
 }
 
 Vector2f LayoutLineBox::GetRelativePosition() const

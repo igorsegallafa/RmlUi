@@ -549,12 +549,12 @@ Element* BlockContainer::GetElement() const
 }
 
 // Returns the block box's parent.
-BlockContainer* BlockContainer::GetParent() const
+const BlockContainer* BlockContainer::GetParent() const
 {
 	return parent;
 }
 
-LayoutBlockBoxSpace* BlockContainer::GetBlockBoxSpace() const
+const LayoutBlockBoxSpace* BlockContainer::GetBlockBoxSpace() const
 {
 	return space.get();
 }
@@ -727,12 +727,13 @@ InlineContainer::CloseResult InlineContainer::Close(LayoutInlineBox** out_open_i
 	return CloseResult::OK;
 }
 
-LayoutInlineBox* InlineContainer::CloseLineBox(LayoutLineBox* child, UniquePtr<LayoutInlineBox> overflow, LayoutInlineBox* overflow_chain)
+LayoutInlineBox* InlineContainer::CloseLineBox(float child_pos_y, Vector2f child_dimensions, UniquePtr<LayoutInlineBox> overflow,
+	LayoutInlineBox* overflow_chain)
 {
 	RMLUI_ZoneScoped;
 
-	if (child->GetDimensions().x > 0)
-		box_cursor = (child->GetPosition().y - position.y) + child->GetDimensions().y;
+	if (child_dimensions.x > 0)
+		box_cursor = (child_pos_y - position.y) + child_dimensions.y;
 
 	// If we have any pending floating elements for our parent, then this would be an ideal time to place them.
 	parent->PlaceQueuedFloats(box_cursor);
@@ -813,15 +814,9 @@ float InlineContainer::GetShrinkToFitWidth() const
 }
 
 // Returns the block box's parent.
-BlockContainer* InlineContainer::GetParent() const
+const BlockContainer* InlineContainer::GetParent() const
 {
 	return parent;
-}
-
-// Returns the position of the block box, relative to its parent's content area.
-Vector2f InlineContainer::GetPosition() const
-{
-	return position;
 }
 
 float InlineContainer::GetHeightIncludingOpenLine() const

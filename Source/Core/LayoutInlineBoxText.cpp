@@ -141,11 +141,7 @@ void LayoutInlineBoxText::PositionElement()
 	}
 }
 
-// Sizes the inline box's element.
-void LayoutInlineBoxText::SizeElement(bool RMLUI_UNUSED_PARAMETER(split))
-{
-	RMLUI_UNUSED(split);
-}
+void LayoutInlineBoxText::SizeElement(bool /*split*/, Vector2f /*line_position*/) {}
 
 String LayoutInlineBoxText::DumpNameValue() const
 {

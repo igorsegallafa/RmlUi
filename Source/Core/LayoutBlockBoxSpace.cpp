@@ -36,7 +36,7 @@
 
 namespace Rml {
 
-LayoutBlockBoxSpace::LayoutBlockBoxSpace(BlockContainer* _parent) : offset(0, 0), dimensions(0, 0)
+LayoutBlockBoxSpace::LayoutBlockBoxSpace(const BlockContainer* _parent) : offset(0, 0), dimensions(0, 0)
 {
 	parent = _parent;
 }

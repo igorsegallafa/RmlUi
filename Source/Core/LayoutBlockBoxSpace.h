@@ -46,7 +46,7 @@ class BlockContainer;
 
 class LayoutBlockBoxSpace {
 public:
-	LayoutBlockBoxSpace(BlockContainer* parent);
+	LayoutBlockBoxSpace(const BlockContainer* parent);
 	~LayoutBlockBoxSpace();
 
 	/// Imports boxes from another block into this space.
@@ -105,7 +105,7 @@ private:
 	using SpaceBoxList = Vector<SpaceBox>;
 
 	// Our block-box parent.
-	BlockContainer* parent;
+	const BlockContainer* parent;
 
 	// The boxes floating in our space.
 	SpaceBoxList boxes[NUM_ANCHOR_EDGES];

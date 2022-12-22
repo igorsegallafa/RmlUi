@@ -70,14 +70,9 @@ public:
 	/// @param split_box[in] The box overflowed from a previous line.
 	void AddChainedBox(LayoutInlineBox* chained_box);
 
-	/// Returns the position of the line box, relative to its parent's block box's content area.
-	/// @return The position of the line box.
-	Vector2f GetPosition() const;
 	/// Returns the position of the line box, relative to its parent's block box's offset parent.
-	/// @return The relative position of the line box.
 	Vector2f GetRelativePosition() const;
 	/// Returns the dimensions of the line box.
-	/// @return The dimensions of the line box.
 	Vector2f GetDimensions() const;
 
 	/// Returns the line box's open inline box.
@@ -108,7 +103,7 @@ private:
 	// The block-level box containing this line.
 	InlineContainer* parent;
 
-	// The top-left position of the line box; this is set when the first inline box is placed.
+	// The top-left position of the line box, relative to its parent's block box's content area; this is set when the first inline box is placed.
 	Vector2f position;
 	bool position_set;
 

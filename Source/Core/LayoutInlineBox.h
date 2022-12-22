@@ -103,24 +103,20 @@ public:
 	/// Positions the inline box's element.
 	virtual void PositionElement();
 	/// Sizes the inline box's element.
-	/// @param split[in] True if this box is split, false otherwise.
-	virtual void SizeElement(bool split);
+	/// @param[in] split True if this box is split, false otherwise.
+	/// @param[in] line_position Position of parent line to enable placement of chained boxes.
+	virtual void SizeElement(bool split, Vector2f line_position);
 
 	/// Returns the vertical align property of the box's element.
 	/// @return the vertical align property, or -1 if it is set to a numerical value.
 	Style::VerticalAlign GetVerticalAlignProperty() const;
 
-	/// Returns the inline box's element.
-	/// @return The inline box's element.
 	Element* GetElement();
 
-	/// Returns the inline box's parent.
-	/// @param The parent of this inline box. This will be nullptr for a root-level inline box (ie, one that has a block element has a parent in the
-	/// true hierarchy).
 	LayoutInlineBox* GetParent();
+	const LayoutInlineBox* GetParent() const;
 
 	/// Returns the inline box's dimension box.
-	/// @return The inline box's dimension box.
 	const Box& GetBox() const;
 	/// Returns the height of the inline box. This is separate from the the box, as different types of inline
 	/// elements generate different line heights. The possible types are:
@@ -130,7 +126,6 @@ public:
 	///  * text elements, which use their line-height
 	float GetHeight() const;
 	/// Returns the baseline of the inline box.
-	/// @return The box's baseline.
 	float GetBaseline() const;
 
 	// Debug dump type name and value.

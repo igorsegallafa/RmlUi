@@ -66,8 +66,6 @@ private:
 	Type type;
 };
 
-
-
 class BlockLevelBox : public LayoutBox {
 public:
 	// Returns the outer size of this box including overflowing content. Similar to scroll width, but shrinked if overflow is caught
@@ -185,10 +183,10 @@ public:
 	Element* GetElement() const;
 
 	/// Returns the block box's parent.
-	BlockContainer* GetParent() const;
+	const BlockContainer* GetParent() const;
 
 	/// Returns the block box space.
-	LayoutBlockBoxSpace* GetBlockBoxSpace() const;
+	const LayoutBlockBoxSpace* GetBlockBoxSpace() const;
 
 	/// Returns the position of the block box, relative to its parent's content area.
 	/// @return The relative position of the block box.
@@ -294,12 +292,12 @@ public:
 	CloseResult Close(LayoutInlineBox** out_open_inline_box = nullptr);
 
 	/// Called by a closing line box child. Increments the cursor, and creates a new line box to fit the overflow (if any).
-	/// @param child[in] The closing child line box.
-	/// @param overflow[in] The overflow from the closing line box. May be nullptr if there was no overflow.
-	/// @param overflow_chain[in] The end of the chained hierarchy to be spilled over to the new line, as the parent to the overflow box (if one
-	/// exists).
+	/// @param[in] child_pos_y The vertical position of the line being closed.
+	/// @param[in] child_dimensions The size of the line being closed.
+	/// @param[in] overflow The overflow from the closing line box. May be nullptr if there was no overflow.
+	/// @param[in] overflow_chain The end of the chained hierarchy to be spilled over to the new line, as the parent to the overflow box (if one exists).
 	/// @return If the line box had overflow, this will be the last inline box created by the overflow.
-	LayoutInlineBox* CloseLineBox(LayoutLineBox* child, UniquePtr<LayoutInlineBox> overflow, LayoutInlineBox* overflow_chain);
+	LayoutInlineBox* CloseLineBox(float child_pos_y, Vector2f child_dimensions, UniquePtr<LayoutInlineBox> overflow, LayoutInlineBox* overflow_chain);
 
 	/// Adds a new inline element to this inline-context box.
 	/// @param element[in] The new inline element.
@@ -330,10 +328,7 @@ public:
 	float GetShrinkToFitWidth() const;
 
 	/// Returns the block box's parent.
-	BlockContainer* GetParent() const;
-
-	/// Returns the position of the block box, relative to its parent's content area.
-	Vector2f GetPosition() const;
+	const BlockContainer* GetParent() const;
 
 	/// Returns the height of this inline container, including the last line even if it is still open.
 	float GetHeightIncludingOpenLine() const;

@@ -68,7 +68,7 @@ public:
 	/// Positions the inline box's element.
 	void PositionElement() override;
 	/// Sizes the inline box's element.
-	void SizeElement(bool split) override;
+	void SizeElement(bool split, Vector2f line_position) override;
 
 	// Debug dump type name and value.
 	String DumpNameValue() const override;
