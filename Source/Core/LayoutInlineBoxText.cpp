@@ -89,8 +89,8 @@ UniquePtr<LayoutInlineBox> LayoutInlineBoxText::FlowContent(bool first_box, floa
 
 	Vector2f content_area;
 	content_area.x = line_width;
-	content_area.y = box.GetSize().y;
-	box.SetContent(content_area);
+	content_area.y = GetBoxContentSize().y;
+	SetBoxContentSize(content_area);
 
 	// Call the base-class's FlowContent() to increment the width of our parent's box.
 	LayoutInlineBox::FlowContent(first_box, available_width, right_spacing_width);
@@ -104,40 +104,42 @@ UniquePtr<LayoutInlineBox> LayoutInlineBoxText::FlowContent(bool first_box, floa
 // Computes and sets the vertical position of this element, relative to its parent inline box (or block box, for an un-nested inline box).
 void LayoutInlineBoxText::CalculateBaseline(float& ascender, float& descender)
 {
-	ascender = height - baseline;
-	descender = height - ascender;
+	ascender = GetHeight() - GetBaseline();
+	descender = GetHeight() - ascender;
 }
 
 // Offsets the baseline of this box, and all of its children, by the ascender of the parent line box.
 void LayoutInlineBoxText::OffsetBaseline(float ascender)
 {
 	// Offset by the ascender.
-	position.y += (ascender - (height - baseline));
+	float increment = (ascender - (GetHeight() - GetBaseline()));
 
 	// Calculate the leading (the difference between font height and line height).
 	float leading = 0;
 
-	FontFaceHandle font_face_handle = element->GetFontFaceHandle();
+	FontFaceHandle font_face_handle = GetElement()->GetFontFaceHandle();
 	if (font_face_handle != 0)
-		leading = height - GetFontEngineInterface()->GetLineHeight(font_face_handle);
+		leading = GetHeight() - GetFontEngineInterface()->GetLineHeight(font_face_handle);
 
 	// Offset by the half-leading.
-	position.y += leading * 0.5f;
+	increment += leading * 0.5f;
+
+	SetVerticalPosition(GetPosition().y + increment);
 }
 
-// Positions the inline box's element.
-void LayoutInlineBoxText::PositionElement()
+void LayoutInlineBoxText::PositionElement(Vector2f relative_position, Element* offset_parent)
 {
+	auto text_element = GetTextElement();
 	if (line_begin == 0)
 	{
-		LayoutInlineBox::PositionElement();
+		LayoutInlineBox::PositionElement(relative_position, offset_parent);
 
-		GetTextElement()->ClearLines();
-		GetTextElement()->AddLine(Vector2f(0, 0), line_contents);
+		text_element->ClearLines();
+		text_element->AddLine(Vector2f(0, 0), line_contents);
 	}
 	else
 	{
-		GetTextElement()->AddLine(line->GetRelativePosition() + position - element->GetRelativeOffset(Box::BORDER), line_contents);
+		text_element->AddLine(relative_position + GetPosition() - text_element->GetRelativeOffset(Box::BORDER), line_contents);
 	}
 }
 
@@ -161,9 +163,9 @@ void LayoutInlineBoxText::operator delete(void* chunk, size_t size)
 // Returns the box's element as a text element.
 ElementText* LayoutInlineBoxText::GetTextElement()
 {
-	RMLUI_ASSERT(rmlui_dynamic_cast<ElementText*>(element));
+	RMLUI_ASSERT(rmlui_dynamic_cast<ElementText*>(GetElement()));
 
-	return static_cast<ElementText*>(element);
+	return static_cast<ElementText*>(GetElement());
 }
 
 // Builds a box for the first word of the element.
@@ -177,8 +179,8 @@ void LayoutInlineBoxText::BuildWordBox()
 	FontFaceHandle font_face_handle = text_element->GetFontFaceHandle();
 	if (font_face_handle == 0)
 	{
-		height = 0;
-		baseline = 0;
+		SetHeight(0);
+		SetBaseline(0);
 
 		const ComputedValues& computed = text_element->GetComputedValues();
 		const String font_family_property = computed.font_family();
@@ -205,7 +207,7 @@ void LayoutInlineBoxText::BuildWordBox()
 	Vector2f content_area;
 	line_segmented = !text_element->GenerateToken(content_area.x, line_begin);
 	content_area.y = text_element->GetLineHeight();
-	box.SetContent(content_area);
+	SetBoxContentSize(content_area);
 }
 
 } // namespace Rml

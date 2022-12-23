@@ -101,7 +101,7 @@ public:
 	void SetVerticalPosition(float position);
 
 	/// Positions the inline box's element.
-	virtual void PositionElement();
+	virtual void PositionElement(Vector2f relative_position, Element* offset_parent);
 	/// Sizes the inline box's element.
 	/// @param[in] split True if this box is split, false otherwise.
 	/// @param[in] line_position Position of parent line to enable placement of chained boxes.
@@ -114,18 +114,18 @@ public:
 	LayoutInlineBox* GetParent();
 	const LayoutInlineBox* GetParent() const;
 
-	/// Returns the inline box's dimension box.
-	const Box& GetBox() const;
 	/// Returns the height of the inline box. This is separate from the the box, as different types of inline
 	/// elements generate different line heights. The possible types are:
 	///  * replaced elements (or inline-block elements), which use their entire box (including margins) as their
 	///    height
 	///  * non-replaced elements, which use the maximum line-height of their children
 	///  * text elements, which use their line-height
-	float GetHeight() const;
+	float GetHeight() const { return height; }
 	/// Returns the baseline of the inline box.
-	float GetBaseline() const;
+	float GetBaseline() const { return baseline; }
 
+	/// Returns the inline box's dimension box.
+	const Box& GetBox() const;
 	// Debug dump type name and value.
 	virtual String DumpNameValue() const;
 	// Debug dump layout tree.
@@ -135,6 +135,15 @@ public:
 	void operator delete(void* chunk, size_t size);
 
 protected:
+	Element* GetElement() { return element; }
+
+	void SetHeight(float value) { height = value; }
+	void SetBaseline(float value) { baseline = value; }
+
+	Vector2f GetBoxContentSize() const { return box.GetSize(); }
+	void SetBoxContentSize(Vector2f value) { return box.SetContent(value); }
+
+private:
 	/// Returns our parent box's font face handle.
 	/// @return The font face handle of our parent box.
 	FontFaceHandle GetParentFont() const;

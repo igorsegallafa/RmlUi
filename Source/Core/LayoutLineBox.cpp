@@ -153,10 +153,15 @@ LayoutInlineBox* LayoutLineBox::Close(UniquePtr<LayoutInlineBox> overflow)
 		}
 	}
 
+	// Find the position of the line box, relative to its parent's block box's offset parent.
+	const BlockContainer* block_container = GetBlockContainer();
+	const BlockContainer* offset_parent = block_container->GetOffsetParent();
+	const Vector2f relative_position = position - (offset_parent->GetPosition() - block_container->GetOffsetRoot()->GetPosition());
+
 	// Get each line box to set the position of their element, relative to their parents.
 	for (int i = (int)inline_boxes.size() - 1; i >= 0; --i)
 	{
-		inline_boxes[i]->PositionElement();
+		inline_boxes[i]->PositionElement(relative_position, offset_parent->GetElement());
 
 		// Check if this inline box is part of the open box chain.
 		bool inline_box_open = false;
@@ -326,12 +331,6 @@ void LayoutLineBox::AddChainedBox(LayoutInlineBox* chained_box)
 		AddBox(MakeUnique<LayoutInlineBox>(hierarchy.top()));
 		hierarchy.pop();
 	}
-}
-
-Vector2f LayoutLineBox::GetRelativePosition() const
-{
-	const BlockContainer* block_container = GetBlockContainer();
-	return position - (block_container->GetOffsetParent()->GetPosition() - block_container->GetOffsetRoot()->GetPosition());
 }
 
 Vector2f LayoutLineBox::GetDimensions() const

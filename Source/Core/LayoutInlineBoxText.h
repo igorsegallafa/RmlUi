@@ -66,7 +66,7 @@ public:
 	void OffsetBaseline(float ascender) override;
 
 	/// Positions the inline box's element.
-	void PositionElement() override;
+	void PositionElement(Vector2f relative_position, Element* offset_parent) override;
 	/// Sizes the inline box's element.
 	void SizeElement(bool split, Vector2f line_position) override;
 

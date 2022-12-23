@@ -294,7 +294,7 @@ void LayoutInlineBox::SetVerticalPosition(float _position)
 	position.y = _position;
 }
 
-void LayoutInlineBox::PositionElement()
+void LayoutInlineBox::PositionElement(Vector2f relative_position, Element* offset_parent)
 {
 	if (box.GetSize() == Vector2f(-1, -1))
 	{
@@ -308,7 +308,7 @@ void LayoutInlineBox::PositionElement()
 		position.y += box.GetEdge(Box::MARGIN, Box::TOP);
 
 	if (!chained)
-		element->SetOffset(line->GetRelativePosition() + position, line->GetBlockContainer()->GetOffsetParent()->GetElement());
+		element->SetOffset(relative_position + position, offset_parent);
 }
 
 void LayoutInlineBox::SizeElement(bool split, Vector2f line_position)
@@ -367,18 +367,6 @@ const Box& LayoutInlineBox::GetBox() const
 	return box;
 }
 
-// Returns the height of the inline box.
-float LayoutInlineBox::GetHeight() const
-{
-	return height;
-}
-
-// Returns the baseline of the inline box.
-float LayoutInlineBox::GetBaseline() const
-{
-	return baseline;
-}
-
 String LayoutInlineBox::DumpNameValue() const
 {
 	return "LayoutInlineBox";
@@ -405,7 +393,6 @@ void LayoutInlineBox::operator delete(void* chunk, size_t size)
 	LayoutEngine::DeallocateLayoutChunk(chunk, size);
 }
 
-// Returns our parent box's font face handle.
 FontFaceHandle LayoutInlineBox::GetParentFont() const
 {
 	if (!parent)

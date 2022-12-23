@@ -263,37 +263,28 @@ bool LayoutEngine::FormatElementBlock(BlockContainer* block_context_box, Element
 	if (!new_block_context_box)
 		return false;
 
-	// Format the element's children.
-	for (int i = 0; i < element->GetNumChildren(); i++)
+	for (int layout_iteration = 0; layout_iteration < 2; layout_iteration++)
 	{
-		if (!FormatElementFlow(new_block_context_box, element->GetChild(i)))
-			i = -1;
-	}
-
-	// Close the block box, and check the return code; we may have overflowed either this element or our parent.
-	switch (new_block_context_box->Close())
-	{
-	case BlockContainer::CloseResult::LayoutSelf:
-	{
-		// We need to reformat ourself; format all of our children again and close the box. No need to check for error
-		// codes, as we already have our vertical slider bar.
+		// Format the element's children.
 		for (int i = 0; i < element->GetNumChildren(); i++)
-			FormatElementFlow(new_block_context_box, element->GetChild(i));
-
-		if (new_block_context_box->Close() == BlockContainer::CloseResult::OK)
 		{
-			element->OnLayout();
-			break;
+			if (!FormatElementFlow(new_block_context_box, element->GetChild(i)))
+				i = -1;
 		}
+
+		const auto result = new_block_context_box->Close();
+		if (result == BlockContainer::CloseResult::LayoutSelf)
+			// We need to reformat ourself; do a second iteration to format all of our children and close again.
+			continue;
+		else if (result == BlockContainer::CloseResult::LayoutParent)
+			// We caused our parent to add a vertical scrollbar; bail out!
+			return false;
+
+		// Otherwise, we are all good to finish up.
+		break;
 	}
-	//-fallthrough
-	case BlockContainer::CloseResult::LayoutParent:
-	{
-		// We caused our parent to add a vertical scrollbar; bail out!
-		return false;
-	}
-	default: element->OnLayout(); break;
-	}
+
+	element->OnLayout();
 
 	if (format_settings.out_visible_overflow_size)
 		*format_settings.out_visible_overflow_size = new_block_context_box->GetVisibleOverflowSize();
