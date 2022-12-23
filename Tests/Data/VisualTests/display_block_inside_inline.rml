@@ -10,13 +10,20 @@
 </head>
 <body id="rmlui-debug-layout">
 
+<span id="wrap">
+	<span id="a">
+		<div id="block">Y</div>
+	</span>
+	<span id="b">Z</span>
+</span>
+
+<!--
+
 <span id="span">
 A
 <div id="div">B</div>
 C
 </span>
-
-<!--
 
 <span id="span" style="text-align: center; border: 1px #000; background: #f00;">
 A<br/>B
