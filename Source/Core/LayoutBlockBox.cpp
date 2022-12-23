@@ -232,13 +232,12 @@ BlockContainer::CloseResult BlockContainer::Close()
 			return CloseResult::LayoutParent;
 	}
 
+	// If we represent a positioned element, then we can now (as we've been sized) act as the containing block for all
+	// the absolutely-positioned elements of our descendants.
+	CloseAbsoluteElements();
+
 	if (element)
 	{
-		// If we represent a positioned element, then we can now (as we've been sized) act as the containing block for all
-		// the absolutely-positioned elements of our descendants.
-		if (element->GetPosition() != Style::Position::Static)
-			CloseAbsoluteElements();
-
 		// Any relatively positioned elements that we act as containing block for may also need to be have their positions
 		// updated to reflect changes to the size of this block box.
 		for (Element* child : relative_elements)

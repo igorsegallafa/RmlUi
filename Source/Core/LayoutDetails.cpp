@@ -123,20 +123,6 @@ void LayoutDetails::BuildBox(Box& box, Vector2f containing_block, Element* eleme
 	BuildBoxSizeAndMargins(box, min_size, max_size, containing_block, element, box_context, replaced_element, override_shrink_to_fit_width);
 }
 
-// Generates the box for an element placed in a block box.
-void LayoutDetails::BuildBox(Box& box, float& min_height, float& max_height, BlockContainer* containing_box, Element* element, BoxContext box_context,
-	float override_shrink_to_fit_width)
-{
-	Vector2f containing_block = LayoutDetails::GetContainingBlock(containing_box);
-
-	BuildBox(box, containing_block, element, box_context, override_shrink_to_fit_width);
-
-	if (element)
-		GetDefiniteMinMaxHeight(min_height, max_height, element->GetComputedValues(), box, containing_block.y);
-	else
-		min_height = max_height = box.GetSize().y;
-}
-
 void LayoutDetails::GetMinMaxWidth(float& min_width, float& max_width, const ComputedValues& computed, const Box& box, float containing_block_width)
 {
 	min_width = ResolveValue(computed.min_width(), containing_block_width);
@@ -239,6 +225,8 @@ float LayoutDetails::GetShrinkToFitWidth(Element* element, Vector2f containing_b
 {
 	RMLUI_ASSERT(element);
 
+	// TODO: Can we lay out the elements directly using a fit-content size mode, instead of fetching the shrink-to-fit width first?
+	//       Use a non-definite placeholder for the box content width, and available width as a maximum constraint.
 	Box box;
 	float min_height, max_height;
 	LayoutDetails::BuildBox(box, containing_block, element, BoxContext::Block, containing_block.x);
@@ -256,7 +244,7 @@ float LayoutDetails::GetShrinkToFitWidth(Element* element, Vector2f containing_b
 	// Also, children of elements with a fixed width and height don't need to be formatted further.
 	for (int i = 0; i < element->GetNumChildren(); i++)
 	{
-		if (!LayoutEngine::FormatElement(block_context_box, element->GetChild(i)))
+		if (!LayoutEngine::FormatElementFlow(block_context_box, element->GetChild(i)))
 			i = -1;
 	}
 

@@ -36,6 +36,11 @@ namespace Rml {
 
 class Box;
 
+struct FormatSettings {
+	const Box* override_initial_box = nullptr;
+	Vector2f* out_visible_overflow_size = nullptr;
+};
+
 /**
     @author Robert Curry
  */
@@ -48,22 +53,22 @@ public:
 	/// @param[in] containing_block The size of the containing block.
 	/// @param[in] override_initial_box Optional pointer to a box to override the generated box for the element.
 	/// @param[out] visible_overflow_size Optionally output the overflow size of the element.
-	static void FormatElement(Element* element, Vector2f containing_block, const Box* override_initial_box = nullptr,
-		Vector2f* out_visible_overflow_size = nullptr);
+	static void FormatElement(Element* element, Vector2f containing_block, FormatSettings format_settings = {});
 
-	/// Positions a single element and its children within a block formatting context.
-	/// @param[in] block_context_box The open block box to layout the element in.
-	/// @param[in] element The element to lay out.
-	static bool FormatElement(BlockContainer* block_context_box, Element* element);
+	// TODO Format an element in normal flow layout.
+	static bool FormatElementFlow(BlockContainer* block_context_box, Element* element);
 
 	static void* AllocateLayoutChunk(size_t size);
 	static void DeallocateLayoutChunk(void* chunk, size_t size);
 
 private:
+	// TODO Format an element in an independent formatting context.
+	static bool FormatElementBlockified(BlockContainer* block_context_box, Element* element, FormatSettings format_settings);
+
 	/// Formats and positions an element as a block element.
 	/// @param[in] block_context_box The open block box to layout the element in.
 	/// @param[in] element The block element.
-	static bool FormatElementBlock(BlockContainer* block_context_box, Element* element);
+	static bool FormatElementBlock(BlockContainer* block_context_box, Element* element, FormatSettings format_settings = {});
 	/// Formats and positions an element as an inline element.
 	/// @param[in] block_context_box The open block box to layout the element in.
 	/// @param[in] element The inline element.

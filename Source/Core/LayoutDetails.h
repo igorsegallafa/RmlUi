@@ -68,17 +68,6 @@ public:
 	/// shrinking.
 	static void BuildBox(Box& box, Vector2f containing_block, Element* element, BoxContext box_context = BoxContext::Block,
 		float override_shrink_to_fit_width = -1);
-	/// Generates the box for an element placed in a block box.
-	/// @param[out] box The box to be built.
-	/// @param[out] min_height The minimum height of the element's box.
-	/// @param[out] max_height The maximum height of the element's box.
-	/// @param[in] containing_box The block box containing the element.
-	/// @param[in] element The element to build the box for.
-	/// @param[in] box_context The formatting context in which the box is generated.
-	/// @param[in] override_shrink_to_fit_width Provide a fixed shrink-to-fit width instead of formatting the element when its properties allow
-	/// shrinking.
-	static void BuildBox(Box& box, float& min_height, float& max_height, BlockContainer* containing_box, Element* element,
-		BoxContext box_context = BoxContext::Block, float override_shrink_to_fit_width = -1);
 
 	// Retrieves the minimum and maximum width from an element's computed values.
 	static void GetMinMaxWidth(float& min_width, float& max_width, const ComputedValues& computed, const Box& box, float containing_block_width);

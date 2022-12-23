@@ -88,6 +88,17 @@ void LayoutEngine::DeallocateLayoutChunk(void* chunk, size_t size)
 	}
 }
 
+// Table elements should be handled within FormatElementTable, log a warning when it seems like we're encountering table parts in the wild.
+static void LogWarningForWildTablePart(Element* element, Style::Display display)
+{
+	RMLUI_ASSERT(element);
+	String value = "*unknown";
+	StyleSheetSpecification::GetPropertySpecification().GetProperty(PropertyId::Display)->GetValue(value, Property(display));
+
+	Log::Message(Log::LT_WARNING, "Element has a display type '%s', but is not located in a table. Element will not be formatted: %s", value.c_str(),
+		element->GetAddress().c_str());
+}
+
 #ifdef RMLUI_DEBUG
 static bool g_debug_dumping_layout_tree = false;
 struct DebugDumpLayoutTree {
@@ -124,7 +135,7 @@ struct DebugDumpLayoutTree {
 #endif
 
 // Formats the contents for a root-level element (usually a document or floating element).
-void LayoutEngine::FormatElement(Element* element, Vector2f containing_block, const Box* override_initial_box, Vector2f* out_visible_overflow_size)
+void LayoutEngine::FormatElement(Element* element, Vector2f containing_block, FormatSettings format_settings)
 {
 	RMLUI_ASSERT(element && containing_block.x >= 0 && containing_block.y >= 0);
 #ifdef RMLUI_ENABLE_PROFILING
@@ -133,47 +144,23 @@ void LayoutEngine::FormatElement(Element* element, Vector2f containing_block, co
 	RMLUI_ZoneName(name.c_str(), name.size());
 #endif
 
-	if (element && element->GetId() == "absolute")
-		int x = 0;
-
+	// TODO: Make a lighter data structure for the containing block, or, just a pointer to the given box's containing block box.
 	auto containing_block_box = MakeUnique<BlockContainer>(nullptr, nullptr, Box(containing_block), 0.0f, FLT_MAX);
 	DebugDumpLayoutTree debug_dump_tree(element, containing_block_box.get());
 
-	Box box;
-	if (override_initial_box)
-		box = *override_initial_box;
-	else
-		LayoutDetails::BuildBox(box, containing_block, element);
-
-	// TODO: This is basically the same as FormatElementBlock with some more stuff... Can we merge them and just use FormatElement(block, element)?
-	// That way perhaps we're able to consider e.g. both absolute and flex box simultaneously.
-	float min_height, max_height;
-	LayoutDetails::GetDefiniteMinMaxHeight(min_height, max_height, element->GetComputedValues(), box, containing_block.y);
-
-	BlockContainer* block_context_box = containing_block_box->AddBlockElement(element, box, min_height, max_height);
-
 	for (int layout_iteration = 0; layout_iteration < 2; layout_iteration++)
 	{
-		for (int i = 0; i < element->GetNumChildren(); i++)
-		{
-			if (!FormatElement(block_context_box, element->GetChild(i)))
-				i = -1;
-		}
-
-		if (block_context_box->Close() == BlockContainer::CloseResult::OK)
+		if (FormatElementBlockified(containing_block_box.get(), element, format_settings))
 			break;
 	}
 
-	block_context_box->CloseAbsoluteElements();
-
-	if (out_visible_overflow_size)
-		*out_visible_overflow_size = block_context_box->GetVisibleOverflowSize();
+	// Close it so that any absolutely positioned or floated elements are placed.
+	containing_block_box->Close();
 
 	element->OnLayout();
 }
 
-// Positions a single element and its children within this layout.
-bool LayoutEngine::FormatElement(BlockContainer* block_context_box, Element* element)
+bool LayoutEngine::FormatElementFlow(BlockContainer* block_context_box, Element* element)
 {
 #ifdef RMLUI_ENABLE_PROFILING
 	RMLUI_ZoneScoped;
@@ -181,13 +168,12 @@ bool LayoutEngine::FormatElement(BlockContainer* block_context_box, Element* ele
 	RMLUI_ZoneName(name.c_str(), name.size());
 #endif
 
-	auto& computed = element->GetComputedValues();
-
 	// Check if we have to do any special formatting for any elements that don't fit into the standard layout scheme.
 	if (FormatElementSpecial(block_context_box, element))
 		return true;
 
-	const Style::Display display = element->GetDisplay();
+	auto& computed = element->GetComputedValues();
+	const Style::Display display = computed.display();
 
 	// Fetch the display property, and don't lay this element out if it is set to a display type of none.
 	if (display == Style::Display::None)
@@ -197,9 +183,6 @@ bool LayoutEngine::FormatElement(BlockContainer* block_context_box, Element* ele
 	// block box to be laid out and positioned once the block has been closed and sized.
 	if (computed.position() == Style::Position::Absolute || computed.position() == Style::Position::Fixed)
 	{
-		// if (uses_unsupported_display_position_float_combination("absolutely positioned"))
-		//	return true;
-
 		// Display the element as a block element.
 		block_context_box->AddAbsoluteElement(element);
 		return true;
@@ -208,9 +191,6 @@ bool LayoutEngine::FormatElement(BlockContainer* block_context_box, Element* ele
 	// If the element is floating, we remove it from the flow.
 	if (computed.float_() != Style::Float::None)
 	{
-		// if (uses_unsupported_display_position_float_combination("floated"))
-		//	return true;
-
 		LayoutEngine::FormatElement(element, LayoutDetails::GetContainingBlock(block_context_box));
 		return block_context_box->AddFloatElement(element);
 	}
@@ -228,51 +208,77 @@ bool LayoutEngine::FormatElement(BlockContainer* block_context_box, Element* ele
 	case Style::Display::TableRowGroup:
 	case Style::Display::TableColumn:
 	case Style::Display::TableColumnGroup:
-	case Style::Display::TableCell:
-	{
-		// These elements should have been handled within FormatElementTable, seems like we're encountering table parts in the wild.
-		const Property* display_property = element->GetProperty(PropertyId::Display);
-		Log::Message(Log::LT_WARNING, "Element has a display type '%s', but is not located in a table. Element will not be formatted: %s",
-			display_property ? display_property->ToString().c_str() : "*unknown*", element->GetAddress().c_str());
-		return true;
-	}
-	case Style::Display::None:
-		RMLUI_ERROR; /* handled above */
-		break;
+	case Style::Display::TableCell: LogWarningForWildTablePart(element, display); return true;
+	case Style::Display::None: /* handled above */ RMLUI_ERROR; break;
 	}
 
 	return true;
 }
 
-// Formats and positions an element as a block element.
-bool LayoutEngine::FormatElementBlock(BlockContainer* block_context_box, Element* element)
+bool LayoutEngine::FormatElementBlockified(BlockContainer* block_context_box, Element* element, FormatSettings format_settings)
+{
+#ifdef RMLUI_ENABLE_PROFILING
+	RMLUI_ZoneScoped;
+	auto name = CreateString(80, ">%s %x", element->GetAddress(false, false).c_str(), element);
+	RMLUI_ZoneName(name.c_str(), name.size());
+#endif
+
+	const Style::Display display = element->GetDisplay();
+
+	switch (display)
+	{
+	case Style::Display::Inline:
+	case Style::Display::InlineBlock:
+	case Style::Display::TableCell:
+	case Style::Display::Block: return FormatElementBlock(block_context_box, element, format_settings);
+	case Style::Display::Flex: return FormatElementFlex(block_context_box, element);
+	case Style::Display::Table: return FormatElementTable(block_context_box, element);
+
+	case Style::Display::TableRow:
+	case Style::Display::TableRowGroup:
+	case Style::Display::TableColumn:
+	case Style::Display::TableColumnGroup: LogWarningForWildTablePart(element, display); return true;
+	case Style::Display::None: break;
+	}
+
+	return true;
+}
+
+bool LayoutEngine::FormatElementBlock(BlockContainer* block_context_box, Element* element, FormatSettings format_settings)
 {
 	RMLUI_ZoneScopedC(0x2F4F4F);
 
+	const Vector2f containing_block = LayoutDetails::GetContainingBlock(block_context_box);
+
 	Box box;
+	if (format_settings.override_initial_box)
+		box = *format_settings.override_initial_box;
+	else
+		LayoutDetails::BuildBox(box, containing_block, element);
+
 	float min_height, max_height;
-	LayoutDetails::BuildBox(box, min_height, max_height, block_context_box, element);
+	LayoutDetails::GetDefiniteMinMaxHeight(min_height, max_height, element->GetComputedValues(), box, containing_block.y);
 
 	BlockContainer* new_block_context_box = block_context_box->AddBlockElement(element, box, min_height, max_height);
-	if (new_block_context_box == nullptr)
+	if (!new_block_context_box)
 		return false;
 
 	// Format the element's children.
 	for (int i = 0; i < element->GetNumChildren(); i++)
 	{
-		if (!FormatElement(new_block_context_box, element->GetChild(i)))
+		if (!FormatElementFlow(new_block_context_box, element->GetChild(i)))
 			i = -1;
 	}
 
 	// Close the block box, and check the return code; we may have overflowed either this element or our parent.
 	switch (new_block_context_box->Close())
 	{
-		// We need to reformat ourself; format all of our children again and close the box. No need to check for error
-		// codes, as we already have our vertical slider bar.
 	case BlockContainer::CloseResult::LayoutSelf:
 	{
+		// We need to reformat ourself; format all of our children again and close the box. No need to check for error
+		// codes, as we already have our vertical slider bar.
 		for (int i = 0; i < element->GetNumChildren(); i++)
-			FormatElement(new_block_context_box, element->GetChild(i));
+			FormatElementFlow(new_block_context_box, element->GetChild(i));
 
 		if (new_block_context_box->Close() == BlockContainer::CloseResult::OK)
 		{
@@ -281,16 +287,20 @@ bool LayoutEngine::FormatElementBlock(BlockContainer* block_context_box, Element
 		}
 	}
 	//-fallthrough
-	// We caused our parent to add a vertical scrollbar; bail out!
-	case BlockContainer::CloseResult::LayoutParent: return false;
-
+	case BlockContainer::CloseResult::LayoutParent:
+	{
+		// We caused our parent to add a vertical scrollbar; bail out!
+		return false;
+	}
 	default: element->OnLayout(); break;
 	}
+
+	if (format_settings.out_visible_overflow_size)
+		*format_settings.out_visible_overflow_size = new_block_context_box->GetVisibleOverflowSize();
 
 	return true;
 }
 
-// Formats and positions an element as an inline element.
 bool LayoutEngine::FormatElementInline(BlockContainer* block_context_box, Element* element)
 {
 	RMLUI_ZoneScopedC(0x3F6F6F);
@@ -304,7 +314,7 @@ bool LayoutEngine::FormatElementInline(BlockContainer* block_context_box, Elemen
 	// Format the element's children.
 	for (int i = 0; i < element->GetNumChildren(); i++)
 	{
-		if (!FormatElement(block_context_box, element->GetChild(i)))
+		if (!FormatElementFlow(block_context_box, element->GetChild(i)))
 			return false;
 	}
 
@@ -313,7 +323,6 @@ bool LayoutEngine::FormatElementInline(BlockContainer* block_context_box, Elemen
 	return true;
 }
 
-// Positions an element as a sized inline element, formatting its internal hierarchy as a block element.
 bool LayoutEngine::FormatElementInlineBlock(BlockContainer* block_context_box, Element* element)
 {
 	RMLUI_ZoneScopedC(0x1F2F2F);

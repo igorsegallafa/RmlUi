@@ -278,7 +278,7 @@ void LayoutFlex::Format()
 			if (initial_box_size.x < 0.f)
 				format_box.SetContent(Vector2f(flex_available_content_size.x - item.cross.sum_edges, initial_box_size.y));
 
-			LayoutEngine::FormatElement(element, flex_content_containing_block, &format_box);
+			LayoutEngine::FormatElement(element, flex_content_containing_block, FormatSettings{&format_box, nullptr});
 			item.inner_flex_base_size = element->GetBox().GetSize().y;
 		}
 
@@ -560,7 +560,7 @@ void LayoutFlex::Format()
 				if (content_size.y < 0.0f)
 				{
 					item.box.SetContent(Vector2f(used_main_size_inner, content_size.y));
-					LayoutEngine::FormatElement(item.element, flex_content_containing_block, &item.box);
+					LayoutEngine::FormatElement(item.element, flex_content_containing_block, FormatSettings{&item.box, nullptr});
 					item.hypothetical_cross_size = item.element->GetBox().GetSize().y + item.cross.sum_edges;
 				}
 				else
@@ -817,7 +817,7 @@ void LayoutFlex::Format()
 			item.box.SetContent(item_size);
 
 			Vector2f cell_visible_overflow_size;
-			LayoutEngine::FormatElement(item.element, flex_content_containing_block, &item.box, &cell_visible_overflow_size);
+			LayoutEngine::FormatElement(item.element, flex_content_containing_block, {&item.box, &cell_visible_overflow_size});
 
 			// Set the position of the element within the the flex container
 			item.element->SetOffset(flex_content_offset + item_offset, element_flex);

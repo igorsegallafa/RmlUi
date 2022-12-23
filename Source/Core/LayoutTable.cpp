@@ -277,7 +277,7 @@ void LayoutTable::DetermineRowHeights()
 				// If both the row and the cell heights are 'auto', we need to format the cell to get its height.
 				if (box.GetSize().y < 0)
 				{
-					LayoutEngine::FormatElement(element_cell, table_initial_content_size, &box);
+					LayoutEngine::FormatElement(element_cell, table_initial_content_size, FormatSettings{&box, nullptr});
 					box.SetContent(element_cell->GetBox().GetSize());
 				}
 
@@ -395,7 +395,7 @@ void LayoutTable::FormatCells()
 			if (is_aligned)
 			{
 				// We need to format the cell to know how much padding to add.
-				LayoutEngine::FormatElement(element_cell, table_initial_content_size, &box);
+				LayoutEngine::FormatElement(element_cell, table_initial_content_size, FormatSettings{&box, nullptr});
 				box.SetContent(element_cell->GetBox().GetSize());
 			}
 			else
@@ -440,7 +440,7 @@ void LayoutTable::FormatCells()
 		//   instead set the new box and offset all descending elements whose offset parent is the cell, to account for the new padding box.
 		//   That should be faster than formatting the element again, but there may be edge-cases not accounted for.
 		Vector2f cell_visible_overflow_size;
-		LayoutEngine::FormatElement(element_cell, table_initial_content_size, &box, &cell_visible_overflow_size);
+		LayoutEngine::FormatElement(element_cell, table_initial_content_size, FormatSettings{&box, &cell_visible_overflow_size});
 
 		// Set the position of the element within the the table container
 		element_cell->SetOffset(cell_offset, element_table);
