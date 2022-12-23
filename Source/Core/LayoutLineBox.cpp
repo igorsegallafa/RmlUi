@@ -134,6 +134,7 @@ LayoutInlineBox* LayoutLineBox::Close(UniquePtr<LayoutInlineBox> overflow)
 
 	// Position all the boxes horizontally in the line. We only need to reposition the elements if they're set to
 	// centre or right; the element are already placed left-aligned, and justification occurs at the text level.
+	// TODO: Cache locally
 	Style::TextAlign text_align_property = GetBlockContainer()->GetElement()->GetComputedValues().text_align();
 	if (text_align_property == Style::TextAlign::Center || text_align_property == Style::TextAlign::Right)
 	{

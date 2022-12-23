@@ -351,12 +351,6 @@ Style::VerticalAlign LayoutInlineBox::GetVerticalAlignProperty() const
 	return vertical_align_property;
 }
 
-// Returns the inline box's element.
-Element* LayoutInlineBox::GetElement()
-{
-	return element;
-}
-
 const LayoutInlineBox* LayoutInlineBox::GetParent() const
 {
 	return parent;
@@ -392,7 +386,7 @@ String LayoutInlineBox::DumpNameValue() const
 
 String LayoutInlineBox::DumpTree(int depth) const
 {
-	const String parent_str = (parent ? LayoutElementName(parent->GetElement()) : "none");
+	const String parent_str = (parent ? LayoutElementName(parent->element) : "none");
 	String value = String(depth * 2, ' ') + DumpNameValue() + " | " + LayoutElementName(element) + " | P: " + parent_str + '\n';
 
 	for (auto&& child : children)
@@ -414,10 +408,10 @@ void LayoutInlineBox::operator delete(void* chunk, size_t size)
 // Returns our parent box's font face handle.
 FontFaceHandle LayoutInlineBox::GetParentFont() const
 {
-	if (parent == nullptr)
+	if (!parent)
 		return line->GetBlockContainer()->GetElement()->GetFontFaceHandle();
 	else
-		return parent->GetElement()->GetFontFaceHandle();
+		return parent->element->GetFontFaceHandle();
 }
 
 String LayoutElementName(Element* element)

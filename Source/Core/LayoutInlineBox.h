@@ -111,8 +111,6 @@ public:
 	/// @return the vertical align property, or -1 if it is set to a numerical value.
 	Style::VerticalAlign GetVerticalAlignProperty() const;
 
-	Element* GetElement();
-
 	LayoutInlineBox* GetParent();
 	const LayoutInlineBox* GetParent() const;
 

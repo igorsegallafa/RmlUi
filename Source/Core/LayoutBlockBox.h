@@ -193,10 +193,8 @@ public:
 	Vector2f GetPosition() const;
 
 	/// Returns the block box against which all positions of boxes in the hierarchy are set relative to.
-	/// @return This box's offset parent.
 	const BlockContainer* GetOffsetParent() const;
 	/// Returns the block box against which all positions of boxes in the hierarchy are calculated relative to.
-	/// @return This box's offset root.
 	const BlockContainer* GetOffsetRoot() const;
 
 	/// Returns the block box's dimension box.
