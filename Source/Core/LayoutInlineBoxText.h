@@ -33,42 +33,10 @@
 
 namespace Rml {
 
-/**
-    @author Peter Curry
- */
-
 class LayoutInlineBoxText : public LayoutInlineBox {
 public:
-	/// Constructs a new inline box for a text element.
-	/// @param[in] element The text element this inline box is flowing.
-	/// @param[in] line_begin The index of the first character of the element's string this text box will render.
-	LayoutInlineBoxText(ElementText* element, int line_begin = 0);
+	LayoutInlineBoxText(ElementText* element) : LayoutInlineBox(element) {}
 	virtual ~LayoutInlineBoxText();
-
-	/// Returns true if this box is capable of overflowing, or if it must be rendered on a single line.
-	bool CanOverflow() const override;
-
-	/// Flows the inline box's content into its parent line.
-	/// @param[in] first_box True if this box is the first box containing content to be flowed into this line.
-	/// @param available_width[in] The width available for flowing this box's content. This is measured from the left side of this box's content area.
-	/// @param right_spacing_width[in] The width of the spacing that must be left on the right of the element if no overflow occurs. If overflow
-	/// occurs, then the entire width can be used.
-	/// @return The overflow box containing any content that spilled over from the flow. This must be nullptr if no overflow occured.
-	UniquePtr<LayoutInlineBox> FlowContent(bool first_box, float available_width, float right_spacing_width) override;
-
-	/// Computes and sets the vertical position of this element, relative to its parent inline box (or block box,
-	/// for an un-nested inline box).
-	/// @param ascender[out] The maximum ascender of this inline box and all of its children.
-	/// @param descender[out] The maximum descender of this inline box and all of its children.
-	void CalculateBaseline(float& ascender, float& descender) override;
-	/// Offsets the baseline of this box, and all of its children, by the ascender of the parent line box.
-	/// @param ascender[in] The ascender of the line box.
-	void OffsetBaseline(float ascender) override;
-
-	/// Positions the inline box's element.
-	void PositionElement(Vector2f relative_position, Element* offset_parent) override;
-	/// Sizes the inline box's element.
-	void SizeElement(bool split, Vector2f line_position) override;
 
 	// Debug dump type name and value.
 	String DumpNameValue() const override;
@@ -77,20 +45,7 @@ public:
 	void operator delete(void* chunk, size_t size);
 
 private:
-	/// Returns the box's element as a text element.
-	/// @return The box's element cast to a text element.
 	ElementText* GetTextElement();
-
-	/// Builds a box for the first word of the element.
-	void BuildWordBox();
-
-	// The index of the first character of this line.
-	int line_begin;
-	// The contents on this line.
-	String line_contents;
-
-	// True if this line can be segmented into parts, false if it consists of only a single word.
-	bool line_segmented;
 };
 
 String FontFaceDescription(const String& font_family, Style::FontStyle style, Style::FontWeight weight);

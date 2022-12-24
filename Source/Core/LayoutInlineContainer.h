@@ -35,30 +35,11 @@
 
 namespace Rml {
 
-class LayoutBlockBoxSpace;
-class LayoutEngine;
-class InlineContainer;
-
 class InlineContainer final : public BlockLevelBox {
 public:
 	/// Creates a new block box in an inline context.
 	InlineContainer(BlockContainer* parent, bool wrap_content);
-
 	~InlineContainer();
-
-	/// Closes the box. This will determine the element's height (if it was unspecified).
-	/// @param[out] Optionally, output the open inline box.
-	/// @return The result of the close; this may request a reformat of this element or our parent.
-	CloseResult Close(LayoutInlineBox** out_open_inline_box = nullptr);
-
-	/// Called by a closing line box child. Increments the cursor, and creates a new line box to fit the overflow (if any).
-	/// @param[in] child_pos_y The vertical position of the line being closed.
-	/// @param[in] child_dimensions The size of the line being closed.
-	/// @param[in] overflow The overflow from the closing line box. May be nullptr if there was no overflow.
-	/// @param[in] overflow_chain The end of the chained hierarchy to be spilled over to the new line, as the parent to the overflow box (if one
-	/// exists).
-	/// @return If the line box had overflow, this will be the last inline box created by the overflow.
-	LayoutInlineBox* CloseLineBox(float child_pos_y, Vector2f child_dimensions, UniquePtr<LayoutInlineBox> overflow, LayoutInlineBox* overflow_chain);
 
 	/// Adds a new inline element to this inline-context box.
 	/// @param element[in] The new inline element.
@@ -72,6 +53,11 @@ public:
 	/// Adds an inline box for resuming an inline box that has been split.
 	/// @param[in] chained_box The box overflowed from a previous line.
 	void AddChainedBox(LayoutInlineBox* chained_box);
+
+	/// Closes the box. This will determine the element's height (if it was unspecified).
+	/// @param[out] Optionally, output the open inline box.
+	/// @return The result of the close; this may request a reformat of this element or our parent.
+	CloseResult Close(LayoutInlineBox** out_open_inline_box = nullptr);
 
 	/// Returns the offset from the top-left corner of this box's offset element the next child box will be positioned at.
 	/// @param[in] top_margin The top margin of the box. This will be collapsed as appropriate against other block boxes.
@@ -88,9 +74,6 @@ public:
 	/// Calculate the dimensions of the box's internal content width; i.e. the size used to calculate the shrink-to-fit width.
 	float GetShrinkToFitWidth() const;
 
-	/// Returns the block box's parent.
-	const BlockContainer* GetParent() const;
-
 	/// Returns the height of this inline container, including the last line even if it is still open.
 	float GetHeightIncludingOpenLine() const;
 
@@ -104,23 +87,26 @@ public:
 
 private:
 	using LineBoxList = Vector<UniquePtr<LayoutLineBox>>;
+	using InlineBoxList = Vector<UniquePtr<LayoutInlineBox>>;
 
-	// The box's block parent. This will be nullptr for the root of the box tree.
-	BlockContainer* parent;
+	BlockContainer* parent; // [not-null]
 
-	// The block box's position.
-	Vector2f position;
-	// The block box's size.
+	Vector2f position = {-1, -1};
 	Vector2f box_size;
 
-	// Used by inline contexts only; set to true if the block box's line boxes should stretch to fit their inline content instead of wrapping.
+	// True if the block box's line boxes should stretch to fit their inline content instead of wrapping.
 	bool wrap_content;
 
 	// The vertical position of the next block box to be added to this box, relative to the top of this box.
-	float box_cursor;
+	float box_cursor = 0;
 
 	// Used by inline contexts only; stores the list of line boxes flowing inline content.
 	LineBoxList line_boxes;
+
+	InlineBoxList inline_boxes;
+
+	// The open inline box; this is nullptr if all inline boxes are closed.
+	LayoutInlineBox* open_inline_box = nullptr;
 };
 
 } // namespace Rml

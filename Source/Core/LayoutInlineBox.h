@@ -35,97 +35,12 @@
 namespace Rml {
 
 class Element;
-class ElementText;
-class FontFaceHandleDefault;
-class BlockContainer;
-class LayoutLineBox;
-
-/**
-    @author Peter Curry
- */
 
 class LayoutInlineBox {
 public:
-	/// Constructs a new inline box for an element.
-	/// @param element[in] The element this inline box is flowing.
-	/// @param box[in] The extents of the inline box's element.
-	LayoutInlineBox(Element* element, const Box& box);
-	/// Constructs a new inline box for a split box.
-	/// @param chain[in] The box that has overflowed into us.
-	LayoutInlineBox(LayoutInlineBox* chain);
+	LayoutInlineBox(Element* element) : element(element) {}
 	virtual ~LayoutInlineBox();
 
-	/// Sets the inline box's line.
-	/// @param line[in] The line this inline box resides in.
-	void SetLine(LayoutLineBox* line);
-	/// Sets the inline box's parent.
-	/// @param parent[in] The parent this inline box resides in.
-	void SetParent(LayoutInlineBox* parent);
-
-	/// Closes the box.
-	void Close();
-
-	/// Flows the inline box's content into its parent line.
-	/// @param[in] first_box True if this box is the first box containing content to be flowed into this line.
-	/// @param[in] available_width The width available for flowing this box's content. This is measured from the left side of this box's content area.
-	/// @param[in] right_spacing_width The width of the spacing that must be left on the right of the element if no overflow occurs. If overflow
-	/// occurs, then the entire width can be used.
-	/// @return The overflow box containing any content that spilled over from the flow. This must be nullptr if no overflow occured.
-	virtual UniquePtr<LayoutInlineBox> FlowContent(bool first_box, float available_width, float right_spacing_width);
-
-	/// Computes and sets the vertical position of this element, relative to its parent inline box (or block box,
-	/// for an un-nested inline box).
-	/// @param ascender[out] The maximum ascender of this inline box and all of its children.
-	/// @param descender[out] The maximum descender of this inline box and all of its children.
-	virtual void CalculateBaseline(float& ascender, float& descender);
-	/// Offsets the baseline of this box, and all of its children, by the ascender of the parent line box.
-	/// @param ascender[in] The ascender of the line box.
-	virtual void OffsetBaseline(float ascender);
-
-	/// Returns true if this box is capable of overflowing, or if it must be rendered on a single line.
-	/// @return True if this box can overflow, false otherwise.
-	virtual bool CanOverflow() const;
-	/// Returns true if this box's element is the last child of its parent.
-	/// @param True if this box is a last child.
-	bool IsLastChild() const;
-
-	/// Returns the inline box's offset from its line.
-	/// @return The box's offset from its line.
-	Vector2f GetPosition() const;
-
-	/// Sets the inline box's horizontal offset from its parent's content area.
-	/// @param position[in] The box's horizontal offset.
-	void SetHorizontalPosition(float position);
-	/// Sets the inline box's vertical offset from its parent's content area.
-	/// @param position[in] The box's vertical offset.
-	void SetVerticalPosition(float position);
-
-	/// Positions the inline box's element.
-	virtual void PositionElement(Vector2f relative_position, Element* offset_parent);
-	/// Sizes the inline box's element.
-	/// @param[in] split True if this box is split, false otherwise.
-	/// @param[in] line_position Position of parent line to enable placement of chained boxes.
-	virtual void SizeElement(bool split, Vector2f line_position);
-
-	/// Returns the vertical align property of the box's element.
-	/// @return the vertical align property, or -1 if it is set to a numerical value.
-	Style::VerticalAlign GetVerticalAlignProperty() const;
-
-	LayoutInlineBox* GetParent();
-	const LayoutInlineBox* GetParent() const;
-
-	/// Returns the height of the inline box. This is separate from the the box, as different types of inline
-	/// elements generate different line heights. The possible types are:
-	///  * replaced elements (or inline-block elements), which use their entire box (including margins) as their
-	///    height
-	///  * non-replaced elements, which use the maximum line-height of their children
-	///  * text elements, which use their line-height
-	float GetHeight() const { return height; }
-	/// Returns the baseline of the inline box.
-	float GetBaseline() const { return baseline; }
-
-	/// Returns the inline box's dimension box.
-	const Box& GetBox() const;
 	// Debug dump type name and value.
 	virtual String DumpNameValue() const;
 	// Debug dump layout tree.
@@ -137,50 +52,22 @@ public:
 protected:
 	Element* GetElement() { return element; }
 
-	void SetHeight(float value) { height = value; }
-	void SetBaseline(float value) { baseline = value; }
-
-	Vector2f GetBoxContentSize() const { return box.GetSize(); }
-	void SetBoxContentSize(Vector2f value) { return box.SetContent(value); }
-
 private:
-	/// Returns our parent box's font face handle.
-	/// @return The font face handle of our parent box.
-	FontFaceHandle GetParentFont() const;
+	using InlineBoxList = Vector<UniquePtr<LayoutInlineBox>>;
 
-	// The box's element.
 	Element* element;
 
-	// The line box's offset relative to its parent block box.
-	Vector2f position;
-	// The element's inline box.
-	Box box;
-	// The inline box's width; note that this is stored separately from the box dimensions. It is only used by
-	// nesting inline boxes, such as HTML spans containing text.
-	float width;
-	// The inline box's height; note that this is stored separately from the box dimensions, as inline elements
-	// don't necessarily have identical relationships between their box dimensions and line height.
-	float height;
-
-	// The value of this box's element's vertical-align property.
-	Style::VerticalAlign vertical_align_property;
-	// The baseline of the inline element.
-	float baseline;
-
-	// The inline box's parent; this will be nullptr if we're not a nested inline element.
-	LayoutInlineBox* parent;
-	// This inline box's line.
-	LayoutLineBox* line;
-
-	Vector<LayoutInlineBox*> children;
-
-	// The next link in our element's chain of inline boxes.
-	LayoutInlineBox* chain;
-	// True if we're a link in a chain of inline boxes flowing from previous lines.
-	bool chained;
+	InlineBoxList children;
 };
 
-// Safely return element name for debugging.
+class LayoutFragment {
+public:
+	LayoutFragment(LayoutInlineBox* inline_box) : inline_box(inline_box) {}
+
+private:
+	LayoutInlineBox* inline_box;
+};
+
 String LayoutElementName(Element* element);
 
 } // namespace Rml

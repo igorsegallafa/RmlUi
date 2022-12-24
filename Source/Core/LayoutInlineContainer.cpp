@@ -39,16 +39,12 @@
 
 namespace Rml {
 
-InlineContainer::InlineContainer(BlockContainer* _parent, bool _wrap_content) : BlockLevelBox(Type::InlineContainer), position(-1, -1)
+InlineContainer::InlineContainer(BlockContainer* _parent, bool _wrap_content) :
+	BlockLevelBox(Type::InlineContainer), parent(_parent), wrap_content(_wrap_content)
 {
 	RMLUI_ASSERT(_parent);
 
-	parent = _parent;
-
 	line_boxes.push_back(MakeUnique<LayoutLineBox>(this));
-	wrap_content = _wrap_content;
-
-	box_cursor = 0;
 
 	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent);
 	box_size = Vector2f(containing_block.x, -1);
@@ -56,6 +52,27 @@ InlineContainer::InlineContainer(BlockContainer* _parent, bool _wrap_content) : 
 }
 
 InlineContainer::~InlineContainer() {}
+
+LayoutInlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
+{
+	// We're an inline context box, so we'll add this new inline element into our line boxes.
+	return line_boxes.back()->AddElement(element, box);
+}
+
+void InlineContainer::AddBreak(float line_height)
+{
+	// Increment by the line height if no line is open, otherwise simply end the line.
+	LayoutLineBox* last_line = line_boxes.back().get();
+	if (last_line->GetDimensions().y < 0)
+		box_cursor += line_height;
+	else
+		last_line->Close();
+}
+
+void InlineContainer::AddChainedBox(LayoutInlineBox* chained_box)
+{
+	line_boxes.back()->AddChainedBox(chained_box);
+}
 
 InlineContainer::CloseResult InlineContainer::Close(LayoutInlineBox** out_open_inline_box)
 {
@@ -86,58 +103,11 @@ InlineContainer::CloseResult InlineContainer::Close(LayoutInlineBox** out_open_i
 	SetVisibleOverflowSize(visible_overflow_size);
 
 	// Increment the parent's cursor.
-	if (parent)
-	{
-		// If this close fails, it means this block box has caused our parent block box to generate an automatic vertical scrollbar.
-		if (!parent->CloseChildBox(this, position.y, box_size.y))
-			return CloseResult::LayoutParent;
-	}
+	// If this close fails, it means this block box has caused our parent block box to generate an automatic vertical scrollbar.
+	if (!parent->CloseChildBox(this, position.y, box_size.y))
+		return CloseResult::LayoutParent;
 
 	return CloseResult::OK;
-}
-
-LayoutInlineBox* InlineContainer::CloseLineBox(float child_pos_y, Vector2f child_dimensions, UniquePtr<LayoutInlineBox> overflow,
-	LayoutInlineBox* overflow_chain)
-{
-	RMLUI_ZoneScoped;
-
-	if (child_dimensions.x > 0)
-		box_cursor = (child_pos_y - position.y) + child_dimensions.y;
-
-	// If we have any pending floating elements for our parent, then this would be an ideal time to place them.
-	parent->PlaceQueuedFloats(box_cursor);
-
-	// Add a new line box.
-	line_boxes.push_back(MakeUnique<LayoutLineBox>(this));
-
-	if (overflow_chain)
-		line_boxes.back()->AddChainedBox(overflow_chain);
-
-	if (overflow)
-		return line_boxes.back()->AddBox(std::move(overflow));
-
-	return nullptr;
-}
-
-LayoutInlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
-{
-	// We're an inline context box, so we'll add this new inline element into our line boxes.
-	return line_boxes.back()->AddElement(element, box);
-}
-
-void InlineContainer::AddBreak(float line_height)
-{
-	// Increment by the line height if no line is open, otherwise simply end the line.
-	LayoutLineBox* last_line = line_boxes.back().get();
-	if (last_line->GetDimensions().y < 0)
-		box_cursor += line_height;
-	else
-		last_line->Close();
-}
-
-void InlineContainer::AddChainedBox(LayoutInlineBox* chained_box)
-{
-	line_boxes.back()->AddChainedBox(chained_box);
 }
 
 Vector2f InlineContainer::NextBoxPosition(float top_margin, Style::Clear clear_property) const
@@ -180,12 +150,6 @@ float InlineContainer::GetShrinkToFitWidth() const
 	content_width = Math::Min(content_width, box_size.x);
 
 	return content_width;
-}
-
-// Returns the block box's parent.
-const BlockContainer* InlineContainer::GetParent() const
-{
-	return parent;
 }
 
 float InlineContainer::GetHeightIncludingOpenLine() const

@@ -36,6 +36,7 @@
 #include "LayoutBlockBoxSpace.h"
 #include "LayoutDetails.h"
 #include "LayoutEngine.h"
+#include "LayoutInlineContainer.h"
 
 namespace Rml {
 
@@ -50,7 +51,6 @@ void LayoutBox::operator delete(void* chunk, size_t size)
 	LayoutEngine::DeallocateLayoutChunk(chunk, size);
 }
 
-// Creates a new block box for rendering a block element.
 BlockContainer::BlockContainer(BlockContainer* _parent, Element* _element, const Box& _box, float _min_height, float _max_height) :
 	BlockLevelBox(Type::BlockContainer), position(0), box(_box), min_height(_min_height), max_height(_max_height)
 {
@@ -136,10 +136,8 @@ BlockContainer::BlockContainer(BlockContainer* _parent, Element* _element, const
 	}
 }
 
-// Releases the block box.
 BlockContainer::~BlockContainer() {}
 
-// Closes the box.
 BlockContainer::CloseResult BlockContainer::Close()
 {
 	// If the last child of this block box is an inline box, then we haven't closed it; close it now!
@@ -315,7 +313,6 @@ BlockContainer* BlockContainer::AddBlockElement(Element* element, const Box& box
 	return static_cast<BlockContainer*>(block_boxes.back().get());
 }
 
-// Adds a new inline element to this inline box.
 LayoutInlineBox* BlockContainer::AddInlineElement(Element* element, const Box& box)
 {
 	RMLUI_ZoneScoped;
@@ -342,7 +339,6 @@ LayoutInlineBox* BlockContainer::AddInlineElement(Element* element, const Box& b
 	return inline_box;
 }
 
-// Adds a line-break to this block box.
 void BlockContainer::AddBreak()
 {
 	const float line_height = element->GetLineHeight();
@@ -358,7 +354,6 @@ void BlockContainer::AddBreak()
 	box_cursor += line_height;
 }
 
-// Adds an element to this block box to be handled as a floating element.
 bool BlockContainer::AddFloatElement(Element* element)
 {
 	// If we have an open inline block box, then we have to position the box a little differently, queue it for later.
@@ -371,7 +366,6 @@ bool BlockContainer::AddFloatElement(Element* element)
 	return true;
 }
 
-// Adds an element to this block box to be handled as an absolutely-positioned element.
 void BlockContainer::AddAbsoluteElement(Element* element)
 {
 	AbsoluteElement absolute_element;
@@ -391,7 +385,6 @@ void BlockContainer::AddAbsoluteElement(Element* element)
 	absolute_parent->absolute_elements.push_back(absolute_element);
 }
 
-// Lays out, sizes, and positions all absolute elements in this block relative to the containing block.
 void BlockContainer::CloseAbsoluteElements()
 {
 	if (!absolute_elements.empty())
@@ -479,7 +472,6 @@ void BlockContainer::PlaceQueuedFloats(float vertical_offset)
 	}
 }
 
-// Calculate the dimensions of the box's internal content width; i.e. the size of the largest line.
 float BlockContainer::GetShrinkToFitWidth() const
 {
 	float content_width = 0.0f;
@@ -540,13 +532,11 @@ void BlockContainer::ExtendInnerContentSize(Vector2f _inner_content_size)
 	inner_content_size.y = Math::Max(inner_content_size.y, _inner_content_size.y);
 }
 
-// Returns the block box's element.
 Element* BlockContainer::GetElement() const
 {
 	return element;
 }
 
-// Returns the block box's parent.
 const BlockContainer* BlockContainer::GetParent() const
 {
 	return parent;
@@ -557,31 +547,26 @@ const LayoutBlockBoxSpace* BlockContainer::GetBlockBoxSpace() const
 	return space.get();
 }
 
-// Returns the position of the block box, relative to its parent's content area.
 Vector2f BlockContainer::GetPosition() const
 {
 	return position;
 }
 
-// Returns the element against which all positions of boxes in the hierarchy are calculated relative to.
 const BlockContainer* BlockContainer::GetOffsetParent() const
 {
 	return offset_parent;
 }
 
-// Returns the block box against which all positions of boxes in the hierarchy are calculated relative to.
 const BlockContainer* BlockContainer::GetOffsetRoot() const
 {
 	return offset_root;
 }
 
-// Returns the block box's dimension box.
 Box& BlockContainer::GetBox()
 {
 	return box;
 }
 
-// Returns the block box's dimension box.
 const Box& BlockContainer::GetBox() const
 {
 	return box;
@@ -611,7 +596,6 @@ const BlockContainer* BlockContainer::GetOpenBlockContainer() const
 	return nullptr;
 }
 
-// Closes our last block box, if it is an open inline block box.
 BlockContainer::CloseResult BlockContainer::CloseInlineBlockBox()
 {
 	if (InlineContainer* inline_container = GetOpenInlineContainer())
@@ -620,14 +604,12 @@ BlockContainer::CloseResult BlockContainer::CloseInlineBlockBox()
 	return CloseResult::OK;
 }
 
-// Positions a floating element within this block box.
 void BlockContainer::PlaceFloat(Element* element, float offset)
 {
 	const Vector2f box_position = NextBoxPosition();
 	space->PlaceFloat(element, box_position.y + offset);
 }
 
-// Checks if we have a new vertical overflow on an auto-scrolling element.
 bool BlockContainer::CatchVerticalOverflow(float cursor)
 {
 	if (cursor == -1)

@@ -298,6 +298,9 @@ bool LayoutEngine::FormatElementInline(BlockContainer* block_context_box, Elemen
 
 	const Vector2f containing_block = LayoutDetails::GetContainingBlock(block_context_box);
 
+	if (element->GetId() == "a")
+		int x = 0;
+
 	Box box;
 	LayoutDetails::BuildBox(box, containing_block, element, BoxContext::Inline);
 	LayoutInlineBox* inline_box = block_context_box->AddInlineElement(element, box);
@@ -308,6 +311,9 @@ bool LayoutEngine::FormatElementInline(BlockContainer* block_context_box, Elemen
 		if (!FormatElementFlow(block_context_box, element->GetChild(i)))
 			return false;
 	}
+
+	if (element->GetId() == "a")
+		int x = 0;
 
 	inline_box->Close();
 
