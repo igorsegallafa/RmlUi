@@ -38,8 +38,7 @@ public:
 	LayoutLineBox() {}
 	~LayoutLineBox();
 
-	// Debug dump layout tree.
-	String DumpTree(int depth) const;
+	String DebugDumpTree(int depth) const;
 
 	void* operator new(size_t size);
 	void operator delete(void* chunk, size_t size);

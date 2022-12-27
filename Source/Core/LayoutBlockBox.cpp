@@ -572,7 +572,7 @@ const Box& BlockContainer::GetBox() const
 	return box;
 }
 
-String BlockContainer::DumpTree(int depth) const
+String BlockContainer::DebugDumpTree(int depth) const
 {
 	String value = String(depth * 2, ' ') + "BlockContainer" + " | " + LayoutElementName(element) + '\n';
 

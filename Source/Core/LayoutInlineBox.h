@@ -41,10 +41,8 @@ public:
 	LayoutInlineBox(Element* element) : element(element) {}
 	virtual ~LayoutInlineBox();
 
-	// Debug dump type name and value.
-	virtual String DumpNameValue() const;
-	// Debug dump layout tree.
-	String DumpTree(int depth) const;
+	virtual String DebugDumpNameValue() const;
+	String DebugDumpTree(int depth) const;
 
 	void* operator new(size_t size);
 	void operator delete(void* chunk, size_t size);

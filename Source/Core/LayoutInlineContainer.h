@@ -82,8 +82,7 @@ public:
 	/// @return True if the baseline was found.
 	bool GetBaselineOfLastLine(float& out_baseline) const;
 
-	// Debug dump layout tree.
-	String DumpTree(int depth) const override;
+	String DebugDumpTree(int depth) const override;
 
 private:
 	using LineBoxList = Vector<UniquePtr<LayoutLineBox>>;

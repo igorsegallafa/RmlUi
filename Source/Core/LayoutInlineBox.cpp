@@ -40,17 +40,17 @@ namespace Rml {
 
 LayoutInlineBox::~LayoutInlineBox() {}
 
-String LayoutInlineBox::DumpNameValue() const
+String LayoutInlineBox::DebugDumpNameValue() const
 {
 	return "LayoutInlineBox";
 }
 
-String LayoutInlineBox::DumpTree(int depth) const
+String LayoutInlineBox::DebugDumpTree(int depth) const
 {
-	String value = String(depth * 2, ' ') + DumpNameValue() + " | " + LayoutElementName(element) + '\n';
+	String value = String(depth * 2, ' ') + DebugDumpNameValue() + " | " + LayoutElementName(element) + '\n';
 
 	for (auto&& child : children)
-		value += child->DumpTree(depth + 1);
+		value += child->DebugDumpTree(depth + 1);
 
 	return value;
 }

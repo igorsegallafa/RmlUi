@@ -170,12 +170,12 @@ bool InlineContainer::GetBaselineOfLastLine(float& out_baseline) const
 	return found_baseline;
 }
 
-String InlineContainer::DumpTree(int depth) const
+String InlineContainer::DebugDumpTree(int depth) const
 {
 	String value = String(depth * 2, ' ') + "InlineContainer" + '\n';
 
 	for (auto&& line_box : line_boxes)
-		value += line_box->DumpTree(depth + 1);
+		value += line_box->DebugDumpTree(depth + 1);
 
 	return value;
 }

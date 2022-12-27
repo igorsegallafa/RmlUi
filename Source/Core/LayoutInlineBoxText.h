@@ -38,8 +38,7 @@ public:
 	LayoutInlineBoxText(ElementText* element) : LayoutInlineBox(element) {}
 	virtual ~LayoutInlineBoxText();
 
-	// Debug dump type name and value.
-	String DumpNameValue() const override;
+	String DebugDumpNameValue() const override;
 
 	void* operator new(size_t size);
 	void operator delete(void* chunk, size_t size);

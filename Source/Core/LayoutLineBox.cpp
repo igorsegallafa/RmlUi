@@ -42,7 +42,7 @@ namespace Rml {
 
 LayoutLineBox::~LayoutLineBox() {}
 
-String LayoutLineBox::DumpTree(int depth) const
+String LayoutLineBox::DebugDumpTree(int depth) const
 {
 	const String value =
 		String(depth * 2, ' ') + "LayoutLineBox (" + ToString(fragments.size()) + " fragment" + (fragments.size() == 1 ? "" : "s") + ")\n ";

@@ -62,7 +62,7 @@ String FontFaceDescription(const String& font_family, Style::FontStyle style, St
 
 LayoutInlineBoxText::~LayoutInlineBoxText() {}
 
-String LayoutInlineBoxText::DumpNameValue() const
+String LayoutInlineBoxText::DebugDumpNameValue() const
 {
 	return "LayoutInlineBoxText";
 }

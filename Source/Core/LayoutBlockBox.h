@@ -48,7 +48,7 @@ public:
 	Type GetType() const { return type; }
 
 	// Debug dump layout tree.
-	String DumpLayoutTree(int depth = 0) const { return DumpTree(depth); }
+	String DumpLayoutTree(int depth = 0) const { return DebugDumpTree(depth); }
 
 	virtual ~LayoutBox() = default;
 
@@ -59,7 +59,7 @@ protected:
 	LayoutBox(OuterType outer_type, Type type) : outer_type(outer_type), type(type) {}
 
 	// Debug dump layout tree.
-	virtual String DumpTree(int depth) const = 0;
+	virtual String DebugDumpTree(int depth) const = 0;
 
 private:
 	OuterType outer_type;
@@ -223,7 +223,7 @@ private:
 	bool CatchVerticalOverflow(float cursor = -1);
 
 	// Debug dump layout tree.
-	String DumpTree(int depth) const override;
+	String DebugDumpTree(int depth) const override;
 
 	using AbsoluteElementList = Vector<AbsoluteElement>;
 	using BlockBoxList = Vector<UniquePtr<BlockLevelBox>>;
