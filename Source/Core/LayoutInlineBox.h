@@ -48,11 +48,10 @@ public:
 	virtual void Submit(Element* offset_parent, Vector2f position, Vector2f layout_bounds)
 	{
 		RMLUI_ASSERT(element && element != offset_parent);
-
 		element->SetOffset(position, offset_parent);
 
-		Box element_box;
 		// TODO: Other edges, additional boxes
+		Box element_box;
 		element_box.SetContent(layout_bounds);
 		element->SetBox(element_box);
 		element->OnLayout();
@@ -77,9 +76,8 @@ private:
 	Element* element;
 };
 
-class InlineBoxRoot : public InlineLevelBox {
+class InlineBoxBase : public InlineLevelBox {
 public:
-	InlineBoxRoot() : InlineLevelBox(nullptr) {}
 	InlineLevelBox* AddChild(UniquePtr<InlineLevelBox> child)
 	{
 		auto result = child.get();
@@ -87,13 +85,10 @@ public:
 		return result;
 	}
 
-	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) override;
-
 	String DebugDumpTree(int depth) const override;
-	String DebugDumpNameValue() const override { return "InlineBoxRoot"; }
 
 protected:
-	InlineBoxRoot(Element* element) : InlineLevelBox(element) {}
+	InlineBoxBase(Element* element) : InlineLevelBox(element) {}
 
 private:
 	using InlineBoxList = Vector<UniquePtr<InlineLevelBox>>;
@@ -102,9 +97,16 @@ private:
 	InlineBoxList children;
 };
 
-class InlineBox final : public InlineBoxRoot {
+class InlineBoxRoot final : public InlineBoxBase {
 public:
-	InlineBox(Element* element, const Box& box) : InlineBoxRoot(element), box(box) { RMLUI_ASSERT(element && box.GetSize().x < 0.f); }
+	InlineBoxRoot() : InlineBoxBase(nullptr) {}
+	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) override;
+	String DebugDumpNameValue() const override { return "InlineBoxRoot"; }
+};
+
+class InlineBox final : public InlineBoxBase {
+public:
+	InlineBox(Element* element, const Box& box) : InlineBoxBase(element), box(box) { RMLUI_ASSERT(element && box.GetSize().x < 0.f); }
 
 	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) override;
 	float GetEdge(Box::Edge edge) const override;
@@ -112,8 +114,6 @@ public:
 	void Submit(Element* offset_parent, Vector2f position, Vector2f layout_bounds) override
 	{
 		Element* element = GetElement();
-		RMLUI_ASSERT(element && element != offset_parent);
-
 		element->SetOffset(position - box.GetPosition(), offset_parent);
 
 		Box element_box = box;
@@ -129,9 +129,9 @@ private:
 	Box box;
 };
 
-class InlineLevelBox_Replaced final : public InlineLevelBox {
+class InlineLevelBox_Atomic final : public InlineLevelBox {
 public:
-	InlineLevelBox_Replaced(Element* element, const Box& box) : InlineLevelBox(element), box(box)
+	InlineLevelBox_Atomic(Element* element, const Box& box) : InlineLevelBox(element), box(box)
 	{
 		RMLUI_ASSERT(element);
 		RMLUI_ASSERT(box.GetSize().x >= 0.f && box.GetSize().y >= 0.f);
@@ -139,7 +139,15 @@ public:
 
 	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) override;
 
-	String DebugDumpNameValue() const override { return "InlineLevelBox_Replaced"; }
+	String DebugDumpNameValue() const override { return "InlineLevelBox_Atomic"; }
+
+	void Submit(Element* offset_parent, Vector2f position, Vector2f /*layout_bounds*/) override
+	{
+		Element* element = GetElement();
+		element->SetOffset(position, offset_parent);
+		element->SetBox(box);
+		OnLayout();
+	}
 
 private:
 	Box box;

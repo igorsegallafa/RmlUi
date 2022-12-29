@@ -59,15 +59,17 @@ InlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
 	InlineBox* inline_box = nullptr;
 	InlineLevelBox* inline_level_box = nullptr;
 
+	InlineBoxBase* open_inline_box = (!open_inline_boxes.empty() ? open_inline_boxes.back() : static_cast<InlineBoxBase*>(&root_inline_box));
+
 	if (auto text_element = rmlui_dynamic_cast<ElementText*>(element))
-		inline_level_box = root_inline_box.AddChild(MakeUnique<InlineLevelBox_Text>(text_element));
+		inline_level_box = open_inline_box->AddChild(MakeUnique<InlineLevelBox_Text>(text_element));
 	else if (box.GetSize().x >= 0.f)
-		inline_level_box = root_inline_box.AddChild(MakeUnique<InlineLevelBox_Replaced>(element, box));
+		inline_level_box = open_inline_box->AddChild(MakeUnique<InlineLevelBox_Atomic>(element, box));
 	else
 	{
 		auto inline_box_ptr = MakeUnique<InlineBox>(element, box);
 		inline_box = inline_box_ptr.get();
-		inline_level_box = root_inline_box.AddChild(std::move(inline_box_ptr));
+		inline_level_box = open_inline_box->AddChild(std::move(inline_box_ptr));
 	}
 
 	LayoutLineBox* line_box = EnsureOpenLineBox();

@@ -77,7 +77,7 @@ String InlineLevelBox::DebugDumpTree(int depth) const
 	return value;
 }
 
-String InlineBoxRoot::DebugDumpTree(int depth) const
+String InlineBoxBase::DebugDumpTree(int depth) const
 {
 	String value = InlineLevelBox::DebugDumpTree(depth);
 	for (auto&& child : children)
@@ -103,7 +103,7 @@ float InlineBox::GetEdge(Box::Edge edge) const
 	return GetEdgeSize(box, edge);
 }
 
-LayoutFragment InlineLevelBox_Replaced::LayoutContent(bool first_box, float available_width, float right_spacing_width)
+LayoutFragment InlineLevelBox_Atomic::LayoutContent(bool first_box, float available_width, float right_spacing_width)
 {
 	const Vector2f outer_size = {
 		box.GetSizeAcross(Box::HORIZONTAL, Box::MARGIN),

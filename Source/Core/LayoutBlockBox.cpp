@@ -342,8 +342,18 @@ BlockContainer::InlineBoxHandle BlockContainer::AddInlineElement(Element* elemen
 
 void BlockContainer::CloseInlineElement(InlineBoxHandle handle)
 {
-	// TODO: Check that handle.inline_container is still the open box, otherwise it has been closed already probably by an intermediary block element
-	// (block-inside-inline).
+	// If the inline-level element did not generate an inline box, then there is no need to close anything.
+	if (!handle.inline_box || !handle.inline_container)
+		return;
+
+	// Check that the handle's inline container is still the open box, otherwise it has been closed already possibly
+	// by an intermediary block-level element.
+	// TODO: Maybe we need to close its cloned box in the new line container?
+	InlineContainer* inline_container = GetOpenInlineContainer();
+	if (inline_container != handle.inline_container)
+		return;
+
+	inline_container->CloseInlineElement(handle.inline_box);
 }
 
 void BlockContainer::AddBreak()

@@ -51,7 +51,7 @@ struct LayoutChunk {
 };
 
 static constexpr std::size_t ChunkSizeBig = std::max({sizeof(BlockContainer), sizeof(InlineContainer)});
-static constexpr std::size_t ChunkSizeMedium = std::max({sizeof(InlineLevelBox_Replaced), sizeof(InlineLevelBox_Text), sizeof(InlineBox)});
+static constexpr std::size_t ChunkSizeMedium = std::max({sizeof(InlineLevelBox_Atomic), sizeof(InlineLevelBox_Text), sizeof(InlineBox)});
 static constexpr std::size_t ChunkSizeSmall = std::max({sizeof(LayoutLineBox), sizeof(LayoutBlockBoxSpace)});
 
 static Pool<LayoutChunk<ChunkSizeBig>> layout_chunk_pool_big(50, true);
