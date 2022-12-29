@@ -292,7 +292,7 @@ BlockContainer* BlockContainer::AddBlockElement(Element* element, const Box& box
 	// Close the inline container if there is one open.
 	if (InlineContainer* inline_container = GetOpenInlineContainer())
 	{
-		LayoutInlineBox* open_inline_box = nullptr;
+		InlineBox* open_inline_box = nullptr;
 
 		if (inline_container->Close(&open_inline_box) != CloseResult::OK)
 			return nullptr;
@@ -323,7 +323,8 @@ BlockContainer::InlineBoxHandle BlockContainer::AddInlineElement(Element* elemen
 	// Otherwise, we open a new inline container.
 	if (!inline_container)
 	{
-		auto inline_container_ptr = MakeUnique<InlineContainer>(this, wrap_content);
+		const float line_height = element->GetLineHeight();
+		auto inline_container_ptr = MakeUnique<InlineContainer>(this, line_height, wrap_content);
 		inline_container = inline_container_ptr.get();
 		block_boxes.push_back(std::move(inline_container_ptr));
 
@@ -334,7 +335,7 @@ BlockContainer::InlineBoxHandle BlockContainer::AddInlineElement(Element* elemen
 		}
 	}
 
-	LayoutInlineBox* inline_box = inline_container->AddInlineElement(element, box);
+	InlineBox* inline_box = inline_container->AddInlineElement(element, box);
 
 	return {inline_container, inline_box};
 }

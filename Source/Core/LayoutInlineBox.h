@@ -45,7 +45,7 @@ public:
 
 	virtual LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) = 0;
 
-	virtual void Submit(Element* offset_parent, Vector2f position, Vector2f outer_size)
+	virtual void Submit(Element* offset_parent, Vector2f position, Vector2f layout_bounds)
 	{
 		RMLUI_ASSERT(element && element != offset_parent);
 
@@ -53,7 +53,7 @@ public:
 
 		Box element_box;
 		// TODO: Other edges, additional boxes
-		element_box.SetContent(outer_size);
+		element_box.SetContent(layout_bounds);
 		element->SetBox(element_box);
 		element->OnLayout();
 	}
@@ -71,13 +71,15 @@ protected:
 
 	Element* GetElement() const { return element; }
 
+	void OnLayout() { element->OnLayout(); } // TODO
+
 private:
 	Element* element;
 };
 
-// TODO: InlineBox
-class LayoutInlineBox : public InlineLevelBox {
+class InlineBoxRoot : public InlineLevelBox {
 public:
+	InlineBoxRoot() : InlineLevelBox(nullptr) {}
 	InlineLevelBox* AddChild(UniquePtr<InlineLevelBox> child)
 	{
 		auto result = child.get();
@@ -85,10 +87,13 @@ public:
 		return result;
 	}
 
+	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) override;
+
 	String DebugDumpTree(int depth) const override;
+	String DebugDumpNameValue() const override { return "InlineBoxRoot"; }
 
 protected:
-	LayoutInlineBox(Element* element) : InlineLevelBox(element) {}
+	InlineBoxRoot(Element* element) : InlineLevelBox(element) {}
 
 private:
 	using InlineBoxList = Vector<UniquePtr<InlineLevelBox>>;
@@ -97,27 +102,28 @@ private:
 	InlineBoxList children;
 };
 
-class InlineBox_Root final : public LayoutInlineBox {
+class InlineBox final : public InlineBoxRoot {
 public:
-	InlineBox_Root() : LayoutInlineBox(nullptr) {}
-
-	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) override;
-
-	String DebugDumpNameValue() const override { return "InlineBox_Root"; }
-};
-
-class InlineBox_Element final : public LayoutInlineBox {
-public:
-	InlineBox_Element(Element* element, const Box& box) : LayoutInlineBox(element)
-	{
-		RMLUI_ASSERT(element);
-		RMLUI_ASSERT(box.GetSize().x < 0.f);
-	}
+	InlineBox(Element* element, const Box& box) : InlineBoxRoot(element), box(box) { RMLUI_ASSERT(element && box.GetSize().x < 0.f); }
 
 	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) override;
 	float GetEdge(Box::Edge edge) const override;
 
-	String DebugDumpNameValue() const override { return "InlineBox_Element"; }
+	void Submit(Element* offset_parent, Vector2f position, Vector2f layout_bounds) override
+	{
+		Element* element = GetElement();
+		RMLUI_ASSERT(element && element != offset_parent);
+
+		element->SetOffset(position - box.GetPosition(), offset_parent);
+
+		Box element_box = box;
+		element_box.SetContent(layout_bounds);
+		// TODO: Zero out split edges, additional boxes
+		element->SetBox(element_box);
+		OnLayout();
+	}
+
+	String DebugDumpNameValue() const override { return "InlineBox"; }
 
 private:
 	Box box;
@@ -133,8 +139,6 @@ public:
 
 	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) override;
 
-	float GetEdge(Box::Edge edge) const override;
-
 	String DebugDumpNameValue() const override { return "InlineLevelBox_Replaced"; }
 
 private:
@@ -148,14 +152,14 @@ struct LayoutFragment {
 	};
 
 	LayoutFragment() = default;
-	LayoutFragment(InlineLevelBox* inline_box, Vector2f outer_size, LayoutOverflowHandle overflow_handle = {}) :
-		inline_box(inline_box), outer_size(outer_size), overflow_handle(overflow_handle)
+	LayoutFragment(InlineLevelBox* inline_box, Vector2f layout_bounds, LayoutOverflowHandle overflow_handle = {}) :
+		inline_box(inline_box), layout_bounds(layout_bounds), overflow_handle(overflow_handle)
 	{}
 
 	explicit operator bool() const { return inline_box; }
 
 	InlineLevelBox* inline_box = nullptr;
-	Vector2f outer_size;
+	Vector2f layout_bounds;
 
 	// Overflow handle is non-zero when there is another fragment to be layed out.
 	// TODO: I think we can make this part of the return value for LayoutContent instead? No need to keep this around. Maybe need a pointer to the

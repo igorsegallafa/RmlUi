@@ -77,7 +77,7 @@ String InlineLevelBox::DebugDumpTree(int depth) const
 	return value;
 }
 
-String LayoutInlineBox::DebugDumpTree(int depth) const
+String InlineBoxRoot::DebugDumpTree(int depth) const
 {
 	String value = InlineLevelBox::DebugDumpTree(depth);
 	for (auto&& child : children)
@@ -85,15 +85,20 @@ String LayoutInlineBox::DebugDumpTree(int depth) const
 	return value;
 }
 
-LayoutFragment InlineBox_Element::LayoutContent(bool first_box, float available_width, float right_spacing_width)
+LayoutFragment InlineBoxRoot::LayoutContent(bool /*first_box*/, float /*available_width*/, float /*right_spacing_width*/)
+{
+	return {};
+}
+
+LayoutFragment InlineBox::LayoutContent(bool first_box, float available_width, float right_spacing_width)
 {
 	if (first_box || right_spacing_width <= available_width)
-		return LayoutFragment{this, Vector2f(-1.f)};
+		return LayoutFragment{this, Vector2f(-1.f, GetElement()->GetLineHeight())};
 
 	return {};
 }
 
-float InlineBox_Element::GetEdge(Box::Edge edge) const
+float InlineBox::GetEdge(Box::Edge edge) const
 {
 	return GetEdgeSize(box, edge);
 }
@@ -108,16 +113,6 @@ LayoutFragment InlineLevelBox_Replaced::LayoutContent(bool first_box, float avai
 	if (first_box || outer_size.x + right_spacing_width <= available_width)
 		return LayoutFragment{this, outer_size};
 
-	return {};
-}
-
-float InlineLevelBox_Replaced::GetEdge(Box::Edge edge) const
-{
-	return GetEdgeSize(box, edge);
-}
-
-LayoutFragment InlineBox_Root::LayoutContent(bool /*first_box*/, float /*available_width*/, float /*right_spacing_width*/)
-{
 	return {};
 }
 

@@ -40,8 +40,8 @@
 
 namespace Rml {
 
-InlineContainer::InlineContainer(BlockContainer* _parent, bool _wrap_content) :
-	BlockLevelBox(Type::InlineContainer), parent(_parent), wrap_content(_wrap_content)
+InlineContainer::InlineContainer(BlockContainer* _parent, float _element_line_height, bool _wrap_content) :
+	BlockLevelBox(Type::InlineContainer), parent(_parent), element_line_height(_element_line_height), wrap_content(_wrap_content)
 {
 	RMLUI_ASSERT(_parent);
 
@@ -52,11 +52,11 @@ InlineContainer::InlineContainer(BlockContainer* _parent, bool _wrap_content) :
 
 InlineContainer::~InlineContainer() {}
 
-LayoutInlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
+InlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
 {
 	RMLUI_ASSERT(element);
 
-	LayoutInlineBox* inline_box = nullptr;
+	InlineBox* inline_box = nullptr;
 	InlineLevelBox* inline_level_box = nullptr;
 
 	if (auto text_element = rmlui_dynamic_cast<ElementText*>(element))
@@ -65,7 +65,7 @@ LayoutInlineBox* InlineContainer::AddInlineElement(Element* element, const Box& 
 		inline_level_box = root_inline_box.AddChild(MakeUnique<InlineLevelBox_Replaced>(element, box));
 	else
 	{
-		auto inline_box_ptr = MakeUnique<InlineBox_Element>(element, box);
+		auto inline_box_ptr = MakeUnique<InlineBox>(element, box);
 		inline_box = inline_box_ptr.get();
 		inline_level_box = root_inline_box.AddChild(std::move(inline_box_ptr));
 	}
@@ -77,19 +77,19 @@ LayoutInlineBox* InlineContainer::AddInlineElement(Element* element, const Box& 
 		// TODO: subtract floats
 		const float line_width = box_size.x;
 
-		line_box->AddInlineBox(inline_level_box, wrap_content, line_width);
+		line_box->AddBox(inline_level_box, wrap_content, line_width);
 		break; // TODO
 
 		// TODO, handle split inline boxes. Break out on finish.
 	}
 
 	if (inline_box)
-		open_inline_boxes.push(inline_box);
+		open_inline_boxes.push_back(inline_box);
 
 	return inline_box;
 }
 
-void InlineContainer::CloseInlineElement(LayoutInlineBox* inline_box)
+void InlineContainer::CloseInlineElement(InlineBox* inline_box)
 {
 	if (!inline_box || open_inline_boxes.empty())
 	{
@@ -97,7 +97,7 @@ void InlineContainer::CloseInlineElement(LayoutInlineBox* inline_box)
 		return;
 	}
 
-	LayoutInlineBox* open_inline_box = open_inline_boxes.top();
+	InlineBox* open_inline_box = open_inline_boxes.back();
 	if (open_inline_box != inline_box || line_boxes.empty())
 	{
 		// Calls to CloseInlineElement() should be submitted in reverse order to AddInlineElement().
@@ -106,7 +106,7 @@ void InlineContainer::CloseInlineElement(LayoutInlineBox* inline_box)
 	}
 
 	line_boxes.back()->CloseInlineBox(inline_box);
-	open_inline_boxes.pop();
+	open_inline_boxes.pop_back();
 }
 
 void InlineContainer::AddBreak(float line_height)
@@ -118,18 +118,18 @@ void InlineContainer::AddBreak(float line_height)
 		box_cursor += line_height;
 }
 
-void InlineContainer::AddChainedBox(LayoutInlineBox* chained_box)
+void InlineContainer::AddChainedBox(InlineBox* chained_box)
 {
 	// TODO
 	// line_boxes.back()->AddChainedBox(chained_box);
 }
 
-InlineContainer::CloseResult InlineContainer::Close(LayoutInlineBox** out_open_inline_box)
+InlineContainer::CloseResult InlineContainer::Close(InlineBox** out_open_inline_box)
 {
 	// The parent container may need the open inline box to be split and resumed.
 	if (out_open_inline_box && !open_inline_boxes.empty())
 		// TODO: I guess we need to copy out the whole stack, otherwise we need to use parent on the inline blocks.
-		*out_open_inline_box = open_inline_boxes.top();
+		*out_open_inline_box = open_inline_boxes.back();
 
 	CloseOpenLineBox();
 
@@ -170,8 +170,12 @@ void InlineContainer::CloseOpenLineBox()
 		const Vector2f relative_position = position - (offset_parent->GetPosition() - parent->GetOffsetRoot()->GetPosition());
 		const Vector2f line_position = {relative_position.x, relative_position.y + box_cursor};
 
+		// TODO: We don't really want to close then, but rather split them.
+		for (auto it = open_inline_boxes.rbegin(); it != open_inline_boxes.rend(); ++it)
+			line_box->CloseInlineBox(*it);
+
 		// TODO Position due to floats.
-		const float height_of_line = line_box->Close(offset_parent->GetElement(), line_position);
+		const float height_of_line = line_box->Close(offset_parent->GetElement(), line_position, element_line_height);
 		box_cursor += height_of_line;
 	}
 }

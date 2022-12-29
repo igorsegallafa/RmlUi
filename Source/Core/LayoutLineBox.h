@@ -38,7 +38,7 @@ public:
 	LayoutLineBox() {}
 	~LayoutLineBox();
 
-	void AddInlineBox(InlineLevelBox* inline_box, bool wrap_content, float line_width)
+	void AddBox(InlineLevelBox* box, bool wrap_content, float line_width)
 	{
 		// TODO: The spacing this element must leave on the right of the line, to account not only for its margins and padding,
 		// but also for its parents which will close immediately after it.
@@ -54,22 +54,24 @@ public:
 				// TODO: Subtract floats (or perhaps in passed-in line_width).
 				available_width = Math::RoundUpFloat(line_width - box_cursor);
 
-			LayoutFragment fragment = inline_box->LayoutContent(first_box, available_width, right_spacing_width);
+			LayoutFragment fragment = box->LayoutContent(first_box, available_width, right_spacing_width);
 			if (fragment)
 			{
+				RMLUI_ASSERT(fragment.layout_bounds.y >= 0.f);
+
 				// TODO: Split case.
-				if (fragment.outer_size.x < 0.f)
+				if (fragment.layout_bounds.x < 0.f)
 				{
-					// Auto-sized fragment.
-					fragments.push_back({inline_box, {box_cursor, 0.f}, fragment.outer_size, open_fragment_index});
+					// Opening up an inline box.
+					box_cursor += box->GetEdge(Box::LEFT);
+					fragments.push_back({box, {box_cursor, 0.f}, fragment.layout_bounds, open_fragment_index});
 					open_fragment_index = (FragmentIndex)fragments.size() - 1;
-					box_cursor += inline_box->GetEdge(Box::LEFT);
 				}
 				else
 				{
 					// Closed, fixed-size fragment.
-					fragments.push_back({inline_box, {box_cursor, 0.f}, fragment.outer_size, InvalidIndex});
-					box_cursor += fragment.outer_size.x;
+					fragments.push_back({box, {box_cursor, 0.f}, fragment.layout_bounds, InvalidIndex});
+					box_cursor += fragment.layout_bounds.x;
 				}
 			}
 			else
@@ -83,23 +85,23 @@ public:
 	}
 
 	// Returns height of line. Note: This can be different from the element's computed line-height property.
-	float Close(Element* offset_parent, Vector2f line_position)
+	float Close(Element* offset_parent, Vector2f line_position, float element_line_height)
 	{
 		// TODO: How to handle open fragments?
-		// RMLUI_ASSERTMSG(open_fragment_index == InvalidIndex, "Some fragments were not properly closed.");
+		RMLUI_ASSERTMSG(open_fragment_index == InvalidIndex, "Some fragments were not properly closed.");
 
 		// Vertically align fragments and size line.
-		float height_of_line = 0.f;
+		float height_of_line = element_line_height;
 
 		for (const auto& fragment : fragments)
-			height_of_line = Math::Max(fragment.size.y, height_of_line);
+			height_of_line = Math::Max(fragment.layout_bounds.y, height_of_line);
 
 		// TODO: Alignment
 
 		// Position and size all inline-level boxes, place geometry boxes.
 		for (const auto& fragment : fragments)
 		{
-			fragment.inline_box->Submit(offset_parent, line_position + fragment.position, fragment.size);
+			fragment.inline_box->Submit(offset_parent, line_position + fragment.position, fragment.layout_bounds);
 		}
 
 		is_closed = true;
@@ -107,16 +109,15 @@ public:
 		return height_of_line;
 	}
 
-	void CloseInlineBox(LayoutInlineBox* inline_box)
+	void CloseInlineBox(InlineBox* inline_box)
 	{
 		PlacedFragment* fragment = GetFragment(open_fragment_index);
 		if (fragment && fragment->inline_box == inline_box)
 		{
-			box_cursor += inline_box->GetEdge(Box::RIGHT);
 			open_fragment_index = fragment->parent_index;
-
-			fragment->size.x = box_cursor - fragment->position.x;
+			fragment->layout_bounds.x = box_cursor - fragment->position.x;
 			fragment->parent_index = InvalidIndex;
+			box_cursor += inline_box->GetEdge(Box::RIGHT);
 		}
 	}
 
@@ -136,7 +137,7 @@ private:
 	struct PlacedFragment {
 		InlineLevelBox* inline_box;
 		Vector2f position;          // Outer (top,left) position relative to start of the line, disregarding floats.
-		Vector2f size;              // Outer size.
+		Vector2f layout_bounds;     // Outer size for replaced and inline blocks, inner size for inline boxes.
 		FragmentIndex parent_index; // Specified for open fragments.
 	};
 

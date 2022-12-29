@@ -143,7 +143,7 @@ public:
 
 	struct InlineBoxHandle {
 		InlineContainer* inline_container;
-		LayoutInlineBox* inline_box;
+		InlineBox* inline_box;
 	};
 
 	/// Adds a new inline element to this inline-context box.
@@ -273,7 +273,7 @@ private:
 	ElementList queued_float_elements;
 	// Used by block contexts only; stores an inline element hierarchy that was interrupted by a child block box.
 	// The hierarchy will be resumed in an inline-context box once the intervening block box is completed.
-	LayoutInlineBox* interrupted_chain;
+	InlineBox* interrupted_chain;
 	// Used by block contexts only; stores the value of the overflow property for the element.
 	Style::Overflow overflow_x_property;
 	Style::Overflow overflow_y_property;

@@ -44,28 +44,28 @@ namespace Rml {
 class InlineContainer final : public BlockLevelBox {
 public:
 	/// Creates a new block box in an inline context.
-	InlineContainer(BlockContainer* parent, bool wrap_content);
+	InlineContainer(BlockContainer* parent, float element_line_height, bool wrap_content);
 	~InlineContainer();
 
 	/// Adds a new inline element to this inline-context box.
 	/// @param element[in] The new inline element.
 	/// @param box[in] The box defining the element's bounds.
 	/// @return The inline box representing the element. Once the element's children have been positioned, Close() must be called on it.
-	LayoutInlineBox* AddInlineElement(Element* element, const Box& box);
+	InlineBox* AddInlineElement(Element* element, const Box& box);
 	// TODO
-	void CloseInlineElement(LayoutInlineBox* inline_box);
+	void CloseInlineElement(InlineBox* inline_box);
 
 	/// Add a break to the last line.
 	void AddBreak(float line_height);
 
 	/// Adds an inline box for resuming an inline box that has been split.
 	/// @param[in] chained_box The box overflowed from a previous line.
-	void AddChainedBox(LayoutInlineBox* chained_box);
+	void AddChainedBox(InlineBox* chained_box);
 
 	/// Closes the box. This will determine the element's height (if it was unspecified).
 	/// @param[out] Optionally, output the open inline box.
 	/// @return The result of the close; this may request a reformat of this element or our parent.
-	CloseResult Close(LayoutInlineBox** out_open_inline_box = nullptr);
+	CloseResult Close(InlineBox** out_open_inline_box = nullptr);
 
 	/// Returns the offset from the top-left corner of this box's offset element the next child box will be positioned at.
 	/// @param[in] top_margin The top margin of the box. This will be collapsed as appropriate against other block boxes.
@@ -105,18 +105,20 @@ private:
 	Vector2f position;
 	Vector2f box_size;
 
+	// The element's computed line-height. Not necessarily the same as the height of our lines.
+	float element_line_height;
 	// True if the block box's line boxes should stretch to fit their inline content instead of wrapping.
 	bool wrap_content;
 
 	// The vertical position of the next block box to be added to this box, relative to the top of this box.
 	float box_cursor = 0;
 
-	InlineBox_Root root_inline_box;
+	InlineBoxRoot root_inline_box;
 
 	// The open inline box; this is nullptr if all inline boxes are closed.
 	// TODO: Add std::stack to Types.h?
 	// @performance Perhaps add parent to inline boxes, so we only need to store the leaf open node here, thereby avoiding allocations.
-	std::stack<LayoutInlineBox*> open_inline_boxes;
+	Vector<InlineBox*> open_inline_boxes;
 
 	// Used by inline contexts only; stores the list of line boxes flowing inline content.
 	// @performance Use first_child, next_sibling instead to build the tree?
