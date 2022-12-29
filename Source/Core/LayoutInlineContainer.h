@@ -88,6 +88,8 @@ private:
 	using LineBoxList = Vector<UniquePtr<LayoutLineBox>>;
 	using InlineBoxList = Vector<UniquePtr<LayoutInlineBox>>;
 
+	LayoutLineBox* EnsureLineBox();
+
 	BlockContainer* parent; // [not-null]
 
 	Vector2f position = {-1, -1};
@@ -99,13 +101,15 @@ private:
 	// The vertical position of the next block box to be added to this box, relative to the top of this box.
 	float box_cursor = 0;
 
-	// Used by inline contexts only; stores the list of line boxes flowing inline content.
-	LineBoxList line_boxes;
-
+	// @performance Use first_child, next_sibling instead to build the tree?
 	InlineBoxList inline_boxes;
 
 	// The open inline box; this is nullptr if all inline boxes are closed.
 	LayoutInlineBox* open_inline_box = nullptr;
+
+	// Used by inline contexts only; stores the list of line boxes flowing inline content.
+	// @performance Use first_child, next_sibling instead to build the tree?
+	LineBoxList line_boxes;
 };
 
 } // namespace Rml

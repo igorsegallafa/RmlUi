@@ -40,6 +40,12 @@ namespace Rml {
 
 LayoutInlineBox::~LayoutInlineBox() {}
 
+UniquePtr<LayoutFragment> LayoutInlineBox::LayoutContent(bool /*first_box*/, float /*available_width*/, float /*right_spacing_width*/)
+{
+	// TODO: Size
+	return MakeUnique<LayoutFragment>(this, Vector2f{});
+}
+
 String LayoutInlineBox::DebugDumpNameValue() const
 {
 	return "LayoutInlineBox";

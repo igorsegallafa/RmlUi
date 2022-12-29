@@ -38,6 +38,8 @@ public:
 	LayoutInlineBoxText(ElementText* element) : LayoutInlineBox(element) {}
 	virtual ~LayoutInlineBoxText();
 
+	UniquePtr<LayoutFragment> LayoutContent(bool first_box, float available_width, float right_spacing_width) override;
+
 	String DebugDumpNameValue() const override;
 
 	void* operator new(size_t size);
@@ -45,6 +47,8 @@ public:
 
 private:
 	ElementText* GetTextElement();
+
+	String line_contents;
 };
 
 String FontFaceDescription(const String& font_family, Style::FontStyle style, Style::FontWeight weight);

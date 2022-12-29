@@ -36,6 +36,7 @@
 #include "LayoutBlockBox.h"
 #include "LayoutBlockBoxSpace.h"
 #include "LayoutDetails.h"
+#include "LayoutInlineBoxText.h"
 
 namespace Rml {
 
@@ -55,8 +56,38 @@ InlineContainer::~InlineContainer() {}
 
 LayoutInlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
 {
-	// We're an inline context box, so we'll add this new inline element into our line boxes.
-	return line_boxes.back()->AddElement(element, box);
+	RMLUI_ASSERT(element);
+
+	if (auto text_element = rmlui_dynamic_cast<ElementText*>(element))
+		inline_boxes.push_back(MakeUnique<LayoutInlineBoxText>(text_element));
+	else
+		inline_boxes.push_back(MakeUnique<LayoutInlineBox>(element));
+
+	LayoutInlineBox* inline_box = inline_boxes.back().get();
+	LayoutLineBox* line_box = EnsureLineBox();
+
+	while (true)
+	{
+		// TODO See old LayoutLineBox::AddBox
+		const bool first_box = line_box->IsEmpty();
+		float available_width = -1;
+		if (wrap_content)
+			available_width =
+				Math::RoundUpFloat(dimensions.x - (open_inline_box->GetPosition().x + open_inline_box->GetBox().GetPosition(Box::CONTENT).x));
+
+		UniquePtr<LayoutFragment> fragment = inline_box->LayoutContent(first_box, available_width, right_spacing_width);
+		if (fragment)
+		{
+			line_box->AddFragment(std::move(fragment));
+		}
+		else
+		{
+			RMLUI_ASSERT(!first_box);
+			break;
+		}
+	}
+
+
 }
 
 void InlineContainer::AddBreak(float line_height)
@@ -168,6 +199,13 @@ bool InlineContainer::GetBaselineOfLastLine(float& out_baseline) const
 			break;
 	}
 	return found_baseline;
+}
+
+LayoutLineBox* InlineContainer::EnsureLineBox()
+{
+	if (line_boxes.empty())
+		line_boxes.push_back(MakeUnique<LayoutLineBox>());
+	return line_boxes.back().get();
 }
 
 String InlineContainer::DebugDumpTree(int depth) const

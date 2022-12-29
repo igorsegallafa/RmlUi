@@ -62,6 +62,31 @@ String FontFaceDescription(const String& font_family, Style::FontStyle style, St
 
 LayoutInlineBoxText::~LayoutInlineBoxText() {}
 
+UniquePtr<LayoutFragment> LayoutInlineBoxText::LayoutContent(bool first_box, float available_width, float right_spacing_width)
+{
+	ElementText* text_element = GetTextElement();
+	RMLUI_ASSERT(text_element != nullptr);
+
+	int line_length;
+	float line_width;
+	bool overflow =
+		!text_element->GenerateLine(line_contents, line_length, line_width, line_begin, available_width, right_spacing_width, first_box, true);
+
+	Vector2f content_area;
+	content_area.x = line_width;
+	content_area.y = GetBoxContentSize().y;
+	SetBoxContentSize(content_area);
+
+	// Call the base-class's FlowContent() to increment the width of our parent's box.
+	LayoutInlineBox::FlowContent(first_box, available_width, right_spacing_width);
+
+	if (overflow)
+		return MakeUnique<LayoutInlineBoxText>(GetTextElement(), line_begin + line_length);
+
+	// TODO: Size
+	return MakeUnique<LayoutFragment>(this, Vector2f{});
+}
+
 String LayoutInlineBoxText::DebugDumpNameValue() const
 {
 	return "LayoutInlineBoxText";

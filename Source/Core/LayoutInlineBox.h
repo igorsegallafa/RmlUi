@@ -35,11 +35,21 @@
 namespace Rml {
 
 class Element;
+class LayoutFragment;
 
 class LayoutInlineBox {
 public:
-	LayoutInlineBox(Element* element) : element(element) {}
+	LayoutInlineBox(Element* element) : element(element) { RMLUI_ASSERT(element); }
 	virtual ~LayoutInlineBox();
+
+	LayoutInlineBox* AddChild(UniquePtr<LayoutInlineBox> child)
+	{
+		auto result = child.get();
+		children.push_back(std::move(child));
+		return result;
+	}
+
+	virtual UniquePtr<LayoutFragment> LayoutContent(bool first_box, float available_width, float right_spacing_width);
 
 	virtual String DebugDumpNameValue() const;
 	String DebugDumpTree(int depth) const;
@@ -55,15 +65,29 @@ private:
 
 	Element* element;
 
+	// @performance Use first_child, next_sibling instead to build the tree?
 	InlineBoxList children;
 };
 
 class LayoutFragment {
 public:
-	LayoutFragment(LayoutInlineBox* inline_box) : inline_box(inline_box) {}
+	using OverflowHandle = int;
 
+	LayoutFragment(LayoutInlineBox* inline_box, Vector2f size, OverflowHandle overflow_handle = {}) :
+		inline_box(inline_box), size(size), overflow_handle(overflow_handle)
+	{}
+
+	float GetWidth() const { return size.x; }
+
+	// TODO: operator new/delete --or-- instead make it into a struct, no overloading.
 private:
 	LayoutInlineBox* inline_box;
+	Vector2f size;
+
+	// Overflow handle is non-zero when there is another fragment to be layed out.
+	// TODO: I think we can make this part of the return value for LayoutContent instead? No need to keep this around. Maybe need a pointer to the
+	// next fragment in the chain.
+	OverflowHandle overflow_handle;
 };
 
 String LayoutElementName(Element* element);

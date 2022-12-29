@@ -132,7 +132,7 @@ public:
 	/// @param[in] child_size_y The vertical margin size of the child.
 	/// @return False if the block box caused an automatic vertical scrollbar to appear, forcing an entire reformat of the block box.
 	bool CloseChildBox(BlockLevelBox* child, float child_position_top, float child_size_y);
-
+	
 	/// Adds a new block element to this block-context box.
 	/// @param element[in] The new block element.
 	/// @param box[in] The box used for the new block box.
@@ -140,11 +140,20 @@ public:
 	/// @param max_height[in] The maximum height of the content box.
 	/// @return The block box representing the element. Once the element's children have been positioned, Close() must be called on it.
 	BlockContainer* AddBlockElement(Element* element, const Box& box, float min_height, float max_height);
+	
+	struct InlineBoxHandle {
+		InlineContainer* inline_container;
+		LayoutInlineBox* inline_box;
+	};
+
 	/// Adds a new inline element to this inline-context box.
 	/// @param element[in] The new inline element.
 	/// @param box[in] The box defining the element's bounds.
 	/// @return The inline box representing the element. Once the element's children have been positioned, Close() must be called on it.
-	LayoutInlineBox* AddInlineElement(Element* element, const Box& box);
+	InlineBoxHandle AddInlineElement(Element* element, const Box& box);
+	// TODO
+	void CloseInlineElement(InlineBoxHandle handle);
+
 	/// Adds a line-break to this block box.
 	void AddBreak();
 

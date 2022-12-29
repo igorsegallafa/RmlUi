@@ -313,7 +313,7 @@ BlockContainer* BlockContainer::AddBlockElement(Element* element, const Box& box
 	return static_cast<BlockContainer*>(block_boxes.back().get());
 }
 
-LayoutInlineBox* BlockContainer::AddInlineElement(Element* element, const Box& box)
+BlockContainer::InlineBoxHandle BlockContainer::AddInlineElement(Element* element, const Box& box)
 {
 	RMLUI_ZoneScoped;
 
@@ -336,7 +336,13 @@ LayoutInlineBox* BlockContainer::AddInlineElement(Element* element, const Box& b
 
 	LayoutInlineBox* inline_box = inline_container->AddInlineElement(element, box);
 
-	return inline_box;
+	return {inline_container, inline_box};
+}
+
+void BlockContainer::CloseInlineElement(InlineBoxHandle handle)
+{
+	// TODO: Check that handle.inline_container is still the open box, otherwise it has been closed already probably by an intermediary block element
+	// (block-inside-inline).
 }
 
 void BlockContainer::AddBreak()

@@ -89,7 +89,7 @@ void LayoutEngine::DeallocateLayoutChunk(void* chunk, size_t size)
 }
 
 // Table elements should be handled within FormatElementTable, log a warning when it seems like we're encountering table parts in the wild.
-static void LogWarningForWildTablePart(Element* element, Style::Display display)
+static void LogUnexpectedTablePart(Element* element, Style::Display display)
 {
 	RMLUI_ASSERT(element);
 	String value = "*unknown";
@@ -208,7 +208,7 @@ bool LayoutEngine::FormatElementFlow(BlockContainer* block_context_box, Element*
 	case Style::Display::TableRowGroup:
 	case Style::Display::TableColumn:
 	case Style::Display::TableColumnGroup:
-	case Style::Display::TableCell: LogWarningForWildTablePart(element, display); return true;
+	case Style::Display::TableCell: LogUnexpectedTablePart(element, display); return true;
 	case Style::Display::None: /* handled above */ RMLUI_ERROR; break;
 	}
 
@@ -237,7 +237,7 @@ bool LayoutEngine::FormatElementBlockified(BlockContainer* block_context_box, El
 	case Style::Display::TableRow:
 	case Style::Display::TableRowGroup:
 	case Style::Display::TableColumn:
-	case Style::Display::TableColumnGroup: LogWarningForWildTablePart(element, display); return true;
+	case Style::Display::TableColumnGroup: LogUnexpectedTablePart(element, display); return true;
 	case Style::Display::None: break;
 	}
 

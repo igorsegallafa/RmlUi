@@ -38,12 +38,21 @@ public:
 	LayoutLineBox() {}
 	~LayoutLineBox();
 
+	bool IsEmpty() const { return fragments.empty(); }
+
+	void AddFragment(UniquePtr<LayoutFragment> fragment)
+	{
+		box_cursor += fragment->GetWidth();
+		fragments.push_back(std::move(fragment));
+	}
+
 	String DebugDumpTree(int depth) const;
 
 	void* operator new(size_t size);
 	void operator delete(void* chunk, size_t size);
 
 private:
+	// TODO: Do we need pointers/overloading here, can we take the fragments by value?
 	using FragmentList = Vector<UniquePtr<LayoutFragment>>;
 
 	// The horizontal cursor. This is where the next inline box will be placed along the line.
