@@ -38,18 +38,18 @@
 
 namespace Rml {
 
+String LayoutElementName(Element* element)
+{
+	if (!element)
+		return "nullptr";
+	if (!element->GetId().empty())
+		return '#' + element->GetId();
+	if (element->GetTagName() == "#text")
+		return "text";
+	return element->GetAddress();
+}
+
 LayoutInlineBox::~LayoutInlineBox() {}
-
-UniquePtr<LayoutFragment> LayoutInlineBox::LayoutContent(bool /*first_box*/, float /*available_width*/, float /*right_spacing_width*/)
-{
-	// TODO: Size
-	return MakeUnique<LayoutFragment>(this, Vector2f{});
-}
-
-String LayoutInlineBox::DebugDumpNameValue() const
-{
-	return "LayoutInlineBox";
-}
 
 String LayoutInlineBox::DebugDumpTree(int depth) const
 {
@@ -71,15 +71,21 @@ void LayoutInlineBox::operator delete(void* chunk, size_t size)
 	LayoutEngine::DeallocateLayoutChunk(chunk, size);
 }
 
-String LayoutElementName(Element* element)
+LayoutFragment LayoutInlineBoxSized::LayoutContent(bool /*first_box*/, float available_width, float right_spacing_width)
 {
-	if (!element)
-		return "nullptr";
-	if (!element->GetId().empty())
-		return '#' + element->GetId();
-	if (element->GetTagName() == "#text")
-		return "text";
-	return element->GetAddress();
+	Vector2f outer_size;
+	outer_size.x = box.GetSizeAcross(Box::HORIZONTAL, Box::MARGIN);
+	outer_size.y = box.GetSize().y; // Vertical edges are ignored for inline elements.
+
+	if (outer_size.x + right_spacing_width < available_width)
+		return LayoutFragment{this, outer_size};
+
+	return {};
+}
+
+String LayoutInlineBoxSized::DebugDumpNameValue() const
+{
+	return "LayoutInlineBoxSized";
 }
 
 } // namespace Rml

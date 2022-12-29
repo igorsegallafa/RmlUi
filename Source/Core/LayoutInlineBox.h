@@ -35,11 +35,10 @@
 namespace Rml {
 
 class Element;
-class LayoutFragment;
+struct LayoutFragment;
 
 class LayoutInlineBox {
 public:
-	LayoutInlineBox(Element* element) : element(element) { RMLUI_ASSERT(element); }
 	virtual ~LayoutInlineBox();
 
 	LayoutInlineBox* AddChild(UniquePtr<LayoutInlineBox> child)
@@ -49,15 +48,19 @@ public:
 		return result;
 	}
 
-	virtual UniquePtr<LayoutFragment> LayoutContent(bool first_box, float available_width, float right_spacing_width);
+	virtual float GetEdge(Box::Edge edge) const = 0;
 
-	virtual String DebugDumpNameValue() const;
+	virtual LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) = 0;
+
+	virtual String DebugDumpNameValue() const = 0;
 	String DebugDumpTree(int depth) const;
 
 	void* operator new(size_t size);
 	void operator delete(void* chunk, size_t size);
 
 protected:
+	LayoutInlineBox(Element* element) : element(element) { RMLUI_ASSERT(element); }
+
 	Element* GetElement() { return element; }
 
 private:
@@ -69,25 +72,37 @@ private:
 	InlineBoxList children;
 };
 
-class LayoutFragment {
+class LayoutInlineBoxSized : public LayoutInlineBox {
 public:
+	LayoutInlineBoxSized(Element* element, const Box& box) : LayoutInlineBox(element), box(box) { RMLUI_ASSERT(box.GetSize() >= Vector2f(0.f)); }
+
+	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) override;
+
+	String DebugDumpNameValue() const override;
+
+private:
+	Box box;
+};
+
+struct LayoutFragment {
 	using OverflowHandle = int;
 
-	LayoutFragment(LayoutInlineBox* inline_box, Vector2f size, OverflowHandle overflow_handle = {}) :
-		inline_box(inline_box), size(size), overflow_handle(overflow_handle)
+	enum class Type { Invalid, Closed, };
+
+	LayoutFragment() = default;
+	LayoutFragment(LayoutInlineBox* inline_box, Vector2f outer_size, OverflowHandle overflow_handle = {}) :
+		inline_box(inline_box), outer_size(outer_size), overflow_handle(overflow_handle)
 	{}
 
-	float GetWidth() const { return size.x; }
+	explicit operator bool() const { return inline_box; }
 
-	// TODO: operator new/delete --or-- instead make it into a struct, no overloading.
-private:
-	LayoutInlineBox* inline_box;
-	Vector2f size;
+	LayoutInlineBox* inline_box = nullptr;
+	Vector2f outer_size;
 
 	// Overflow handle is non-zero when there is another fragment to be layed out.
 	// TODO: I think we can make this part of the return value for LayoutContent instead? No need to keep this around. Maybe need a pointer to the
 	// next fragment in the chain.
-	OverflowHandle overflow_handle;
+	OverflowHandle overflow_handle = {};
 };
 
 String LayoutElementName(Element* element);

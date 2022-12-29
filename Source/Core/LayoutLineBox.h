@@ -38,12 +38,68 @@ public:
 	LayoutLineBox() {}
 	~LayoutLineBox();
 
-	bool IsEmpty() const { return fragments.empty(); }
-
-	void AddFragment(UniquePtr<LayoutFragment> fragment)
+	void AddInlineBox(LayoutInlineBox* inline_box, bool wrap_content, float line_width)
 	{
-		box_cursor += fragment->GetWidth();
-		fragments.push_back(std::move(fragment));
+		// TODO: The spacing this element must leave on the right of the line, to account not only for its margins and padding,
+		// but also for its parents which will close immediately after it.
+		// (Right edge width of all open fragments)
+		const float right_spacing_width = 0.f;
+
+		while (true)
+		{
+			// TODO See old LayoutLineBox::AddBox
+			const bool first_box = fragments.empty();
+			float available_width = FLT_MAX;
+			if (wrap_content)
+				// TODO: Subtract floats (or perhaps in passed-in line_width).
+				available_width = Math::RoundUpFloat(line_width - box_cursor);
+
+			LayoutFragment fragment = inline_box->LayoutContent(first_box, available_width, right_spacing_width);
+			if (fragment)
+			{
+				// TODO: Split case.
+				if (fragment.outer_size.x < 0.f)
+				{
+					// Auto-sized fragment.
+					fragments.push_back({inline_box, box_cursor, -1.f, open_fragment_index});
+					open_fragment_index = (FragmentIndex)fragments.size() - 1;
+					box_cursor += inline_box->GetEdge(Box::LEFT);
+				}
+				else
+				{
+					// Closed, fixed-size fragment.
+					fragments.push_back({inline_box, box_cursor, fragment.outer_size.x, InvalidIndex});
+					box_cursor += fragment.outer_size.x;
+				}
+			}
+			else
+			{
+				RMLUI_ASSERT(!first_box);
+				break;
+			}
+		}
+	}
+
+	void Close()
+	{
+		// Close open fragments.
+
+		// Vertically align fragments and size line.
+
+		// Position and size all inline-level boxes, place geometry boxes.
+	}
+
+	void CloseInlineBox(LayoutInlineBox* inline_box)
+	{
+		PlacedFragment* fragment = GetFragment(open_fragment_index);
+		if (fragment && fragment->inline_box == inline_box)
+		{
+			box_cursor += inline_box->GetEdge(Box::RIGHT);
+			open_fragment_index = fragment->parent_index;
+
+			fragment->size = box_cursor - fragment->position;
+			fragment->parent_index = InvalidIndex;
+		}
 	}
 
 	String DebugDumpTree(int depth) const;
@@ -52,8 +108,30 @@ public:
 	void operator delete(void* chunk, size_t size);
 
 private:
+	using FragmentIndex = unsigned int;
+	static const FragmentIndex InvalidIndex = FragmentIndex(-1);
+
+	struct PlacedFragment {
+		LayoutInlineBox* inline_box;
+		float position;             // Horizontal outer left position relative to start of the line, disregarding floats.
+		float size;                 // Outer size.
+		FragmentIndex parent_index; // Specified for open fragments.
+	};
+
+	PlacedFragment* GetFragment(FragmentIndex index)
+	{
+		if (index != InvalidIndex)
+		{
+			RMLUI_ASSERT(index < (FragmentIndex)fragments.size());
+			return &fragments[index];
+		}
+		return nullptr;
+	}
+
 	// TODO: Do we need pointers/overloading here, can we take the fragments by value?
-	using FragmentList = Vector<UniquePtr<LayoutFragment>>;
+	using FragmentList = Vector<PlacedFragment>;
+
+	FragmentIndex open_fragment_index = InvalidIndex;
 
 	// The horizontal cursor. This is where the next inline box will be placed along the line.
 	float box_cursor = 0.f;

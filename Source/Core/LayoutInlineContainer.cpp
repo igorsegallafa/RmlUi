@@ -45,8 +45,6 @@ InlineContainer::InlineContainer(BlockContainer* _parent, bool _wrap_content) :
 {
 	RMLUI_ASSERT(_parent);
 
-	line_boxes.push_back(MakeUnique<LayoutLineBox>(this));
-
 	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent);
 	box_size = Vector2f(containing_block.x, -1);
 	position = parent->NextBoxPosition();
@@ -66,14 +64,19 @@ LayoutInlineBox* InlineContainer::AddInlineElement(Element* element, const Box& 
 	LayoutInlineBox* inline_box = inline_boxes.back().get();
 	LayoutLineBox* line_box = EnsureLineBox();
 
+	const float line_width = box_size.x;
+	// TODO: The spacing this element must leave on the right of the line, to account not only for its margins and padding,
+	// but also for its parents which will close immediately after it.
+	const float right_spacing_width = 0.f;
+
 	while (true)
 	{
 		// TODO See old LayoutLineBox::AddBox
 		const bool first_box = line_box->IsEmpty();
-		float available_width = -1;
+		float available_width = FLT_MAX;
 		if (wrap_content)
-			available_width =
-				Math::RoundUpFloat(dimensions.x - (open_inline_box->GetPosition().x + open_inline_box->GetBox().GetPosition(Box::CONTENT).x));
+			// TODO: Subtract floats
+			available_width = Math::RoundUpFloat(line_width - line_box->GetCursor());
 
 		UniquePtr<LayoutFragment> fragment = inline_box->LayoutContent(first_box, available_width, right_spacing_width);
 		if (fragment)

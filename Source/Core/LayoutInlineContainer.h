@@ -92,7 +92,7 @@ private:
 
 	BlockContainer* parent; // [not-null]
 
-	Vector2f position = {-1, -1};
+	Vector2f position;
 	Vector2f box_size;
 
 	// True if the block box's line boxes should stretch to fit their inline content instead of wrapping.

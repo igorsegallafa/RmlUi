@@ -35,10 +35,10 @@ namespace Rml {
 
 class LayoutInlineBoxText : public LayoutInlineBox {
 public:
-	LayoutInlineBoxText(ElementText* element) : LayoutInlineBox(element) {}
+	LayoutInlineBoxText(ElementText* element) : LayoutInlineBox(element, Box{}) {}
 	virtual ~LayoutInlineBoxText();
 
-	UniquePtr<LayoutFragment> LayoutContent(bool first_box, float available_width, float right_spacing_width) override;
+	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) override;
 
 	String DebugDumpNameValue() const override;
 
