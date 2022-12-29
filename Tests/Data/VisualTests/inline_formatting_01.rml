@@ -1,0 +1,51 @@
+<rml>
+<head>
+    <title>Inline formatting 01</title>
+    <link type="text/rcss" href="../style.rcss"/>
+	<link rel="help" href="http://www.w3.org/TR/CSS21/visuren.html#floats" />
+	<meta name="Description" content="Floating boxes" />
+	<style>
+		body {
+		}
+		hr {
+			clear: both;
+			margin: 15px;
+			display: block;
+		}
+		span {
+			color: red;
+		}
+		span.outer {
+			padding: 5px;
+			border: 4px #ee0;
+			margin: 5px;
+		}
+		span.inner {
+			padding: 5px;
+			border: 2px #00e;
+			margin: 5px;
+		}
+		.paragraph {
+			margin: 15px 0;
+		}
+		.inline-blocks span.inner {
+			display: inline-block;
+		}
+	</style>
+</head>
+
+<body id="rmlui-debug-layout">
+
+<div class="paragraph" id="plain">In consectetur, neque dignissim tincidunt dapibus, leo metus molestie erat, eu pharetra velit nunc in ipsum. Donec aliquet malesuada iaculis. Quisque maximus urna in congue placerat. In hac habitasse platea dictumst. Mauris a fringilla augue. Donec posuere ante at orci efficitur porttitor vitae ac tellus. Nunc nec sapien orci. Sed rhoncus et dui sed sagittis. Nullam venenatis quis elit vel mattis. In mattis erat et blandit aliquam. Aliquam erat volutpat.</div>
+
+<hr/>
+
+<div class="paragraph" id="inline">In consectetur, neque dignissim tincidunt dapibus, <span class="outer">leo metus molestie erat, eu <span class="inner">pharetra velit nunc in</span> ipsum. Donec aliquet malesuada <span class="inner">iaculis.</span></span> Quisque maximus urna in congue placerat. In hac habitasse platea dictumst. Mauris a fringilla augue. Donec posuere ante at orci efficitur porttitor vitae ac tellus. Nunc nec sapien orci. Sed rhoncus et dui sed sagittis. Nullam <span class="outer">venenatis <span class="inner">quis</span> <span class="inner">elit</span> vel mattis</span>. In mattis erat et blandit aliquam. Aliquam erat volutpat.</div>
+
+<hr/>
+
+<div class="paragraph inline-blocks" id="inline-blocks">In consectetur, neque dignissim tincidunt dapibus, <span class="outer">leo metus molestie erat, eu <span class="inner">pharetra velit nunc in</span> ipsum. Donec aliquet malesuada <span class="inner">iaculis.</span></span> Quisque maximus urna in congue placerat. In hac habitasse platea dictumst. Mauris a fringilla augue. Donec posuere ante at orci efficitur porttitor vitae ac tellus. Nunc nec sapien orci. Sed rhoncus et dui sed sagittis. Nullam <span class="outer">venenatis <span class="inner">quis</span> <span class="inner">elit</span> vel mattis</span>. In mattis erat et blandit aliquam. Aliquam erat volutpat.</div>
+
+<handle size_target="#document"/>
+</body>
+</rml>
