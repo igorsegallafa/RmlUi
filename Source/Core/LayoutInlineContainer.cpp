@@ -57,23 +57,28 @@ LayoutInlineBox* InlineContainer::AddInlineElement(Element* element, const Box& 
 	RMLUI_ASSERT(element);
 
 	LayoutInlineBox* inline_box = nullptr;
-	InlineLevelBox* level_box = nullptr;
+	InlineLevelBox* inline_level_box = nullptr;
 
 	if (auto text_element = rmlui_dynamic_cast<ElementText*>(element))
-		level_box = root_inline_box.AddChild(MakeUnique<InlineLevelBox_Text>(text_element));
+		inline_level_box = root_inline_box.AddChild(MakeUnique<InlineLevelBox_Text>(text_element));
 	else if (box.GetSize().x >= 0.f)
-		level_box = root_inline_box.AddChild(MakeUnique<InlineLevelBox_Replaced>(element, box));
+		inline_level_box = root_inline_box.AddChild(MakeUnique<InlineLevelBox_Replaced>(element, box));
 	else
-		level_box = inline_box = static_cast<LayoutInlineBox*>(root_inline_box.AddChild(MakeUnique<LayoutInlineBox>(element, box)));
+	{
+		auto inline_box_ptr = MakeUnique<InlineBox_Element>(element, box);
+		inline_box = inline_box_ptr.get();
+		inline_level_box = root_inline_box.AddChild(std::move(inline_box_ptr));
+	}
 
-	LayoutLineBox* line_box = EnsureLineBox();
+	LayoutLineBox* line_box = EnsureOpenLineBox();
 
 	while (true)
 	{
 		// TODO: subtract floats
 		const float line_width = box_size.x;
 
-		line_box->AddInlineBox(inline_box, wrap_content, line_width);
+		line_box->AddInlineBox(inline_level_box, wrap_content, line_width);
+		break; // TODO
 
 		// TODO, handle split inline boxes. Break out on finish.
 	}
@@ -107,30 +112,31 @@ void InlineContainer::CloseInlineElement(LayoutInlineBox* inline_box)
 void InlineContainer::AddBreak(float line_height)
 {
 	// Increment by the line height if no line is open, otherwise simply end the line.
-	LayoutLineBox* last_line = line_boxes.back().get();
-	if (last_line->GetDimensions().y < 0)
-		box_cursor += line_height;
+	if (LayoutLineBox* line_box = GetOpenLineBox())
+		CloseOpenLineBox();
 	else
-		last_line->Close();
+		box_cursor += line_height;
 }
 
 void InlineContainer::AddChainedBox(LayoutInlineBox* chained_box)
 {
-	line_boxes.back()->AddChainedBox(chained_box);
+	// TODO
+	// line_boxes.back()->AddChainedBox(chained_box);
 }
 
 InlineContainer::CloseResult InlineContainer::Close(LayoutInlineBox** out_open_inline_box)
 {
 	// The parent container may need the open inline box to be split and resumed.
-	if (out_open_inline_box)
-		*out_open_inline_box = line_boxes.back()->GetOpenInlineBox();
+	if (out_open_inline_box && !open_inline_boxes.empty())
+		// TODO: I guess we need to copy out the whole stack, otherwise we need to use parent on the inline blocks.
+		*out_open_inline_box = open_inline_boxes.top();
 
-	// We're an inline context box; so close our last line, which will still be open.
-	line_boxes.back()->Close();
+	CloseOpenLineBox();
 
 	// Expand our content area if any line boxes had to push themselves out.
-	for (size_t i = 0; i < line_boxes.size(); i++)
-		box_size.x = Math::Max(box_size.x, line_boxes[i]->GetDimensions().x);
+	// TODO
+	// for (size_t i = 0; i < line_boxes.size(); i++)
+	//	box_size.x = Math::Max(box_size.x, line_boxes[i]->GetDimensions().x);
 
 	// Set this box's height, if necessary.
 	if (box_size.y < 0)
@@ -142,7 +148,7 @@ InlineContainer::CloseResult InlineContainer::Close(LayoutInlineBox** out_open_i
 	for (size_t i = 0; i < line_boxes.size(); i++)
 	{
 		LayoutLineBox* line_box = line_boxes[i].get();
-		visible_overflow_size.x = Math::Max(visible_overflow_size.x, line_box->GetBoxCursor());
+		visible_overflow_size.x = Math::Max(visible_overflow_size.x, line_box->GetBoxCursor()); // TODO: Should also add line position
 	}
 
 	SetVisibleOverflowSize(visible_overflow_size);
@@ -153,6 +159,21 @@ InlineContainer::CloseResult InlineContainer::Close(LayoutInlineBox** out_open_i
 		return CloseResult::LayoutParent;
 
 	return CloseResult::OK;
+}
+
+void InlineContainer::CloseOpenLineBox()
+{
+	// Find the position of the line box, relative to its parent's block box's offset parent.
+	if (LayoutLineBox* line_box = GetOpenLineBox())
+	{
+		const BlockContainer* offset_parent = parent->GetOffsetParent();
+		const Vector2f relative_position = position - (offset_parent->GetPosition() - parent->GetOffsetRoot()->GetPosition());
+		const Vector2f line_position = {relative_position.x, relative_position.y + box_cursor};
+
+		// TODO Position due to floats.
+		const float height_of_line = line_box->Close(offset_parent->GetElement(), line_position);
+		box_cursor += height_of_line;
+	}
 }
 
 Vector2f InlineContainer::NextBoxPosition(float top_margin, Style::Clear clear_property) const
@@ -174,7 +195,7 @@ Vector2f InlineContainer::NextLineBoxPosition(float& box_width, bool& _wrap_cont
 	const Vector2f cursor = NextBoxPosition();
 	const Vector2f box_position = parent->GetBlockBoxSpace()->NextBoxPosition(box_width, cursor.y, dimensions);
 
-	// Also, probably shouldn't check for widths when positioning the box?
+	// TODO Also, probably shouldn't check for widths when positioning the box?
 	_wrap_content = wrap_content;
 
 	return box_position;
@@ -190,7 +211,7 @@ float InlineContainer::GetShrinkToFitWidth() const
 		// Perhaps a more robust solution is to modify how we set the line box dimension on 'line_box->close()'
 		// and use that, or add another value in the line_box ... but seems to work for now.
 		LayoutLineBox* line_box = line_boxes[i].get();
-		content_width = Math::Max(content_width, line_box->GetBoxCursor());
+		content_width = Math::Max(content_width, line_box->GetBoxCursor()); // TODO line positions due to floats?
 	}
 	content_width = Math::Min(content_width, box_size.x);
 
@@ -199,7 +220,8 @@ float InlineContainer::GetShrinkToFitWidth() const
 
 float InlineContainer::GetHeightIncludingOpenLine() const
 {
-	const float last_line_height = line_boxes.back()->GetDimensions().y;
+	// TODO: Last line height
+	const float last_line_height = 0.0f; //= line_boxes.back()->GetDimensions().y;
 	return box_cursor + Math::Max(0.0f, last_line_height);
 }
 
@@ -208,23 +230,33 @@ bool InlineContainer::GetBaselineOfLastLine(float& out_baseline) const
 	bool found_baseline = false;
 	for (int j = (int)line_boxes.size() - 1; j >= 0; j--)
 	{
-		found_baseline = line_boxes[j]->GetBaselineOfLastLine(out_baseline);
+		// TODO
+		// found_baseline = line_boxes[j]->GetBaselineOfLastLine(out_baseline);
 		if (found_baseline)
 			break;
 	}
 	return found_baseline;
 }
 
-LayoutLineBox* InlineContainer::EnsureLineBox()
+LayoutLineBox* InlineContainer::EnsureOpenLineBox()
 {
-	if (line_boxes.empty())
+	if (line_boxes.empty() || line_boxes.back()->IsClosed())
 		line_boxes.push_back(MakeUnique<LayoutLineBox>());
+	return line_boxes.back().get();
+}
+
+LayoutLineBox* InlineContainer::GetOpenLineBox()
+{
+	if (line_boxes.empty() || line_boxes.back()->IsClosed())
+		return nullptr;
 	return line_boxes.back().get();
 }
 
 String InlineContainer::DebugDumpTree(int depth) const
 {
 	String value = String(depth * 2, ' ') + "InlineContainer" + '\n';
+
+	value += root_inline_box.DebugDumpTree(depth + 1);
 
 	for (auto&& line_box : line_boxes)
 		value += line_box->DebugDumpTree(depth + 1);

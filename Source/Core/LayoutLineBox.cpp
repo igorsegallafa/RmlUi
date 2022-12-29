@@ -45,7 +45,7 @@ LayoutLineBox::~LayoutLineBox() {}
 String LayoutLineBox::DebugDumpTree(int depth) const
 {
 	const String value =
-		String(depth * 2, ' ') + "LayoutLineBox (" + ToString(fragments.size()) + " fragment" + (fragments.size() == 1 ? "" : "s") + ")\n ";
+		String(depth * 2, ' ') + "LayoutLineBox (" + ToString(fragments.size()) + " fragment" + (fragments.size() == 1 ? "" : "s") + ")\n";
 
 	return value;
 }

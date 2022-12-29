@@ -80,6 +80,17 @@ LayoutFragment InlineLevelBox_Text::LayoutContent(bool first_box, float availabl
 	return LayoutFragment(this, fragment_size, overflow_handle);
 }
 
+void InlineLevelBox_Text::Submit(Element* offset_parent, Vector2f position, Vector2f outer_size)
+{
+	ElementText* text_element = GetTextElement();
+	text_element->SetOffset(position, offset_parent);
+	text_element->ClearLines();
+	text_element->AddLine(Vector2f{}, line_contents);
+
+	// TODO continued lines not handled
+	// TODO Use offset calculation from base function.
+	// TODO Maybe we want to size it?
+}
 String InlineLevelBox_Text::DebugDumpNameValue() const
 {
 	return "InlineLevelBox_Text";

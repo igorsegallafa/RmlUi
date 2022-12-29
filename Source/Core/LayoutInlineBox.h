@@ -45,6 +45,19 @@ public:
 
 	virtual LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) = 0;
 
+	virtual void Submit(Element* offset_parent, Vector2f position, Vector2f outer_size)
+	{
+		RMLUI_ASSERT(element && element != offset_parent);
+
+		element->SetOffset(position, offset_parent);
+
+		Box element_box;
+		// TODO: Other edges, additional boxes
+		element_box.SetContent(outer_size);
+		element->SetBox(element_box);
+		element->OnLayout();
+	}
+
 	virtual float GetEdge(Box::Edge edge) const;
 
 	virtual String DebugDumpNameValue() const = 0;
@@ -115,7 +128,7 @@ public:
 	InlineLevelBox_Replaced(Element* element, const Box& box) : InlineLevelBox(element), box(box)
 	{
 		RMLUI_ASSERT(element);
-		RMLUI_ASSERT(box.GetSize() >= Vector2f(0.f));
+		RMLUI_ASSERT(box.GetSize().x >= 0.f && box.GetSize().y >= 0.f);
 	}
 
 	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) override;

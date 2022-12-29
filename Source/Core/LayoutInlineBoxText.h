@@ -41,6 +41,8 @@ public:
 
 	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) override;
 
+	void Submit(Element* offset_parent, Vector2f position, Vector2f outer_size) override;
+
 	String DebugDumpNameValue() const override;
 
 private:
@@ -50,6 +52,7 @@ private:
 };
 
 String FontFaceDescription(const String& font_family, Style::FontStyle style, Style::FontWeight weight);
+
 
 } // namespace Rml
 #endif

@@ -35,23 +35,24 @@
 #include "LayoutDetails.h"
 #include "LayoutFlex.h"
 #include "LayoutInlineBoxText.h"
+#include "LayoutInlineContainer.h"
 #include "LayoutTable.h"
 #include "Pool.h"
+#include <algorithm>
 #include <cstddef>
 #include <float.h>
 
 namespace Rml {
 
-#define MAX(a, b) (a > b ? a : b)
-
+// TODO: Move to separate file?
 template <size_t Size>
 struct LayoutChunk {
 	alignas(std::max_align_t) byte buffer[Size];
 };
 
-static constexpr std::size_t ChunkSizeBig = sizeof(BlockContainer);
-static constexpr std::size_t ChunkSizeMedium = MAX(sizeof(LayoutInlineBox), sizeof(InlineLevelBox_Text));
-static constexpr std::size_t ChunkSizeSmall = MAX(sizeof(LayoutLineBox), sizeof(LayoutBlockBoxSpace));
+static constexpr std::size_t ChunkSizeBig = std::max({sizeof(BlockContainer), sizeof(InlineContainer)});
+static constexpr std::size_t ChunkSizeMedium = std::max({sizeof(InlineLevelBox_Replaced), sizeof(InlineLevelBox_Text), sizeof(InlineBox_Element)});
+static constexpr std::size_t ChunkSizeSmall = std::max({sizeof(LayoutLineBox), sizeof(LayoutBlockBoxSpace)});
 
 static Pool<LayoutChunk<ChunkSizeBig>> layout_chunk_pool_big(50, true);
 static Pool<LayoutChunk<ChunkSizeMedium>> layout_chunk_pool_medium(50, true);
@@ -303,7 +304,7 @@ bool LayoutEngine::FormatElementInline(BlockContainer* block_context_box, Elemen
 
 	Box box;
 	LayoutDetails::BuildBox(box, containing_block, element, BoxContext::Inline);
-	LayoutInlineBox* inline_box = block_context_box->AddInlineElement(element, box);
+	auto inline_box_handle = block_context_box->AddInlineElement(element, box);
 
 	// Format the element's children.
 	for (int i = 0; i < element->GetNumChildren(); i++)
@@ -315,7 +316,7 @@ bool LayoutEngine::FormatElementInline(BlockContainer* block_context_box, Elemen
 	if (element->GetId() == "a")
 		int x = 0;
 
-	inline_box->Close();
+	block_context_box->CloseInlineElement(inline_box_handle);
 
 	return true;
 }
@@ -329,7 +330,8 @@ bool LayoutEngine::FormatElementInlineBlock(BlockContainer* block_context_box, E
 
 	FormatElement(element, containing_block_size);
 
-	block_context_box->AddInlineElement(element, element->GetBox())->Close();
+	auto inline_box_handle = block_context_box->AddInlineElement(element, element->GetBox());
+	block_context_box->CloseInlineElement(inline_box_handle);
 
 	return true;
 }

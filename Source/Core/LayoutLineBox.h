@@ -61,14 +61,14 @@ public:
 				if (fragment.outer_size.x < 0.f)
 				{
 					// Auto-sized fragment.
-					fragments.push_back({inline_box, box_cursor, -1.f, open_fragment_index});
+					fragments.push_back({inline_box, {box_cursor, 0.f}, fragment.outer_size, open_fragment_index});
 					open_fragment_index = (FragmentIndex)fragments.size() - 1;
 					box_cursor += inline_box->GetEdge(Box::LEFT);
 				}
 				else
 				{
 					// Closed, fixed-size fragment.
-					fragments.push_back({inline_box, box_cursor, fragment.outer_size.x, InvalidIndex});
+					fragments.push_back({inline_box, {box_cursor, 0.f}, fragment.outer_size, InvalidIndex});
 					box_cursor += fragment.outer_size.x;
 				}
 			}
@@ -77,16 +77,34 @@ public:
 				RMLUI_ASSERT(!first_box);
 				break;
 			}
+
+			break; // TODO
 		}
 	}
 
-	void Close()
+	// Returns height of line. Note: This can be different from the element's computed line-height property.
+	float Close(Element* offset_parent, Vector2f line_position)
 	{
-		RMLUI_ASSERTMSG(open_fragment_index == InvalidIndex, "Some fragments were not properly closed.");
+		// TODO: How to handle open fragments?
+		// RMLUI_ASSERTMSG(open_fragment_index == InvalidIndex, "Some fragments were not properly closed.");
 
 		// Vertically align fragments and size line.
+		float height_of_line = 0.f;
+
+		for (const auto& fragment : fragments)
+			height_of_line = Math::Max(fragment.size.y, height_of_line);
+
+		// TODO: Alignment
 
 		// Position and size all inline-level boxes, place geometry boxes.
+		for (const auto& fragment : fragments)
+		{
+			fragment.inline_box->Submit(offset_parent, line_position + fragment.position, fragment.size);
+		}
+
+		is_closed = true;
+
+		return height_of_line;
 	}
 
 	void CloseInlineBox(LayoutInlineBox* inline_box)
@@ -97,10 +115,14 @@ public:
 			box_cursor += inline_box->GetEdge(Box::RIGHT);
 			open_fragment_index = fragment->parent_index;
 
-			fragment->size = box_cursor - fragment->position;
+			fragment->size.x = box_cursor - fragment->position.x;
 			fragment->parent_index = InvalidIndex;
 		}
 	}
+
+	float GetBoxCursor() const { return box_cursor; }
+
+	bool IsClosed() const { return is_closed; }
 
 	String DebugDumpTree(int depth) const;
 
@@ -113,8 +135,8 @@ private:
 
 	struct PlacedFragment {
 		InlineLevelBox* inline_box;
-		float position;             // Horizontal outer left position relative to start of the line, disregarding floats.
-		float size;                 // Horizontal outer size.
+		Vector2f position;          // Outer (top,left) position relative to start of the line, disregarding floats.
+		Vector2f size;              // Outer size.
 		FragmentIndex parent_index; // Specified for open fragments.
 	};
 
@@ -138,6 +160,8 @@ private:
 
 	// The list of inline boxes in this line box. These line boxes may be parented to others in this list.
 	FragmentList fragments;
+
+	bool is_closed = false;
 };
 
 } // namespace Rml

@@ -95,7 +95,10 @@ public:
 private:
 	using LineBoxList = Vector<UniquePtr<LayoutLineBox>>;
 
-	LayoutLineBox* EnsureLineBox();
+	LayoutLineBox* EnsureOpenLineBox();
+	LayoutLineBox* GetOpenLineBox();
+
+	void CloseOpenLineBox();
 
 	BlockContainer* parent; // [not-null]
 

@@ -49,8 +49,8 @@ String LayoutElementName(Element* element)
 		return "nullptr";
 	if (!element->GetId().empty())
 		return '#' + element->GetId();
-	if (element->GetTagName() == "#text")
-		return "text";
+	if (auto element_text = rmlui_dynamic_cast<ElementText*>(element))
+		return '\"' + element_text->GetText().substr(0, 20) + '\"';
 	return element->GetAddress();
 }
 
@@ -100,11 +100,12 @@ float InlineBox_Element::GetEdge(Box::Edge edge) const
 
 LayoutFragment InlineLevelBox_Replaced::LayoutContent(bool first_box, float available_width, float right_spacing_width)
 {
-	Vector2f outer_size;
-	outer_size.x = box.GetSizeAcross(Box::HORIZONTAL, Box::MARGIN);
-	outer_size.y = box.GetSize().y; // Vertical edges are ignored for inline elements.
+	const Vector2f outer_size = {
+		box.GetSizeAcross(Box::HORIZONTAL, Box::MARGIN),
+		box.GetSizeAcross(Box::VERTICAL, Box::MARGIN),
+	};
 
-	if (outer_size.x + right_spacing_width < available_width)
+	if (first_box || outer_size.x + right_spacing_width <= available_width)
 		return LayoutFragment{this, outer_size};
 
 	return {};
