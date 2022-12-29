@@ -37,72 +37,117 @@ namespace Rml {
 class Element;
 struct LayoutFragment;
 
-class LayoutInlineBox {
-public:
-	virtual ~LayoutInlineBox();
+using LayoutOverflowHandle = int;
 
-	LayoutInlineBox* AddChild(UniquePtr<LayoutInlineBox> child)
+class InlineLevelBox {
+public:
+	virtual ~InlineLevelBox();
+
+	virtual LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) = 0;
+
+	virtual float GetEdge(Box::Edge edge) const;
+
+	virtual String DebugDumpNameValue() const = 0;
+	virtual String DebugDumpTree(int depth) const;
+
+	void* operator new(size_t size);
+	void operator delete(void* chunk, size_t size);
+
+protected:
+	InlineLevelBox(Element* element) : element(element) {}
+
+	Element* GetElement() const { return element; }
+
+private:
+	Element* element;
+};
+
+// TODO: InlineBox
+class LayoutInlineBox : public InlineLevelBox {
+public:
+	InlineLevelBox* AddChild(UniquePtr<InlineLevelBox> child)
 	{
 		auto result = child.get();
 		children.push_back(std::move(child));
 		return result;
 	}
 
-	virtual float GetEdge(Box::Edge edge) const = 0;
-
-	virtual LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) = 0;
-
-	virtual String DebugDumpNameValue() const = 0;
-	String DebugDumpTree(int depth) const;
-
-	void* operator new(size_t size);
-	void operator delete(void* chunk, size_t size);
+	String DebugDumpTree(int depth) const override;
 
 protected:
-	LayoutInlineBox(Element* element) : element(element) { RMLUI_ASSERT(element); }
-
-	Element* GetElement() { return element; }
+	LayoutInlineBox(Element* element) : InlineLevelBox(element) {}
 
 private:
-	using InlineBoxList = Vector<UniquePtr<LayoutInlineBox>>;
-
-	Element* element;
+	using InlineBoxList = Vector<UniquePtr<InlineLevelBox>>;
 
 	// @performance Use first_child, next_sibling instead to build the tree?
 	InlineBoxList children;
 };
 
-class LayoutInlineBoxSized : public LayoutInlineBox {
+class InlineBox_Root final : public LayoutInlineBox {
 public:
-	LayoutInlineBoxSized(Element* element, const Box& box) : LayoutInlineBox(element), box(box) { RMLUI_ASSERT(box.GetSize() >= Vector2f(0.f)); }
+	InlineBox_Root() : LayoutInlineBox(nullptr) {}
 
 	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) override;
 
-	String DebugDumpNameValue() const override;
+	String DebugDumpNameValue() const override { return "InlineBox_Root"; }
+};
+
+class InlineBox_Element final : public LayoutInlineBox {
+public:
+	InlineBox_Element(Element* element, const Box& box) : LayoutInlineBox(element)
+	{
+		RMLUI_ASSERT(element);
+		RMLUI_ASSERT(box.GetSize().x < 0.f);
+	}
+
+	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) override;
+	float GetEdge(Box::Edge edge) const override;
+
+	String DebugDumpNameValue() const override { return "InlineBox_Element"; }
+
+private:
+	Box box;
+};
+
+class InlineLevelBox_Replaced final : public InlineLevelBox {
+public:
+	InlineLevelBox_Replaced(Element* element, const Box& box) : InlineLevelBox(element), box(box)
+	{
+		RMLUI_ASSERT(element);
+		RMLUI_ASSERT(box.GetSize() >= Vector2f(0.f));
+	}
+
+	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) override;
+
+	float GetEdge(Box::Edge edge) const override;
+
+	String DebugDumpNameValue() const override { return "InlineLevelBox_Replaced"; }
 
 private:
 	Box box;
 };
 
 struct LayoutFragment {
-	using OverflowHandle = int;
-
-	enum class Type { Invalid, Closed, };
+	enum class Type {
+		Invalid,
+		Closed,
+	};
 
 	LayoutFragment() = default;
-	LayoutFragment(LayoutInlineBox* inline_box, Vector2f outer_size, OverflowHandle overflow_handle = {}) :
+	LayoutFragment(InlineLevelBox* inline_box, Vector2f outer_size, LayoutOverflowHandle overflow_handle = {}) :
 		inline_box(inline_box), outer_size(outer_size), overflow_handle(overflow_handle)
 	{}
 
 	explicit operator bool() const { return inline_box; }
 
-	LayoutInlineBox* inline_box = nullptr;
+	InlineLevelBox* inline_box = nullptr;
 	Vector2f outer_size;
 
 	// Overflow handle is non-zero when there is another fragment to be layed out.
 	// TODO: I think we can make this part of the return value for LayoutContent instead? No need to keep this around. Maybe need a pointer to the
 	// next fragment in the chain.
-	OverflowHandle overflow_handle = {};
+	LayoutOverflowHandle overflow_handle = {};
 };
 
 String LayoutElementName(Element* element);

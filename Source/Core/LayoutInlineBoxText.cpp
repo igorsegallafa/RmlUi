@@ -41,6 +41,7 @@
 
 namespace Rml {
 
+// TODO: Don't need it here anymore? Move it.
 String FontFaceDescription(const String& font_family, Style::FontStyle style, Style::FontWeight weight)
 {
 	String font_attributes;
@@ -60,47 +61,31 @@ String FontFaceDescription(const String& font_family, Style::FontStyle style, St
 	return CreateString(font_attributes.size() + font_family.size() + 8, "'%s' [%s]", font_family.c_str(), font_attributes.c_str());
 }
 
-LayoutInlineBoxText::~LayoutInlineBoxText() {}
-
-LayoutFragment LayoutInlineBoxText::LayoutContent(bool first_box, float available_width, float right_spacing_width)
+LayoutFragment InlineLevelBox_Text::LayoutContent(bool first_box, float available_width, float right_spacing_width)
 {
 	ElementText* text_element = GetTextElement();
-	RMLUI_ASSERT(text_element != nullptr);
 
-	int line_length;
-	float line_width;
+	int line_begin = 0; // TODO: Handle split fragment
+	int line_length = 0;
+	float line_width = 0.f;
 	bool overflow =
 		!text_element->GenerateLine(line_contents, line_length, line_width, line_begin, available_width, right_spacing_width, first_box, true);
 
-	Vector2f content_area;
-	content_area.x = line_width;
-	content_area.y = GetBoxContentSize().y;
-	SetBoxContentSize(content_area);
-
+	LayoutOverflowHandle overflow_handle = {};
 	if (overflow)
-		return MakeUnique<LayoutInlineBoxText>(GetTextElement(), line_begin + line_length);
+		overflow_handle = line_length;
 
-	// TODO: Size
-	return LayoutFragment(this, Vector2f{});
+	const Vector2f fragment_size = {line_width, text_element->GetLineHeight()};
+
+	return LayoutFragment(this, fragment_size, overflow_handle);
 }
 
-String LayoutInlineBoxText::DebugDumpNameValue() const
+String InlineLevelBox_Text::DebugDumpNameValue() const
 {
-	return "LayoutInlineBoxText";
+	return "InlineLevelBox_Text";
 }
 
-void* LayoutInlineBoxText::operator new(size_t size)
-{
-	return LayoutEngine::AllocateLayoutChunk(size);
-}
-
-void LayoutInlineBoxText::operator delete(void* chunk, size_t size)
-{
-	LayoutEngine::DeallocateLayoutChunk(chunk, size);
-}
-
-// Returns the box's element as a text element.
-ElementText* LayoutInlineBoxText::GetTextElement()
+ElementText* InlineLevelBox_Text::GetTextElement()
 {
 	RMLUI_ASSERT(rmlui_dynamic_cast<ElementText*>(GetElement()));
 

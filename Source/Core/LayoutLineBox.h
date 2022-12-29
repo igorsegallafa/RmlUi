@@ -38,7 +38,7 @@ public:
 	LayoutLineBox() {}
 	~LayoutLineBox();
 
-	void AddInlineBox(LayoutInlineBox* inline_box, bool wrap_content, float line_width)
+	void AddInlineBox(InlineLevelBox* inline_box, bool wrap_content, float line_width)
 	{
 		// TODO: The spacing this element must leave on the right of the line, to account not only for its margins and padding,
 		// but also for its parents which will close immediately after it.
@@ -82,7 +82,7 @@ public:
 
 	void Close()
 	{
-		// Close open fragments.
+		RMLUI_ASSERTMSG(open_fragment_index == InvalidIndex, "Some fragments were not properly closed.");
 
 		// Vertically align fragments and size line.
 
@@ -112,9 +112,9 @@ private:
 	static const FragmentIndex InvalidIndex = FragmentIndex(-1);
 
 	struct PlacedFragment {
-		LayoutInlineBox* inline_box;
+		InlineLevelBox* inline_box;
 		float position;             // Horizontal outer left position relative to start of the line, disregarding floats.
-		float size;                 // Outer size.
+		float size;                 // Horizontal outer size.
 		FragmentIndex parent_index; // Specified for open fragments.
 	};
 
@@ -128,9 +128,9 @@ private:
 		return nullptr;
 	}
 
-	// TODO: Do we need pointers/overloading here, can we take the fragments by value?
 	using FragmentList = Vector<PlacedFragment>;
 
+	// Represents a stack of open fragments from nested inline boxes, which will have their width sized to fit their descendants.
 	FragmentIndex open_fragment_index = InvalidIndex;
 
 	// The horizontal cursor. This is where the next inline box will be placed along the line.

@@ -32,9 +32,15 @@
 #include "../../Include/RmlUi/Core/Box.h"
 #include "../../Include/RmlUi/Core/Types.h"
 #include "LayoutBlockBox.h"
+#include "LayoutInlineBox.h"
+#include <stack>
 
 namespace Rml {
 
+/**
+    A container for inline-level boxes. Always a direct child of a block container, starts a new inline formatting context.
+    Not directly a CSS term, but effectively a "block container that only contains inline-level boxes".
+ */
 class InlineContainer final : public BlockLevelBox {
 public:
 	/// Creates a new block box in an inline context.
@@ -46,6 +52,8 @@ public:
 	/// @param box[in] The box defining the element's bounds.
 	/// @return The inline box representing the element. Once the element's children have been positioned, Close() must be called on it.
 	LayoutInlineBox* AddInlineElement(Element* element, const Box& box);
+	// TODO
+	void CloseInlineElement(LayoutInlineBox* inline_box);
 
 	/// Add a break to the last line.
 	void AddBreak(float line_height);
@@ -86,7 +94,6 @@ public:
 
 private:
 	using LineBoxList = Vector<UniquePtr<LayoutLineBox>>;
-	using InlineBoxList = Vector<UniquePtr<LayoutInlineBox>>;
 
 	LayoutLineBox* EnsureLineBox();
 
@@ -101,11 +108,12 @@ private:
 	// The vertical position of the next block box to be added to this box, relative to the top of this box.
 	float box_cursor = 0;
 
-	// @performance Use first_child, next_sibling instead to build the tree?
-	InlineBoxList inline_boxes;
+	InlineBox_Root root_inline_box;
 
 	// The open inline box; this is nullptr if all inline boxes are closed.
-	LayoutInlineBox* open_inline_box = nullptr;
+	// TODO: Add std::stack to Types.h?
+	// @performance Perhaps add parent to inline boxes, so we only need to store the leaf open node here, thereby avoiding allocations.
+	std::stack<LayoutInlineBox*> open_inline_boxes;
 
 	// Used by inline contexts only; stores the list of line boxes flowing inline content.
 	// @performance Use first_child, next_sibling instead to build the tree?

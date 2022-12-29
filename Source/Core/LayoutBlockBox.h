@@ -82,30 +82,30 @@ private:
 	Vector2f visible_overflow_size;
 };
 
-class InlineLevelBox : public LayoutBox {
-public:
-protected:
-	InlineLevelBox(Type type) : LayoutBox(OuterType::InlineLevel, type) {}
-};
-
-class FormattingContext {
-public:
-private:
-	// Contains absolute elements.
-};
-
-class BlockFlexContainer : public BlockLevelBox {
-public:
-	BlockFlexContainer() : BlockLevelBox(Type::FlexContainer) {}
-
-private:
-};
-class InlineFlexContainer : public InlineLevelBox {
-public:
-	InlineFlexContainer() : InlineLevelBox(Type::FlexContainer) {}
-
-private:
-};
+//class InlineLevelBox : public LayoutBox {
+//public:
+//protected:
+//	InlineLevelBox(Type type) : LayoutBox(OuterType::InlineLevel, type) {}
+//};
+//
+//class FormattingContext {
+//public:
+//private:
+//	// Contains absolute elements.
+//};
+//
+//class BlockFlexContainer : public BlockLevelBox {
+//public:
+//	BlockFlexContainer() : BlockLevelBox(Type::FlexContainer) {}
+//
+//private:
+//};
+//class InlineFlexContainer : public InlineLevelBox {
+//public:
+//	InlineFlexContainer() : InlineLevelBox(Type::FlexContainer) {}
+//
+//private:
+//};
 
 /**
     @author Peter Curry

@@ -38,6 +38,11 @@
 
 namespace Rml {
 
+static float GetEdgeSize(const Box& box, Box::Edge edge)
+{
+	return box.GetEdge(Box::PADDING, edge) + box.GetEdge(Box::BORDER, edge) + box.GetEdge(Box::MARGIN, edge);
+}
+
 String LayoutElementName(Element* element)
 {
 	if (!element)
@@ -49,29 +54,51 @@ String LayoutElementName(Element* element)
 	return element->GetAddress();
 }
 
-LayoutInlineBox::~LayoutInlineBox() {}
-
-String LayoutInlineBox::DebugDumpTree(int depth) const
-{
-	String value = String(depth * 2, ' ') + DebugDumpNameValue() + " | " + LayoutElementName(element) + '\n';
-
-	for (auto&& child : children)
-		value += child->DebugDumpTree(depth + 1);
-
-	return value;
-}
-
-void* LayoutInlineBox::operator new(size_t size)
+void* InlineLevelBox::operator new(size_t size)
 {
 	return LayoutEngine::AllocateLayoutChunk(size);
 }
 
-void LayoutInlineBox::operator delete(void* chunk, size_t size)
+void InlineLevelBox::operator delete(void* chunk, size_t size)
 {
 	LayoutEngine::DeallocateLayoutChunk(chunk, size);
 }
 
-LayoutFragment LayoutInlineBoxSized::LayoutContent(bool /*first_box*/, float available_width, float right_spacing_width)
+InlineLevelBox::~InlineLevelBox() {}
+
+float InlineLevelBox::GetEdge(Box::Edge /*edge*/) const
+{
+	return 0.f;
+}
+
+String InlineLevelBox::DebugDumpTree(int depth) const
+{
+	String value = String(depth * 2, ' ') + DebugDumpNameValue() + " | " + LayoutElementName(GetElement()) + '\n';
+	return value;
+}
+
+String LayoutInlineBox::DebugDumpTree(int depth) const
+{
+	String value = InlineLevelBox::DebugDumpTree(depth);
+	for (auto&& child : children)
+		value += child->DebugDumpTree(depth + 1);
+	return value;
+}
+
+LayoutFragment InlineBox_Element::LayoutContent(bool first_box, float available_width, float right_spacing_width)
+{
+	if (first_box || right_spacing_width <= available_width)
+		return LayoutFragment{this, Vector2f(-1.f)};
+
+	return {};
+}
+
+float InlineBox_Element::GetEdge(Box::Edge edge) const
+{
+	return GetEdgeSize(box, edge);
+}
+
+LayoutFragment InlineLevelBox_Replaced::LayoutContent(bool first_box, float available_width, float right_spacing_width)
 {
 	Vector2f outer_size;
 	outer_size.x = box.GetSizeAcross(Box::HORIZONTAL, Box::MARGIN);
@@ -83,9 +110,14 @@ LayoutFragment LayoutInlineBoxSized::LayoutContent(bool /*first_box*/, float ava
 	return {};
 }
 
-String LayoutInlineBoxSized::DebugDumpNameValue() const
+float InlineLevelBox_Replaced::GetEdge(Box::Edge edge) const
 {
-	return "LayoutInlineBoxSized";
+	return GetEdgeSize(box, edge);
+}
+
+LayoutFragment InlineBox_Root::LayoutContent(bool /*first_box*/, float /*available_width*/, float /*right_spacing_width*/)
+{
+	return {};
 }
 
 } // namespace Rml

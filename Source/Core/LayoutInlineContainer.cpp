@@ -56,41 +56,52 @@ LayoutInlineBox* InlineContainer::AddInlineElement(Element* element, const Box& 
 {
 	RMLUI_ASSERT(element);
 
+	LayoutInlineBox* inline_box = nullptr;
+	InlineLevelBox* level_box = nullptr;
+
 	if (auto text_element = rmlui_dynamic_cast<ElementText*>(element))
-		inline_boxes.push_back(MakeUnique<LayoutInlineBoxText>(text_element));
+		level_box = root_inline_box.AddChild(MakeUnique<InlineLevelBox_Text>(text_element));
+	else if (box.GetSize().x >= 0.f)
+		level_box = root_inline_box.AddChild(MakeUnique<InlineLevelBox_Replaced>(element, box));
 	else
-		inline_boxes.push_back(MakeUnique<LayoutInlineBox>(element));
+		level_box = inline_box = static_cast<LayoutInlineBox*>(root_inline_box.AddChild(MakeUnique<LayoutInlineBox>(element, box)));
 
-	LayoutInlineBox* inline_box = inline_boxes.back().get();
 	LayoutLineBox* line_box = EnsureLineBox();
-
-	const float line_width = box_size.x;
-	// TODO: The spacing this element must leave on the right of the line, to account not only for its margins and padding,
-	// but also for its parents which will close immediately after it.
-	const float right_spacing_width = 0.f;
 
 	while (true)
 	{
-		// TODO See old LayoutLineBox::AddBox
-		const bool first_box = line_box->IsEmpty();
-		float available_width = FLT_MAX;
-		if (wrap_content)
-			// TODO: Subtract floats
-			available_width = Math::RoundUpFloat(line_width - line_box->GetCursor());
+		// TODO: subtract floats
+		const float line_width = box_size.x;
 
-		UniquePtr<LayoutFragment> fragment = inline_box->LayoutContent(first_box, available_width, right_spacing_width);
-		if (fragment)
-		{
-			line_box->AddFragment(std::move(fragment));
-		}
-		else
-		{
-			RMLUI_ASSERT(!first_box);
-			break;
-		}
+		line_box->AddInlineBox(inline_box, wrap_content, line_width);
+
+		// TODO, handle split inline boxes. Break out on finish.
 	}
 
+	if (inline_box)
+		open_inline_boxes.push(inline_box);
 
+	return inline_box;
+}
+
+void InlineContainer::CloseInlineElement(LayoutInlineBox* inline_box)
+{
+	if (!inline_box || open_inline_boxes.empty())
+	{
+		RMLUI_ERROR;
+		return;
+	}
+
+	LayoutInlineBox* open_inline_box = open_inline_boxes.top();
+	if (open_inline_box != inline_box || line_boxes.empty())
+	{
+		// Calls to CloseInlineElement() should be submitted in reverse order to AddInlineElement().
+		RMLUI_ERROR;
+		return;
+	}
+
+	line_boxes.back()->CloseInlineBox(inline_box);
+	open_inline_boxes.pop();
 }
 
 void InlineContainer::AddBreak(float line_height)

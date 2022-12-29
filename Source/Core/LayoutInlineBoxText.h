@@ -33,17 +33,15 @@
 
 namespace Rml {
 
-class LayoutInlineBoxText : public LayoutInlineBox {
+class ElementText;
+
+class InlineLevelBox_Text final : public InlineLevelBox {
 public:
-	LayoutInlineBoxText(ElementText* element) : LayoutInlineBox(element, Box{}) {}
-	virtual ~LayoutInlineBoxText();
+	InlineLevelBox_Text(ElementText* element) : InlineLevelBox(element) {}
 
 	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) override;
 
 	String DebugDumpNameValue() const override;
-
-	void* operator new(size_t size);
-	void operator delete(void* chunk, size_t size);
 
 private:
 	ElementText* GetTextElement();
