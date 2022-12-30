@@ -57,7 +57,7 @@ public:
 		element->OnLayout();
 	}
 
-	virtual float GetEdge(Box::Edge edge) const;
+	virtual float GetOuterSpacing(Box::Edge edge) const;
 
 	virtual String DebugDumpNameValue() const = 0;
 	virtual String DebugDumpTree(int depth) const;
@@ -109,7 +109,7 @@ public:
 	InlineBox(Element* element, const Box& box) : InlineBoxBase(element), box(box) { RMLUI_ASSERT(element && box.GetSize().x < 0.f); }
 
 	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) override;
-	float GetEdge(Box::Edge edge) const override;
+	float GetOuterSpacing(Box::Edge edge) const override;
 
 	void Submit(Element* offset_parent, Vector2f position, Vector2f layout_bounds) override
 	{

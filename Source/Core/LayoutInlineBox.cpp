@@ -51,7 +51,7 @@ String LayoutElementName(Element* element)
 		return '#' + element->GetId();
 	if (auto element_text = rmlui_dynamic_cast<ElementText*>(element))
 		return '\"' + element_text->GetText().substr(0, 20) + '\"';
-	return element->GetAddress();
+	return element->GetAddress(false, false);
 }
 
 void* InlineLevelBox::operator new(size_t size)
@@ -66,7 +66,7 @@ void InlineLevelBox::operator delete(void* chunk, size_t size)
 
 InlineLevelBox::~InlineLevelBox() {}
 
-float InlineLevelBox::GetEdge(Box::Edge /*edge*/) const
+float InlineLevelBox::GetOuterSpacing(Box::Edge /*edge*/) const
 {
 	return 0.f;
 }
@@ -98,7 +98,7 @@ LayoutFragment InlineBox::LayoutContent(bool first_box, float available_width, f
 	return {};
 }
 
-float InlineBox::GetEdge(Box::Edge edge) const
+float InlineBox::GetOuterSpacing(Box::Edge edge) const
 {
 	return GetEdgeSize(box, edge);
 }
