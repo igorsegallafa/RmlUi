@@ -187,7 +187,8 @@ bool ElementText::GenerateToken(float& token_width, int line_begin)
 }
 
 // Generates a line of text rendered from this element
-bool ElementText::GenerateLine(String& line, int& line_length, float& line_width, int line_begin, float maximum_line_width, float right_spacing_width, bool trim_whitespace_prefix, bool decode_escape_characters)
+bool ElementText::GenerateLine(String& line, int& line_length, float& line_width, int line_begin, float maximum_line_width, float right_spacing_width,
+	bool trim_whitespace_prefix, bool decode_escape_characters, bool allow_empty)
 {
 	RMLUI_ZoneScoped;
 
@@ -270,7 +271,7 @@ bool ElementText::GenerateLine(String& line, int& line_length, float& line_width
 						else if (next_token_begin == token_begin)
 						{
 							// This means the first character of the token doesn't fit. Let it overflow into the next line if we can.
-							if (!line.empty())
+							if (allow_empty || !line.empty())
 								return false;
 
 							// Not even the first character of the line fits. Go back to consume the first character even though it will overflow.
@@ -281,7 +282,7 @@ bool ElementText::GenerateLine(String& line, int& line_length, float& line_width
 
 					break_line = true;
 				}
-				else if (!line.empty())
+				else if (allow_empty || !line.empty())
 				{
 					// Let the token overflow into the next line.
 					return false;
@@ -317,7 +318,7 @@ void ElementText::ClearLines()
 }
 
 // Adds a new line into the text element.
-void ElementText::AddLine(Vector2f line_position, const String& line)
+void ElementText::AddLine(Vector2f line_position, String line)
 {
 	FontFaceHandle font_face_handle = GetFontFaceHandle();
 
@@ -328,7 +329,7 @@ void ElementText::AddLine(Vector2f line_position, const String& line)
 		UpdateFontEffects();
 
 	Vector2f baseline_position = line_position + Vector2f(0.0f, (float)GetFontEngineInterface()->GetLineHeight(font_face_handle) - GetFontEngineInterface()->GetBaseline(font_face_handle));
-	lines.emplace_back(line, baseline_position);
+	lines.emplace_back(std::move(line), baseline_position);
 
 	geometry_dirty = true;
 }

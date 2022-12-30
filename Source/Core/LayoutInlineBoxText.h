@@ -39,20 +39,17 @@ class InlineLevelBox_Text final : public InlineLevelBox {
 public:
 	InlineLevelBox_Text(ElementText* element) : InlineLevelBox(element) {}
 
-	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) override;
+	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) override;
 
-	void Submit(Element* offset_parent, Vector2f position, Vector2f outer_size) override;
+	void Submit(Element* offset_parent, Vector2f position, Vector2f outer_size, String text) override;
 
 	String DebugDumpNameValue() const override;
 
 private:
 	ElementText* GetTextElement();
-
-	String line_contents;
 };
 
 String FontFaceDescription(const String& font_family, Style::FontStyle style, Style::FontWeight weight);
-
 
 } // namespace Rml
 #endif

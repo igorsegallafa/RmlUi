@@ -58,11 +58,27 @@ private:
 	using FragmentIndex = unsigned int;
 	static const FragmentIndex InvalidIndex = FragmentIndex(-1);
 
+	template <typename Func>
+	void ForAllOpenFragments(Func&& func)
+	{
+		FragmentIndex fragment_index = open_fragment_index;
+		while (PlacedFragment* open_fragment = GetFragment(fragment_index))
+		{
+			func(*open_fragment);
+			fragment_index = open_fragment->parent_index;
+		}
+	}
+
 	struct PlacedFragment {
 		InlineLevelBox* inline_box;
-		Vector2f position;          // Outer (top,left) position relative to start of the line, disregarding floats.
-		Vector2f layout_bounds;     // Outer size for replaced and inline blocks, inner size for inline boxes.
+		Vector2f position;      // Outer (top,left) position relative to start of the line, disregarding floats.
+		Vector2f layout_bounds; // Outer size for replaced and inline blocks, inner size for inline boxes.
+
 		FragmentIndex parent_index; // Specified for open fragments.
+
+		// @performance Replace by a pointer? Don't need it for most fragments.
+		LayoutOverflowHandle overflow_handle;
+		String contents;
 	};
 
 	PlacedFragment* GetFragment(FragmentIndex index)

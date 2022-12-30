@@ -61,36 +61,48 @@ String FontFaceDescription(const String& font_family, Style::FontStyle style, St
 	return CreateString(font_attributes.size() + font_family.size() + 8, "'%s' [%s]", font_family.c_str(), font_attributes.c_str());
 }
 
-LayoutFragment InlineLevelBox_Text::LayoutContent(bool first_box, float available_width, float right_spacing_width)
+LayoutFragment InlineLevelBox_Text::LayoutContent(bool first_box, float available_width, float right_spacing_width,
+	LayoutOverflowHandle in_overflow_handle)
 {
 	ElementText* text_element = GetTextElement();
 
-	int line_begin = 0; // TODO: Handle split fragment
+	// TODO: Allow empty if we have floats too, then we can wrap down. (But never if we cannot wrap?). Force it if we are the first content box of
+	// this line. That is, purely opened inline boxes that we are contained within should not count as a first box (we are then still the first box).
+	const bool allow_empty = !first_box;
+	const bool decode_escape_characters = true;
+
+	String line_contents;
+	int line_begin = in_overflow_handle;
 	int line_length = 0;
 	float line_width = 0.f;
-	bool overflow =
-		!text_element->GenerateLine(line_contents, line_length, line_width, line_begin, available_width, right_spacing_width, first_box, true);
+	bool overflow = !text_element->GenerateLine(line_contents, line_length, line_width, line_begin, available_width, right_spacing_width, first_box,
+		decode_escape_characters, allow_empty);
 
-	LayoutOverflowHandle overflow_handle = {};
+	if (overflow && line_contents.empty())
+		// We couldn't fit anything on this line.
+		return {};
+
+	LayoutOverflowHandle out_overflow_handle = {};
 	if (overflow)
-		overflow_handle = line_length;
+		out_overflow_handle = line_length;
 
 	const Vector2f fragment_size = {line_width, text_element->GetLineHeight()};
 
-	return LayoutFragment(this, fragment_size, overflow_handle);
+	return LayoutFragment(this, fragment_size, out_overflow_handle, std::move(line_contents));
 }
 
-void InlineLevelBox_Text::Submit(Element* offset_parent, Vector2f position, Vector2f outer_size)
+void InlineLevelBox_Text::Submit(Element* offset_parent, Vector2f position, Vector2f outer_size, String text)
 {
 	ElementText* text_element = GetTextElement();
 	text_element->SetOffset(position, offset_parent);
 	text_element->ClearLines();
-	text_element->AddLine(Vector2f{}, line_contents);
+	text_element->AddLine(Vector2f{}, std::move(text));
 
 	// TODO continued lines not handled
 	// TODO Use offset calculation from base function.
 	// TODO Maybe we want to size it?
 }
+
 String InlineLevelBox_Text::DebugDumpNameValue() const
 {
 	return "InlineLevelBox_Text";

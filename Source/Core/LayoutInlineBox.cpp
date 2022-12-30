@@ -85,12 +85,13 @@ String InlineBoxBase::DebugDumpTree(int depth) const
 	return value;
 }
 
-LayoutFragment InlineBoxRoot::LayoutContent(bool /*first_box*/, float /*available_width*/, float /*right_spacing_width*/)
+LayoutFragment InlineBoxRoot::LayoutContent(bool /*first_box*/, float /*available_width*/, float /*right_spacing_width*/,
+	LayoutOverflowHandle /*overflow_handle*/)
 {
 	return {};
 }
 
-LayoutFragment InlineBox::LayoutContent(bool first_box, float available_width, float right_spacing_width)
+LayoutFragment InlineBox::LayoutContent(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle)
 {
 	if (first_box || right_spacing_width <= available_width)
 		return LayoutFragment{this, Vector2f(-1.f, GetElement()->GetLineHeight())};
@@ -103,7 +104,8 @@ float InlineBox::GetOuterSpacing(Box::Edge edge) const
 	return GetEdgeSize(box, edge);
 }
 
-LayoutFragment InlineLevelBox_Atomic::LayoutContent(bool first_box, float available_width, float right_spacing_width)
+LayoutFragment InlineLevelBox_Atomic::LayoutContent(bool first_box, float available_width, float right_spacing_width,
+	LayoutOverflowHandle overflow_handle)
 {
 	const Vector2f outer_size = {
 		box.GetSizeAcross(Box::HORIZONTAL, Box::MARGIN),

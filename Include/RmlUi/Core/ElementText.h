@@ -66,15 +66,17 @@ public:
 	/// @param[in] right_spacing_width The width (in pixels) of the spacing (consisting of margins, padding, etc) that must be remaining on the right of the line if the last of the text is rendered onto this line.
 	/// @param[in] trim_whitespace_prefix If we're collapsing whitespace, whether or not to remove all prefixing whitespace or collapse it down to a single space.
 	/// @param[in] decode_escape_characters Decode escaped characters such as &amp; into &.
+	/// @param[in] allow_empty Allow no tokens to be consumed from the line.
 	/// @return True if the line reached the end of the element's text, false if not.
-	bool GenerateLine(String& line, int& line_length, float& line_width, int line_begin, float maximum_line_width, float right_spacing_width, bool trim_whitespace_prefix, bool decode_escape_characters);
+	bool GenerateLine(String& line, int& line_length, float& line_width, int line_begin, float maximum_line_width, float right_spacing_width,
+		bool trim_whitespace_prefix, bool decode_escape_characters, bool allow_empty);
 
 	/// Clears all lines of generated text and prepares the element for generating new lines.
 	void ClearLines();
 	/// Adds a new line into the text element.
 	/// @param[in] line_position The position of this line, as an offset from the first line.
 	/// @param[in] line The contents of the line.
-	void AddLine(Vector2f line_position, const String& line);
+	void AddLine(Vector2f line_position, String line);
 
 	/// Prevents the element from dirtying its document's layout when its text is changed.
 	void SuppressAutoLayout();

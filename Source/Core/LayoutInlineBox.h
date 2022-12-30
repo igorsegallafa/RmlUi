@@ -43,9 +43,9 @@ class InlineLevelBox {
 public:
 	virtual ~InlineLevelBox();
 
-	virtual LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) = 0;
+	virtual LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) = 0;
 
-	virtual void Submit(Element* offset_parent, Vector2f position, Vector2f layout_bounds)
+	virtual void Submit(Element* offset_parent, Vector2f position, Vector2f layout_bounds, String /*text*/)
 	{
 		RMLUI_ASSERT(element && element != offset_parent);
 		element->SetOffset(position, offset_parent);
@@ -100,7 +100,7 @@ private:
 class InlineBoxRoot final : public InlineBoxBase {
 public:
 	InlineBoxRoot() : InlineBoxBase(nullptr) {}
-	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) override;
+	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) override;
 	String DebugDumpNameValue() const override { return "InlineBoxRoot"; }
 };
 
@@ -108,10 +108,10 @@ class InlineBox final : public InlineBoxBase {
 public:
 	InlineBox(Element* element, const Box& box) : InlineBoxBase(element), box(box) { RMLUI_ASSERT(element && box.GetSize().x < 0.f); }
 
-	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) override;
+	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) override;
 	float GetOuterSpacing(Box::Edge edge) const override;
 
-	void Submit(Element* offset_parent, Vector2f position, Vector2f layout_bounds) override
+	void Submit(Element* offset_parent, Vector2f position, Vector2f layout_bounds, String text) override
 	{
 		Element* element = GetElement();
 		element->SetOffset(position - box.GetPosition(), offset_parent);
@@ -137,11 +137,11 @@ public:
 		RMLUI_ASSERT(box.GetSize().x >= 0.f && box.GetSize().y >= 0.f);
 	}
 
-	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width) override;
+	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) override;
 
 	String DebugDumpNameValue() const override { return "InlineLevelBox_Atomic"; }
 
-	void Submit(Element* offset_parent, Vector2f position, Vector2f /*layout_bounds*/) override
+	void Submit(Element* offset_parent, Vector2f position, Vector2f /*layout_bounds*/, String text) override
 	{
 		Element* element = GetElement();
 		element->SetOffset(position, offset_parent);
@@ -160,8 +160,8 @@ struct LayoutFragment {
 	};
 
 	LayoutFragment() = default;
-	LayoutFragment(InlineLevelBox* inline_box, Vector2f layout_bounds, LayoutOverflowHandle overflow_handle = {}) :
-		inline_box(inline_box), layout_bounds(layout_bounds), overflow_handle(overflow_handle)
+	LayoutFragment(InlineLevelBox* inline_box, Vector2f layout_bounds, LayoutOverflowHandle overflow_handle = {}, String text = {}) :
+		inline_box(inline_box), layout_bounds(layout_bounds), overflow_handle(overflow_handle), text(std::move(text))
 	{}
 
 	explicit operator bool() const { return inline_box; }
@@ -173,6 +173,8 @@ struct LayoutFragment {
 	// TODO: I think we can make this part of the return value for LayoutContent instead? No need to keep this around. Maybe need a pointer to the
 	// next fragment in the chain.
 	LayoutOverflowHandle overflow_handle = {};
+
+	String text;
 };
 
 String LayoutElementName(Element* element);
