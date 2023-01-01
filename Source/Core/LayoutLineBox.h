@@ -39,10 +39,13 @@ public:
 	~LayoutLineBox();
 
 	// Returns true if the box could be completely placed on this line.
+	// TODO: Make a separate AddBox for InlineBox?
 	bool AddBox(InlineLevelBox* box, bool wrap_content, float line_width, LayoutOverflowHandle& inout_overflow_handle);
 
 	// Returns height of line. Note: This can be different from the element's computed line-height property.
 	float Close(Element* offset_parent, Vector2f line_position, float element_line_height);
+
+	UniquePtr<LayoutLineBox> SplitLine();
 
 	void CloseInlineBox(InlineBox* inline_box);
 
@@ -57,53 +60,39 @@ public:
 
 private:
 	using FragmentIndex = unsigned int;
-	static const FragmentIndex InvalidIndex = FragmentIndex(-1);
-
-	template <typename Func>
-	void ForAllOpenFragments(Func&& func)
-	{
-		FragmentIndex fragment_index = open_fragment_index;
-		while (PlacedFragment* open_fragment = GetFragment(fragment_index))
-		{
-			func(*open_fragment);
-			fragment_index = open_fragment->parent_index;
-		}
-	}
 
 	struct PlacedFragment {
-		InlineLevelBox* inline_box;
+		InlineLevelBox* inline_level_box;
 		Vector2f position;      // Outer (top,left) position relative to start of the line, disregarding floats.
 		Vector2f layout_bounds; // Outer size for replaced and inline blocks, inner size for inline boxes.
 
-		FragmentIndex parent_index; // Specified for open fragments.
-
 		// @performance Replace by a pointer? Don't need it for most fragments.
-		LayoutFragment layout_fragment;
+		String text;
 
+		bool principal_fragment = true;
 		bool has_content = false;
+		bool split_left = false;
 		bool split_right = false;
 	};
 
 	PlacedFragment* GetFragment(FragmentIndex index)
 	{
-		if (index != InvalidIndex)
-		{
-			RMLUI_ASSERT(index < (FragmentIndex)fragments.size());
+		if (index < (FragmentIndex)fragments.size())
 			return &fragments[index];
-		}
 		return nullptr;
 	}
 
 	using FragmentList = Vector<PlacedFragment>;
-
-	// Represents a stack of open fragments from nested inline boxes, which will have their width sized to fit their descendants.
-	FragmentIndex open_fragment_index = InvalidIndex;
 
 	// The horizontal cursor. This is where the next inline box will be placed along the line.
 	float box_cursor = 0.f;
 
 	// The list of inline boxes in this line box. These line boxes may be parented to others in this list.
 	FragmentList fragments;
+
+	// List of fragments that have been opened but are yet to be closed.
+	// @performance Store using parent pointers to avoid allocations.
+	Vector<PlacedFragment> open_fragments;
 
 	bool is_closed = false;
 };

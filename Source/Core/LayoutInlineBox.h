@@ -39,6 +39,15 @@ struct LayoutFragment;
 
 using LayoutOverflowHandle = int;
 
+struct BoxDisplay {
+	Element* offset_parent;
+	Vector2f position;
+	Vector2f size;
+	bool principal_box;
+	bool split_left;
+	bool split_right;
+};
+
 class InlineLevelBox {
 public:
 	virtual ~InlineLevelBox();
@@ -46,25 +55,7 @@ public:
 	virtual LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) = 0;
 
 	// Principal box
-	virtual void Submit(Element* offset_parent, Vector2f position, Vector2f layout_bounds, String /*text*/)
-	{
-		RMLUI_ASSERT(element && element != offset_parent);
-		element->SetOffset(position, offset_parent);
-
-		// TODO: Other edges, additional boxes
-		Box element_box;
-		element_box.SetContent(layout_bounds);
-		element->SetBox(element_box);
-		element->OnLayout();
-	}
-	virtual void SubmitFragment(Vector2f offset, Vector2f layout_bounds, String /*text*/)
-	{
-		Box element_box;
-		element_box.SetContent(layout_bounds);
-		// TODO: Will be wrong in case of relative positioning. (we really just want to subtract the value submitted to SetOffset in Submit() above).
-		const Vector2f element_offset = element->GetRelativeOffset();
-		element->AddBox(element_box, offset);
-	}
+	virtual void Submit(BoxDisplay box_display, String /*text*/) { SubmitBox(Box{}, box_display); }
 
 	virtual float GetOuterSpacing(Box::Edge edge) const;
 
@@ -79,9 +70,42 @@ protected:
 
 	Element* GetElement() const { return element; }
 
+	void SubmitBox(Box box, const BoxDisplay& box_display)
+	{
+		RMLUI_ASSERT(element && element != box_display.offset_parent);
+
+		box.SetContent(box_display.size);
+
+		if (box_display.split_left)
+			ZeroBoxEdge(box, Box::LEFT);
+		if (box_display.split_right)
+			ZeroBoxEdge(box, Box::RIGHT);
+
+		if (box_display.principal_box)
+		{
+			element->SetOffset(box_display.position, box_display.offset_parent);
+			element->SetBox(box);
+			OnLayout();
+		}
+		else
+		{
+			// TODO: Will be wrong in case of relative positioning. (we really just want to subtract the value submitted to SetOffset in Submit()
+			// above).
+			const Vector2f element_offset = element->GetRelativeOffset();
+			element->AddBox(box, box_display.position - element_offset);
+		}
+	}
+
 	void OnLayout() { element->OnLayout(); } // TODO
 
 private:
+	static void ZeroBoxEdge(Box& box, Box::Edge edge)
+	{
+		box.SetEdge(Box::PADDING, edge, 0.f);
+		box.SetEdge(Box::BORDER, edge, 0.f);
+		box.SetEdge(Box::MARGIN, edge, 0.f);
+	}
+
 	Element* element;
 };
 
@@ -120,26 +144,13 @@ public:
 	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) override;
 	float GetOuterSpacing(Box::Edge edge) const override;
 
-	void Submit(Element* offset_parent, Vector2f position, Vector2f layout_bounds, String text) override
+	void Submit(BoxDisplay box_display, String /*text*/) override
 	{
-		Element* element = GetElement();
-		element->SetOffset(position - box.GetPosition(), offset_parent);
+		// TODO: Not sure if this is correct.
+		if (box_display.principal_box)
+			box_display.position = box_display.position - box.GetPosition();
 
-		Box element_box = box;
-		element_box.SetContent(layout_bounds);
-		// TODO: Zero out split edges, additional boxes
-		element->SetBox(element_box);
-		OnLayout();
-	}
-
-	void SubmitFragment(Vector2f offset, Vector2f layout_bounds, String /*text*/) override
-	{
-		Element* element = GetElement();
-		Box element_box = box;
-		element_box.SetContent(layout_bounds);
-		// TODO: Will be wrong in case of relative positioning. (we really just want to subtract the value submitted to SetOffset in Submit() above).
-		const Vector2f element_offset = element->GetRelativeOffset();
-		element->AddBox(element_box, offset);
+		SubmitBox(box, box_display);
 	}
 
 	String DebugDumpNameValue() const override { return "InlineBox"; }
@@ -160,12 +171,10 @@ public:
 
 	String DebugDumpNameValue() const override { return "InlineLevelBox_Atomic"; }
 
-	void Submit(Element* offset_parent, Vector2f position, Vector2f /*layout_bounds*/, String text) override
+	void Submit(BoxDisplay box_display, String /*text*/) override
 	{
-		Element* element = GetElement();
-		element->SetOffset(position, offset_parent);
-		element->SetBox(box);
-		OnLayout();
+		box_display.size = box.GetSize();
+		SubmitBox(box, box_display);
 	}
 
 private:

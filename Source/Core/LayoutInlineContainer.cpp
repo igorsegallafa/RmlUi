@@ -85,7 +85,9 @@ InlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
 
 		if (has_fragments_to_place)
 		{
+			auto new_line_box = line_box->SplitLine();
 			CloseOpenLineBox();
+			line_boxes.push_back(std::move(new_line_box));
 			// TODO need to add in the open inline boxes
 		}
 	}
