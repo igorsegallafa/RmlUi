@@ -111,7 +111,7 @@ struct DebugDumpLayoutTree {
 	{
 		// When an element with this ID is encountered, dump the formatted layout tree (including all sub-layouts).
 		static const String debug_trigger_id = "rmlui-debug-layout";
-		is_printing_tree_root = (element->GetId() == debug_trigger_id);
+		is_printing_tree_root = element->HasAttribute(debug_trigger_id);
 		if (is_printing_tree_root)
 			g_debug_dumping_layout_tree = true;
 	}

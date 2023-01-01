@@ -8,7 +8,7 @@
 
 	</style>
 </head>
-<body id="rmlui-debug-layout">
+<body rmlui-debug-layout>
 
 <span id="wrap">
 	<span id="a">
