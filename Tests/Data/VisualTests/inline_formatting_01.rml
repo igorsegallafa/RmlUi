@@ -7,6 +7,8 @@
 	<style>
 		body {
 			width: 1020px;
+			padding: 0;
+			border: 8dp #ddd;
 		}
 		hr {
 			clear: both;
