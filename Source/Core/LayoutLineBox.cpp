@@ -42,7 +42,7 @@ namespace Rml {
 
 LayoutLineBox::~LayoutLineBox() {}
 
-void LayoutLineBox::AddBox(InlineLevelBox* box, bool wrap_content, float line_width)
+bool LayoutLineBox::AddBox(InlineLevelBox* box, bool wrap_content, float line_width, LayoutOverflowHandle& inout_overflow_handle)
 {
 	// TODO: The spacing this element must leave on the right of the line, to account not only for its margins and padding,
 	// but also for its parents which will close immediately after it.
@@ -51,56 +51,56 @@ void LayoutLineBox::AddBox(InlineLevelBox* box, bool wrap_content, float line_wi
 	ForAllOpenFragments(
 		[&right_spacing_width](PlacedFragment& open_fragment) { right_spacing_width += open_fragment.inline_box->GetOuterSpacing(Box::RIGHT); });
 
-	LayoutOverflowHandle overflow_handle = {};
+	// TODO See old LayoutLineBox::AddBox
+	const bool first_box = fragments.empty();
+	float available_width = FLT_MAX;
+	if (wrap_content)
+		// TODO: Subtract floats (or perhaps in passed-in line_width).
+		available_width = Math::RoundUpFloat(line_width - box_cursor);
 
-	while (true)
+	LayoutFragment fragment = box->LayoutContent(first_box, available_width, right_spacing_width, inout_overflow_handle);
+
+	inout_overflow_handle = {};
+	bool box_fully_placed = true;
+
+	if (fragment)
 	{
-		// TODO See old LayoutLineBox::AddBox
-		const bool first_box = fragments.empty();
-		float available_width = FLT_MAX;
-		if (wrap_content)
-			// TODO: Subtract floats (or perhaps in passed-in line_width).
-			available_width = Math::RoundUpFloat(line_width - box_cursor);
+		RMLUI_ASSERT(fragment.layout_bounds.y >= 0.f);
 
-		LayoutFragment fragment = box->LayoutContent(first_box, available_width, right_spacing_width, overflow_handle);
-		if (fragment)
+		if (fragment.overflow_handle)
 		{
-			RMLUI_ASSERT(fragment.layout_bounds.y >= 0.f);
+			box_fully_placed = false;
+			inout_overflow_handle = fragment.overflow_handle;
+		}
 
-			// TODO: Split case.
-			if (fragment.layout_bounds.x < 0.f)
-			{
-				// Opening up an inline box.
-				box_cursor += box->GetOuterSpacing(Box::LEFT);
-				fragments.push_back(PlacedFragment{box, {box_cursor, 0.f}, fragment.layout_bounds, open_fragment_index, {}, {}});
-				open_fragment_index = (FragmentIndex)fragments.size() - 1;
-			}
-			else
-			{
-				// Closed, fixed-size fragment.
-				fragments.push_back(
-					PlacedFragment{box, {box_cursor, 0.f}, fragment.layout_bounds, InvalidIndex, fragment.overflow_handle, std::move(fragment.text)});
-				box_cursor += fragment.layout_bounds.x;
-
-				// TODO: Here we essentially mark open fragments as having content, there are probably better ways to achieve this.
-				ForAllOpenFragments([box_cursor = box_cursor](
-										PlacedFragment& open_fragment) { open_fragment.layout_bounds.x = box_cursor - open_fragment.position.x; });
-			}
-
-			if (fragment.overflow_handle)
-			{
-				// TODO
-			}
+		// TODO: Split case.
+		if (fragment.layout_bounds.x < 0.f)
+		{
+			// Opening up an inline box.
+			box_cursor += box->GetOuterSpacing(Box::LEFT);
+			const Vector2f fragment_position = {box_cursor, 0.f};
+			fragments.push_back(PlacedFragment{box, fragment_position, fragment.layout_bounds, open_fragment_index, std::move(fragment)});
+			open_fragment_index = (FragmentIndex)fragments.size() - 1;
 		}
 		else
 		{
-			RMLUI_ASSERT(!first_box);
-			// We couldn't place it on this line, wrap it down to the next one.
-			break;
-		}
+			// Closed, fixed-size fragment.
+			const Vector2f fragment_position = {box_cursor, 0.f};
+			box_cursor += fragment.layout_bounds.x;
+			fragments.push_back(PlacedFragment{box, fragment_position, fragment.layout_bounds, InvalidIndex, std::move(fragment)});
 
-		break; // TODO
+			// TODO: Here we essentially mark open fragments as having content, there are probably better ways to achieve this.
+			ForAllOpenFragments([box_cursor = box_cursor](PlacedFragment& open_fragment) { open_fragment.has_content = true; });
+		}
 	}
+	else
+	{
+		RMLUI_ASSERT(!first_box);
+		// TODO We couldn't place it on this line, wrap it down to the next one.
+		box_fully_placed = false;
+	}
+
+	return box_fully_placed;
 }
 
 float LayoutLineBox::Close(Element* offset_parent, Vector2f line_position, float element_line_height)
@@ -120,7 +120,14 @@ float LayoutLineBox::Close(Element* offset_parent, Vector2f line_position, float
 	for (const auto& fragment : fragments)
 	{
 		if (fragment.layout_bounds.x >= 0.f)
-			fragment.inline_box->Submit(offset_parent, line_position + fragment.position, fragment.layout_bounds, std::move(fragment.contents));
+		{
+			if (fragment.layout_fragment.type == LayoutFragment::Type::Principal)
+				fragment.inline_box->Submit(offset_parent, line_position + fragment.position, fragment.layout_bounds,
+					std::move(fragment.layout_fragment.text));
+			else
+				fragment.inline_box->SubmitFragment(line_position + fragment.position, fragment.layout_bounds,
+					std::move(fragment.layout_fragment.text));
+		}
 	}
 
 	is_closed = true;

@@ -45,6 +45,7 @@ public:
 
 	virtual LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) = 0;
 
+	// Principal box
 	virtual void Submit(Element* offset_parent, Vector2f position, Vector2f layout_bounds, String /*text*/)
 	{
 		RMLUI_ASSERT(element && element != offset_parent);
@@ -55,6 +56,14 @@ public:
 		element_box.SetContent(layout_bounds);
 		element->SetBox(element_box);
 		element->OnLayout();
+	}
+	virtual void SubmitFragment(Vector2f offset, Vector2f layout_bounds, String /*text*/)
+	{
+		Box element_box;
+		element_box.SetContent(layout_bounds);
+		// TODO: Will be wrong in case of relative positioning. (we really just want to subtract the value submitted to SetOffset in Submit() above).
+		const Vector2f element_offset = element->GetRelativeOffset();
+		element->AddBox(element_box, offset);
 	}
 
 	virtual float GetOuterSpacing(Box::Edge edge) const;
@@ -123,6 +132,16 @@ public:
 		OnLayout();
 	}
 
+	void SubmitFragment(Vector2f offset, Vector2f layout_bounds, String /*text*/) override
+	{
+		Element* element = GetElement();
+		Box element_box = box;
+		element_box.SetContent(layout_bounds);
+		// TODO: Will be wrong in case of relative positioning. (we really just want to subtract the value submitted to SetOffset in Submit() above).
+		const Vector2f element_offset = element->GetRelativeOffset();
+		element->AddBox(element_box, offset);
+	}
+
 	String DebugDumpNameValue() const override { return "InlineBox"; }
 
 private:
@@ -156,18 +175,24 @@ private:
 struct LayoutFragment {
 	enum class Type {
 		Invalid,
-		Closed,
+		Principal, // The element's first and main fragment.
+		Secondary, // Positioned relative to the element's principal fragment.
 	};
+	enum class Split { Closed, OpenLeft, OpenRight, OpenBoth };
 
 	LayoutFragment() = default;
-	LayoutFragment(InlineLevelBox* inline_box, Vector2f layout_bounds, LayoutOverflowHandle overflow_handle = {}, String text = {}) :
-		inline_box(inline_box), layout_bounds(layout_bounds), overflow_handle(overflow_handle), text(std::move(text))
+	LayoutFragment(Vector2f layout_bounds, Type type = Type::Principal, Split split = Split::Closed, LayoutOverflowHandle overflow_handle = {},
+		String text = {}) :
+		layout_bounds(layout_bounds),
+		type(type), split(split), overflow_handle(overflow_handle), text(std::move(text))
 	{}
 
-	explicit operator bool() const { return inline_box; }
+	explicit operator bool() const { return type != Type::Invalid; }
 
-	InlineLevelBox* inline_box = nullptr;
 	Vector2f layout_bounds;
+
+	Type type = Type::Invalid;
+	Split split = Split::Closed;
 
 	// Overflow handle is non-zero when there is another fragment to be layed out.
 	// TODO: I think we can make this part of the return value for LayoutContent instead? No need to keep this around. Maybe need a pointer to the

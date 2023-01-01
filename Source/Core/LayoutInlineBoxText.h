@@ -41,7 +41,9 @@ public:
 
 	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) override;
 
-	void Submit(Element* offset_parent, Vector2f position, Vector2f outer_size, String text) override;
+	void Submit(Element* offset_parent, Vector2f position, Vector2f layout_bounds, String text) override;
+
+	void SubmitFragment(Vector2f offset, Vector2f layout_bounds, String text) override;
 
 	String DebugDumpNameValue() const override;
 

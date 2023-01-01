@@ -94,7 +94,7 @@ LayoutFragment InlineBoxRoot::LayoutContent(bool /*first_box*/, float /*availabl
 LayoutFragment InlineBox::LayoutContent(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle)
 {
 	if (first_box || right_spacing_width <= available_width)
-		return LayoutFragment{this, Vector2f(-1.f, GetElement()->GetLineHeight())};
+		return LayoutFragment{Vector2f(-1.f, GetElement()->GetLineHeight())};
 
 	return {};
 }
@@ -113,7 +113,7 @@ LayoutFragment InlineLevelBox_Atomic::LayoutContent(bool first_box, float availa
 	};
 
 	if (first_box || outer_size.x + right_spacing_width <= available_width)
-		return LayoutFragment{this, outer_size};
+		return LayoutFragment{outer_size};
 
 	return {};
 }

@@ -84,14 +84,15 @@ LayoutFragment InlineLevelBox_Text::LayoutContent(bool first_box, float availabl
 
 	LayoutOverflowHandle out_overflow_handle = {};
 	if (overflow)
-		out_overflow_handle = line_length;
+		out_overflow_handle = line_begin + line_length;
 
 	const Vector2f fragment_size = {line_width, text_element->GetLineHeight()};
 
-	return LayoutFragment(this, fragment_size, out_overflow_handle, std::move(line_contents));
+	return LayoutFragment(fragment_size, line_begin == 0 ? LayoutFragment::Type::Principal : LayoutFragment::Type::Secondary,
+		LayoutFragment::Split::Closed, out_overflow_handle, std::move(line_contents));
 }
 
-void InlineLevelBox_Text::Submit(Element* offset_parent, Vector2f position, Vector2f outer_size, String text)
+void InlineLevelBox_Text::Submit(Element* offset_parent, Vector2f position, Vector2f layout_bounds, String text)
 {
 	ElementText* text_element = GetTextElement();
 	text_element->SetOffset(position, offset_parent);
@@ -101,6 +102,14 @@ void InlineLevelBox_Text::Submit(Element* offset_parent, Vector2f position, Vect
 	// TODO continued lines not handled
 	// TODO Use offset calculation from base function.
 	// TODO Maybe we want to size it?
+}
+
+void InlineLevelBox_Text::SubmitFragment(Vector2f offset, Vector2f layout_bounds, String text)
+{
+	ElementText* text_element = GetTextElement();
+	// TODO: Will be wrong in case of relative positioning. (we really just want to subtract the value submitted to SetOffset in Submit() above).
+	const Vector2f element_offset = text_element->GetRelativeOffset();
+	text_element->AddLine(offset - element_offset, std::move(text));
 }
 
 String InlineLevelBox_Text::DebugDumpNameValue() const

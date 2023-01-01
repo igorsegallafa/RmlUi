@@ -72,17 +72,22 @@ InlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
 		inline_level_box = open_inline_box->AddChild(std::move(inline_box_ptr));
 	}
 
-	LayoutLineBox* line_box = EnsureOpenLineBox();
-
-	while (true)
+	bool has_fragments_to_place = true;
+	LayoutOverflowHandle overflow_handle = {};
+	while (has_fragments_to_place)
 	{
+		LayoutLineBox* line_box = EnsureOpenLineBox();
+
 		// TODO: subtract floats
 		const float line_width = box_size.x;
 
-		line_box->AddBox(inline_level_box, wrap_content, line_width);
-		break; // TODO
+		has_fragments_to_place = !line_box->AddBox(inline_level_box, wrap_content, line_width, overflow_handle);
 
-		// TODO, handle split inline boxes. Break out on finish.
+		if (has_fragments_to_place)
+		{
+			CloseOpenLineBox();
+			// TODO need to add in the open inline boxes
+		}
 	}
 
 	if (inline_box)
@@ -172,7 +177,7 @@ void InlineContainer::CloseOpenLineBox()
 		const Vector2f relative_position = position - (offset_parent->GetPosition() - parent->GetOffsetRoot()->GetPosition());
 		const Vector2f line_position = {relative_position.x, relative_position.y + box_cursor};
 
-		// TODO: We don't really want to close then, but rather split them.
+		// TODO: We don't really want to close them, but rather split them.
 		for (auto it = open_inline_boxes.rbegin(); it != open_inline_boxes.rend(); ++it)
 			line_box->CloseInlineBox(*it);
 

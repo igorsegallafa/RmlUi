@@ -38,7 +38,8 @@ public:
 	LayoutLineBox() {}
 	~LayoutLineBox();
 
-	void AddBox(InlineLevelBox* box, bool wrap_content, float line_width);
+	// Returns true if the box could be completely placed on this line.
+	bool AddBox(InlineLevelBox* box, bool wrap_content, float line_width, LayoutOverflowHandle& inout_overflow_handle);
 
 	// Returns height of line. Note: This can be different from the element's computed line-height property.
 	float Close(Element* offset_parent, Vector2f line_position, float element_line_height);
@@ -77,8 +78,10 @@ private:
 		FragmentIndex parent_index; // Specified for open fragments.
 
 		// @performance Replace by a pointer? Don't need it for most fragments.
-		LayoutOverflowHandle overflow_handle;
-		String contents;
+		LayoutFragment layout_fragment;
+
+		bool has_content = false;
+		bool split_right = false;
 	};
 
 	PlacedFragment* GetFragment(FragmentIndex index)
