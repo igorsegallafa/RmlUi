@@ -59,7 +59,7 @@ bool LayoutLineBox::AddBox(InlineLevelBox* box, bool wrap_content, float line_wi
 	float available_width = FLT_MAX;
 	if (wrap_content)
 		// TODO: Subtract floats (or perhaps in passed-in line_width).
-		available_width = Math::RoundUpFloat(line_width - box_cursor);
+		available_width = Math::Max(Math::RoundUpFloat(line_width - box_cursor), 0.f);
 
 	LayoutFragment fragment = box->LayoutContent(first_box, available_width, right_spacing_width, inout_overflow_handle);
 
@@ -78,12 +78,11 @@ bool LayoutLineBox::AddBox(InlineLevelBox* box, bool wrap_content, float line_wi
 
 		const bool principal_fragment = (fragment.type == LayoutFragment::Type::Principal);
 
-		// TODO: Split case.
 		if (fragment.layout_bounds.x < 0.f)
 		{
 			// Opening up an inline box.
-			box_cursor += box->GetOuterSpacing(Box::LEFT);
 			open_fragments.push_back(PlacedFragment{box, {box_cursor, 0.f}, fragment.layout_bounds, std::move(fragment.text), principal_fragment});
+			box_cursor += box->GetOuterSpacing(Box::LEFT);
 		}
 		else
 		{
@@ -149,8 +148,10 @@ UniquePtr<LayoutLineBox> LayoutLineBox::SplitLine()
 			fragments.push_back(PlacedFragment{open_fragment});
 			PlacedFragment& new_fragment = fragments.back();
 			new_fragment.split_right = true;
-			new_fragment.layout_bounds.x = box_cursor - open_fragment.position.x;
-			//box_cursor += open_fragment.inline_level_box->GetOuterSpacing(Box::RIGHT);
+			// TODO: Same as below. Move virtual call to struct data. Maybe store layout bounds as outer size always?
+			new_fragment.layout_bounds.x = Math::Max(box_cursor - new_fragment.position.x -
+					(new_fragment.split_left ? 0.f : new_fragment.inline_level_box->GetOuterSpacing(Box::LEFT)),
+				0.f);
 		}
 	}
 
@@ -165,10 +166,11 @@ UniquePtr<LayoutLineBox> LayoutLineBox::SplitLine()
 		{
 			fragment.split_left = true;
 			fragment.principal_fragment = false;
+			fragment.has_content = false;
 		}
 		else
 		{
-			//new_line->box_cursor += fragment.inline_level_box->GetOuterSpacing(Box::RIGHT);
+			new_line->box_cursor += fragment.inline_level_box->GetOuterSpacing(Box::LEFT);
 		}
 	}
 
@@ -185,7 +187,8 @@ void LayoutLineBox::CloseInlineBox(InlineBox* inline_box)
 	}
 
 	PlacedFragment& fragment = open_fragments.back();
-	fragment.layout_bounds.x = box_cursor - fragment.position.x;
+	fragment.layout_bounds.x =
+		Math::Max(box_cursor - fragment.position.x - (fragment.split_left ? 0.f : inline_box->GetOuterSpacing(Box::LEFT)), 0.f);
 
 	box_cursor += inline_box->GetOuterSpacing(Box::RIGHT);
 

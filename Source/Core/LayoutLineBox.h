@@ -59,8 +59,6 @@ public:
 	void operator delete(void* chunk, size_t size);
 
 private:
-	using FragmentIndex = unsigned int;
-
 	struct PlacedFragment {
 		InlineLevelBox* inline_level_box;
 		Vector2f position;      // Outer (top,left) position relative to start of the line, disregarding floats.
@@ -74,13 +72,6 @@ private:
 		bool split_left = false;
 		bool split_right = false;
 	};
-
-	PlacedFragment* GetFragment(FragmentIndex index)
-	{
-		if (index < (FragmentIndex)fragments.size())
-			return &fragments[index];
-		return nullptr;
-	}
 
 	using FragmentList = Vector<PlacedFragment>;
 

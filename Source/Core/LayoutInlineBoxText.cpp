@@ -104,7 +104,7 @@ void InlineLevelBox_Text::Submit(BoxDisplay box_display, String text)
 	else
 	{
 		// TODO: Will be wrong in case of relative positioning. (we really just want to subtract the value submitted to SetOffset in Submit() above).
-		const Vector2f element_offset = text_element->GetRelativeOffset();
+		const Vector2f element_offset = text_element->GetRelativeOffset(Box::BORDER);
 		line_offset = box_display.position - element_offset;
 	}
 

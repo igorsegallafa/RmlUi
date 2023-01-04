@@ -191,6 +191,7 @@ bool ElementText::GenerateLine(String& line, int& line_length, float& line_width
 	bool trim_whitespace_prefix, bool decode_escape_characters, bool allow_empty)
 {
 	RMLUI_ZoneScoped;
+	RMLUI_ASSERT(maximum_line_width >= 0.f); // TODO: Check all callers for conformance, check break at line condition below. Possibly check for FLT_MAX.
 
 	FontFaceHandle font_face_handle = GetFontFaceHandle();
 
@@ -296,7 +297,7 @@ bool ElementText::GenerateLine(String& line, int& line_length, float& line_width
 		line_width += token_width;
 
 		// Break out of the loop if an endline was forced.
-		if (break_line)
+		if (break_line && (allow_empty || !line.empty()))
 			return false;
 
 		// Set the beginning of the next token.

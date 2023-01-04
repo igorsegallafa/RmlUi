@@ -93,7 +93,7 @@ LayoutFragment InlineBoxRoot::LayoutContent(bool /*first_box*/, float /*availabl
 
 LayoutFragment InlineBox::LayoutContent(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle)
 {
-	if (first_box || right_spacing_width <= available_width)
+	if (first_box || right_spacing_width <= available_width + GetOuterSpacing(Box::LEFT))
 		return LayoutFragment{Vector2f(-1.f, GetElement()->GetLineHeight())};
 
 	return {};

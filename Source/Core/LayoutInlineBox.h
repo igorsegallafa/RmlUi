@@ -81,9 +81,12 @@ protected:
 		if (box_display.split_right)
 			ZeroBoxEdge(box, Box::RIGHT);
 
+		Vector2f offset = box_display.position;
+		offset.x += box.GetEdge(Box::MARGIN, Box::LEFT);
+
 		if (box_display.principal_box)
 		{
-			element->SetOffset(box_display.position, box_display.offset_parent);
+			element->SetOffset(offset, box_display.offset_parent);
 			element->SetBox(box);
 			OnLayout();
 		}
@@ -91,8 +94,8 @@ protected:
 		{
 			// TODO: Will be wrong in case of relative positioning. (we really just want to subtract the value submitted to SetOffset in Submit()
 			// above).
-			const Vector2f element_offset = element->GetRelativeOffset();
-			element->AddBox(box, box_display.position - element_offset);
+			const Vector2f element_offset = element->GetRelativeOffset(Box::BORDER);
+			element->AddBox(box, offset - element_offset);
 		}
 	}
 
@@ -144,14 +147,7 @@ public:
 	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) override;
 	float GetOuterSpacing(Box::Edge edge) const override;
 
-	void Submit(BoxDisplay box_display, String /*text*/) override
-	{
-		// TODO: Not sure if this is correct.
-		if (box_display.principal_box)
-			box_display.position = box_display.position - box.GetPosition();
-
-		SubmitBox(box, box_display);
-	}
+	void Submit(BoxDisplay box_display, String /*text*/) override { SubmitBox(box, box_display); }
 
 	String DebugDumpNameValue() const override { return "InlineBox"; }
 
