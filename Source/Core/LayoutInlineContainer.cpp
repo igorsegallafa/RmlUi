@@ -81,7 +81,7 @@ InlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
 		// TODO: subtract floats
 		const float line_width = box_size.x;
 
-		has_fragments_to_place = !line_box->AddBox(inline_level_box, wrap_content, line_width, overflow_handle);
+		has_fragments_to_place = line_box->AddBox(inline_level_box, wrap_content, line_width, overflow_handle);
 
 		if (has_fragments_to_place)
 		{
@@ -160,6 +160,7 @@ InlineContainer::CloseResult InlineContainer::Close(InlineBox** out_open_inline_
 		visible_overflow_size.x = Math::Max(visible_overflow_size.x, line_box->GetBoxCursor()); // TODO: Should also add line position
 	}
 
+	visible_overflow_size.x = Math::RoundDownFloat(visible_overflow_size.x);
 	SetVisibleOverflowSize(visible_overflow_size);
 
 	// Increment the parent's cursor.

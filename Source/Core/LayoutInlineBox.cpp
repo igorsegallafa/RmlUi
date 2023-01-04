@@ -64,17 +64,48 @@ void InlineLevelBox::operator delete(void* chunk, size_t size)
 	LayoutEngine::DeallocateLayoutChunk(chunk, size);
 }
 
-InlineLevelBox::~InlineLevelBox() {}
-
-float InlineLevelBox::GetOuterSpacing(Box::Edge /*edge*/) const
+void InlineLevelBox::SubmitBox(Box box, const BoxDisplay& box_display)
 {
-	return 0.f;
+	RMLUI_ASSERT(element && element != box_display.offset_parent);
+
+	box.SetContent(box_display.size);
+
+	if (box_display.split_left)
+		ZeroBoxEdge(box, Box::LEFT);
+	if (box_display.split_right)
+		ZeroBoxEdge(box, Box::RIGHT);
+
+	Vector2f offset = box_display.position;
+	offset.x += box.GetEdge(Box::MARGIN, Box::LEFT);
+
+	if (box_display.principal_box)
+	{
+		element->SetOffset(offset, box_display.offset_parent);
+		element->SetBox(box);
+		OnLayout();
+	}
+	else
+	{
+		// TODO: Will be wrong in case of relative positioning. (we really just want to subtract the value submitted to SetOffset in Submit()
+		// above).
+		const Vector2f element_offset = element->GetRelativeOffset(Box::BORDER);
+		element->AddBox(box, offset - element_offset);
+	}
 }
+
+InlineLevelBox::~InlineLevelBox() {}
 
 String InlineLevelBox::DebugDumpTree(int depth) const
 {
 	String value = String(depth * 2, ' ') + DebugDumpNameValue() + " | " + LayoutElementName(GetElement()) + '\n';
 	return value;
+}
+
+InlineLevelBox* InlineBoxBase::AddChild(UniquePtr<InlineLevelBox> child)
+{
+	auto result = child.get();
+	children.push_back(std::move(child));
+	return result;
 }
 
 String InlineBoxBase::DebugDumpTree(int depth) const
@@ -91,17 +122,24 @@ LayoutFragment InlineBoxRoot::LayoutContent(bool /*first_box*/, float /*availabl
 	return {};
 }
 
+void InlineBoxRoot::Submit(BoxDisplay /*box_display*/, String /*text*/)
+{
+	RMLUI_ERROR;
+}
+
 LayoutFragment InlineBox::LayoutContent(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle)
 {
-	if (first_box || right_spacing_width <= available_width + GetOuterSpacing(Box::LEFT))
-		return LayoutFragment{Vector2f(-1.f, GetElement()->GetLineHeight())};
+	const float edge_left = GetEdgeSize(box, Box::LEFT);
+	const float edge_right = GetEdgeSize(box, Box::RIGHT);
+	if (first_box || right_spacing_width <= available_width + edge_left)
+		return LayoutFragment(FragmentType::InlineBox, Vector2f(-1.f, GetElement()->GetLineHeight()), edge_left, edge_right);
 
 	return {};
 }
 
-float InlineBox::GetOuterSpacing(Box::Edge edge) const
+void InlineBox::Submit(BoxDisplay box_display, String /*text*/)
 {
-	return GetEdgeSize(box, edge);
+	SubmitBox(box, box_display);
 }
 
 LayoutFragment InlineLevelBox_Atomic::LayoutContent(bool first_box, float available_width, float right_spacing_width,
@@ -113,9 +151,15 @@ LayoutFragment InlineLevelBox_Atomic::LayoutContent(bool first_box, float availa
 	};
 
 	if (first_box || outer_size.x + right_spacing_width <= available_width)
-		return LayoutFragment{outer_size};
+		return LayoutFragment(FragmentType::Principal, outer_size, 0.f, 0.f);
 
 	return {};
+}
+
+void InlineLevelBox_Atomic::Submit(BoxDisplay box_display, String /*text*/)
+{
+	box_display.size = box.GetSize();
+	SubmitBox(box, box_display);
 }
 
 } // namespace Rml

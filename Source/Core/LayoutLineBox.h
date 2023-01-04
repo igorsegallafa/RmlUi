@@ -38,8 +38,7 @@ public:
 	LayoutLineBox() {}
 	~LayoutLineBox();
 
-	// Returns true if the box could be completely placed on this line.
-	// TODO: Make a separate AddBox for InlineBox?
+	// Returns true if the box should be placed again on a new line.
 	bool AddBox(InlineLevelBox* box, bool wrap_content, float line_width, LayoutOverflowHandle& inout_overflow_handle);
 
 	// Returns height of line. Note: This can be different from the element's computed line-height property.
@@ -47,10 +46,11 @@ public:
 
 	UniquePtr<LayoutLineBox> SplitLine();
 
+	// Note: Only inline-boxes need to be closed. Other inline-level boxes does not contain child boxes considered in the current inline formatting
+	// context, and does not need to be closed.
 	void CloseInlineBox(InlineBox* inline_box);
 
 	float GetBoxCursor() const { return box_cursor; }
-
 	bool IsClosed() const { return is_closed; }
 
 	String DebugDumpTree(int depth) const;
@@ -64,6 +64,9 @@ private:
 		Vector2f position;      // Outer (top,left) position relative to start of the line, disregarding floats.
 		Vector2f layout_bounds; // Outer size for replaced and inline blocks, inner size for inline boxes.
 
+		float spacing_left = 0.f;  // Left margin-border-padding for inline boxes.
+		float spacing_right = 0.f; // Right margin-border-padding for inline boxes.
+
 		// @performance Replace by a pointer? Don't need it for most fragments.
 		String text;
 
@@ -75,13 +78,15 @@ private:
 
 	using FragmentList = Vector<PlacedFragment>;
 
-	// The horizontal cursor. This is where the next inline box will be placed along the line.
+	// The horizontal cursor. This is the outer-right position of the last placed fragment.
 	float box_cursor = 0.f;
+	// The contribution of opened inline boxes to the placement of the next fragment, due to their left edges (margin-border-padding).
+	float open_spacing_left = 0.f;
 
-	// The list of inline boxes in this line box. These line boxes may be parented to others in this list.
+	// List of placed fragments in this line box.
 	FragmentList fragments;
 
-	// List of fragments that have been opened but are yet to be closed.
+	// List of fragments from inline boxes that have been opened but are yet to be closed.
 	// @performance Store using parent pointers to avoid allocations.
 	Vector<PlacedFragment> open_fragments;
 

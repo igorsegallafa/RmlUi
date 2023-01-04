@@ -54,10 +54,8 @@ public:
 
 	virtual LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) = 0;
 
-	// Principal box
-	virtual void Submit(BoxDisplay box_display, String /*text*/) { SubmitBox(Box{}, box_display); }
-
-	virtual float GetOuterSpacing(Box::Edge edge) const;
+	// Position and size element's box.
+	virtual void Submit(BoxDisplay box_display, String /*text*/) = 0;
 
 	virtual String DebugDumpNameValue() const = 0;
 	virtual String DebugDumpTree(int depth) const;
@@ -70,34 +68,7 @@ protected:
 
 	Element* GetElement() const { return element; }
 
-	void SubmitBox(Box box, const BoxDisplay& box_display)
-	{
-		RMLUI_ASSERT(element && element != box_display.offset_parent);
-
-		box.SetContent(box_display.size);
-
-		if (box_display.split_left)
-			ZeroBoxEdge(box, Box::LEFT);
-		if (box_display.split_right)
-			ZeroBoxEdge(box, Box::RIGHT);
-
-		Vector2f offset = box_display.position;
-		offset.x += box.GetEdge(Box::MARGIN, Box::LEFT);
-
-		if (box_display.principal_box)
-		{
-			element->SetOffset(offset, box_display.offset_parent);
-			element->SetBox(box);
-			OnLayout();
-		}
-		else
-		{
-			// TODO: Will be wrong in case of relative positioning. (we really just want to subtract the value submitted to SetOffset in Submit()
-			// above).
-			const Vector2f element_offset = element->GetRelativeOffset(Box::BORDER);
-			element->AddBox(box, offset - element_offset);
-		}
-	}
+	void SubmitBox(Box box, const BoxDisplay& box_display);
 
 	void OnLayout() { element->OnLayout(); } // TODO
 
@@ -114,12 +85,7 @@ private:
 
 class InlineBoxBase : public InlineLevelBox {
 public:
-	InlineLevelBox* AddChild(UniquePtr<InlineLevelBox> child)
-	{
-		auto result = child.get();
-		children.push_back(std::move(child));
-		return result;
-	}
+	InlineLevelBox* AddChild(UniquePtr<InlineLevelBox> child);
 
 	String DebugDumpTree(int depth) const override;
 
@@ -136,7 +102,10 @@ private:
 class InlineBoxRoot final : public InlineBoxBase {
 public:
 	InlineBoxRoot() : InlineBoxBase(nullptr) {}
+
 	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) override;
+	void Submit(BoxDisplay box_display, String text) override;
+
 	String DebugDumpNameValue() const override { return "InlineBoxRoot"; }
 };
 
@@ -145,9 +114,7 @@ public:
 	InlineBox(Element* element, const Box& box) : InlineBoxBase(element), box(box) { RMLUI_ASSERT(element && box.GetSize().x < 0.f); }
 
 	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) override;
-	float GetOuterSpacing(Box::Edge edge) const override;
-
-	void Submit(BoxDisplay box_display, String /*text*/) override { SubmitBox(box, box_display); }
+	void Submit(BoxDisplay box_display, String text) override;
 
 	String DebugDumpNameValue() const override { return "InlineBox"; }
 
@@ -164,44 +131,38 @@ public:
 	}
 
 	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) override;
+	void Submit(BoxDisplay box_display, String text) override;
 
 	String DebugDumpNameValue() const override { return "InlineLevelBox_Atomic"; }
-
-	void Submit(BoxDisplay box_display, String /*text*/) override
-	{
-		box_display.size = box.GetSize();
-		SubmitBox(box, box_display);
-	}
 
 private:
 	Box box;
 };
 
-struct LayoutFragment {
-	enum class Type {
-		Invalid,
-		Principal, // The element's first and main fragment.
-		Secondary, // Positioned relative to the element's principal fragment.
-	};
-	enum class Split { Closed, OpenLeft, OpenRight, OpenBoth };
+enum class FragmentType {
+	Invalid,    // Could not be placed.
+	InlineBox,  // An inline-box.
+	Principal,  // The element's first and main fragment for inline-level boxes that are not inline-boxes.
+	Additional, // Positioned relative to the element's principal fragment.
+};
 
+struct LayoutFragment {
 	LayoutFragment() = default;
-	LayoutFragment(Vector2f layout_bounds, Type type = Type::Principal, Split split = Split::Closed, LayoutOverflowHandle overflow_handle = {},
-		String text = {}) :
-		layout_bounds(layout_bounds),
-		type(type), split(split), overflow_handle(overflow_handle), text(std::move(text))
+	LayoutFragment(FragmentType type, Vector2f layout_bounds, float spacing_left = 0.f, float spacing_right = 0.f,
+		LayoutOverflowHandle overflow_handle = {}, String text = {}) :
+		type(type),
+		layout_bounds(layout_bounds), spacing_left(spacing_left), spacing_right(spacing_right), overflow_handle(overflow_handle),
+		text(std::move(text))
 	{}
 
-	explicit operator bool() const { return type != Type::Invalid; }
+	FragmentType type = FragmentType::Invalid;
 
 	Vector2f layout_bounds;
 
-	Type type = Type::Invalid;
-	Split split = Split::Closed;
+	float spacing_left = 0.f;  // Padding-border-margin left
+	float spacing_right = 0.f; // Padding-border-margin right
 
 	// Overflow handle is non-zero when there is another fragment to be layed out.
-	// TODO: I think we can make this part of the return value for LayoutContent instead? No need to keep this around. Maybe need a pointer to the
-	// next fragment in the chain.
 	LayoutOverflowHandle overflow_handle = {};
 
 	String text;

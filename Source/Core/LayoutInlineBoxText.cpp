@@ -87,9 +87,9 @@ LayoutFragment InlineLevelBox_Text::LayoutContent(bool first_box, float availabl
 		out_overflow_handle = line_begin + line_length;
 
 	const Vector2f fragment_size = {line_width, text_element->GetLineHeight()};
-
-	return LayoutFragment(fragment_size, line_begin == 0 ? LayoutFragment::Type::Principal : LayoutFragment::Type::Secondary,
-		LayoutFragment::Split::Closed, out_overflow_handle, std::move(line_contents));
+	const FragmentType fragment_type = (line_begin == 0 ? FragmentType::Principal : FragmentType::Additional);
+	
+	return LayoutFragment(fragment_type, fragment_size, 0.f, 0.f, out_overflow_handle, std::move(line_contents));
 }
 
 void InlineLevelBox_Text::Submit(BoxDisplay box_display, String text)
