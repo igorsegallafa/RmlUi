@@ -111,6 +111,8 @@ public:
 	static void GetEdgeSizes(float& margin_a, float& margin_b, float& padding_border_a, float& padding_border_b,
 		const ComputedAxisSize& computed_size, float base_value);
 
+	static String GetDebugElementName(Element* element);
+
 private:
 	/// Calculates and returns the content size for replaced elements.
 	static Vector2f CalculateSizeForReplacedElement(Vector2f specified_content_size, Vector2f min_size, Vector2f max_size, Vector2f intrinsic_size,

@@ -26,10 +26,10 @@
  *
  */
 
-#ifndef RMLUI_CORE_LAYOUTINLINEBOXTEXT_H
-#define RMLUI_CORE_LAYOUTINLINEBOXTEXT_H
+#ifndef RMLUI_CORE_LAYOUTINLINELEVELBOXTEXT_H
+#define RMLUI_CORE_LAYOUTINLINELEVELBOXTEXT_H
 
-#include "LayoutInlineBox.h"
+#include "LayoutInlineLevelBox.h"
 
 namespace Rml {
 

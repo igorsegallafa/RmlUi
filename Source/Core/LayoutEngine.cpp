@@ -34,8 +34,8 @@
 #include "LayoutBlockBoxSpace.h"
 #include "LayoutDetails.h"
 #include "LayoutFlex.h"
-#include "LayoutInlineBoxText.h"
 #include "LayoutInlineContainer.h"
+#include "LayoutInlineLevelBoxText.h"
 #include "LayoutTable.h"
 #include "Pool.h"
 #include <algorithm>
@@ -119,7 +119,7 @@ struct DebugDumpLayoutTree {
 	{
 		if (g_debug_dumping_layout_tree)
 		{
-			const String header = ":: " + LayoutElementName(element) + " ::\n";
+			const String header = ":: " + LayoutDetails::GetDebugElementName(element) + " ::\n";
 			const String layout_tree = header + block_box->DumpLayoutTree();
 			if (SystemInterface* system_interface = GetSystemInterface())
 				system_interface->LogMessage(Log::LT_INFO, layout_tree);
@@ -299,9 +299,6 @@ bool LayoutEngine::FormatElementInline(BlockContainer* block_context_box, Elemen
 
 	const Vector2f containing_block = LayoutDetails::GetContainingBlock(block_context_box);
 
-	if (element->GetId() == "a")
-		int x = 0;
-
 	Box box;
 	LayoutDetails::BuildBox(box, containing_block, element, BoxContext::Inline);
 	auto inline_box_handle = block_context_box->AddInlineElement(element, box);
@@ -312,9 +309,6 @@ bool LayoutEngine::FormatElementInline(BlockContainer* block_context_box, Elemen
 		if (!FormatElementFlow(block_context_box, element->GetChild(i)))
 			return false;
 	}
-
-	if (element->GetId() == "a")
-		int x = 0;
 
 	block_context_box->CloseInlineElement(inline_box_handle);
 

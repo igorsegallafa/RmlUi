@@ -29,7 +29,7 @@
 #ifndef RMLUI_CORE_LAYOUTLINEBOX_H
 #define RMLUI_CORE_LAYOUTLINEBOX_H
 
-#include "LayoutInlineBox.h"
+#include "LayoutInlineLevelBox.h"
 
 namespace Rml {
 

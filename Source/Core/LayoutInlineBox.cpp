@@ -36,69 +36,13 @@
 #include "LayoutBlockBox.h"
 #include "LayoutEngine.h"
 
+// TODO: Includes
+
 namespace Rml {
 
 static float GetEdgeSize(const Box& box, Box::Edge edge)
 {
 	return box.GetEdge(Box::PADDING, edge) + box.GetEdge(Box::BORDER, edge) + box.GetEdge(Box::MARGIN, edge);
-}
-
-String LayoutElementName(Element* element)
-{
-	if (!element)
-		return "nullptr";
-	if (!element->GetId().empty())
-		return '#' + element->GetId();
-	if (auto element_text = rmlui_dynamic_cast<ElementText*>(element))
-		return '\"' + element_text->GetText().substr(0, 20) + '\"';
-	return element->GetAddress(false, false);
-}
-
-void* InlineLevelBox::operator new(size_t size)
-{
-	return LayoutEngine::AllocateLayoutChunk(size);
-}
-
-void InlineLevelBox::operator delete(void* chunk, size_t size)
-{
-	LayoutEngine::DeallocateLayoutChunk(chunk, size);
-}
-
-void InlineLevelBox::SubmitBox(Box box, const BoxDisplay& box_display)
-{
-	RMLUI_ASSERT(element && element != box_display.offset_parent);
-
-	box.SetContent(box_display.size);
-
-	if (box_display.split_left)
-		ZeroBoxEdge(box, Box::LEFT);
-	if (box_display.split_right)
-		ZeroBoxEdge(box, Box::RIGHT);
-
-	Vector2f offset = box_display.position;
-	offset.x += box.GetEdge(Box::MARGIN, Box::LEFT);
-
-	if (box_display.principal_box)
-	{
-		element->SetOffset(offset, box_display.offset_parent);
-		element->SetBox(box);
-		OnLayout();
-	}
-	else
-	{
-		// TODO: Will be wrong in case of relative positioning. (we really just want to subtract the value submitted to SetOffset in Submit()
-		// above).
-		const Vector2f element_offset = element->GetRelativeOffset(Box::BORDER);
-		element->AddBox(box, offset - element_offset);
-	}
-}
-
-InlineLevelBox::~InlineLevelBox() {}
-
-String InlineLevelBox::DebugDumpTree(int depth) const
-{
-	String value = String(depth * 2, ' ') + DebugDumpNameValue() + " | " + LayoutElementName(GetElement()) + '\n';
-	return value;
 }
 
 InlineLevelBox* InlineBoxBase::AddChild(UniquePtr<InlineLevelBox> child)
@@ -139,26 +83,6 @@ LayoutFragment InlineBox::LayoutContent(bool first_box, float available_width, f
 
 void InlineBox::Submit(BoxDisplay box_display, String /*text*/)
 {
-	SubmitBox(box, box_display);
-}
-
-LayoutFragment InlineLevelBox_Atomic::LayoutContent(bool first_box, float available_width, float right_spacing_width,
-	LayoutOverflowHandle overflow_handle)
-{
-	const Vector2f outer_size = {
-		box.GetSizeAcross(Box::HORIZONTAL, Box::MARGIN),
-		box.GetSizeAcross(Box::VERTICAL, Box::MARGIN),
-	};
-
-	if (first_box || outer_size.x + right_spacing_width <= available_width)
-		return LayoutFragment(FragmentType::Principal, outer_size, 0.f, 0.f);
-
-	return {};
-}
-
-void InlineLevelBox_Atomic::Submit(BoxDisplay box_display, String /*text*/)
-{
-	box_display.size = box.GetSize();
 	SubmitBox(box, box_display);
 }
 

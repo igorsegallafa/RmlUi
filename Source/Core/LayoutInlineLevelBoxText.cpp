@@ -26,7 +26,7 @@
  *
  */
 
-#include "LayoutInlineBoxText.h"
+#include "LayoutInlineLevelBoxText.h"
 #include "../../Include/RmlUi/Core/ComputedValues.h"
 #include "../../Include/RmlUi/Core/Core.h"
 #include "../../Include/RmlUi/Core/ElementText.h"
@@ -40,26 +40,6 @@
 #include "LayoutLineBox.h"
 
 namespace Rml {
-
-// TODO: Don't need it here anymore? Move it.
-String FontFaceDescription(const String& font_family, Style::FontStyle style, Style::FontWeight weight)
-{
-	String font_attributes;
-
-	if (style == Style::FontStyle::Italic)
-		font_attributes += "italic, ";
-	if (weight == Style::FontWeight::Bold)
-		font_attributes += "bold, ";
-	else if (weight != Style::FontWeight::Auto && weight != Style::FontWeight::Normal)
-		font_attributes += "weight=" + ToString((int)weight) + ", ";
-
-	if (font_attributes.empty())
-		font_attributes = "regular";
-	else
-		font_attributes.resize(font_attributes.size() - 2);
-
-	return CreateString(font_attributes.size() + font_family.size() + 8, "'%s' [%s]", font_family.c_str(), font_attributes.c_str());
-}
 
 LayoutFragment InlineLevelBox_Text::LayoutContent(bool first_box, float available_width, float right_spacing_width,
 	LayoutOverflowHandle in_overflow_handle)
@@ -88,7 +68,7 @@ LayoutFragment InlineLevelBox_Text::LayoutContent(bool first_box, float availabl
 
 	const Vector2f fragment_size = {line_width, text_element->GetLineHeight()};
 	const FragmentType fragment_type = (line_begin == 0 ? FragmentType::Principal : FragmentType::Additional);
-	
+
 	return LayoutFragment(fragment_type, fragment_size, 0.f, 0.f, out_overflow_handle, std::move(line_contents));
 }
 

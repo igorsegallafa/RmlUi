@@ -277,6 +277,17 @@ void LayoutDetails::GetEdgeSizes(float& margin_a, float& margin_b, float& paddin
 	padding_border_b = Math::Max(0.0f, ResolveValue(computed_size.padding_b, base_value)) + Math::Max(0.0f, computed_size.border_b);
 }
 
+String LayoutDetails::GetDebugElementName(Element* element)
+{
+	if (!element)
+		return "nullptr";
+	if (!element->GetId().empty())
+		return '#' + element->GetId();
+	if (auto element_text = rmlui_dynamic_cast<ElementText*>(element))
+		return '\"' + element_text->GetText().substr(0, 20) + '\"';
+	return element->GetAddress(false, false);
+}
+
 Vector2f LayoutDetails::CalculateSizeForReplacedElement(const Vector2f specified_content_size, const Vector2f min_size, const Vector2f max_size,
 	const Vector2f intrinsic_size, const float intrinsic_ratio)
 {

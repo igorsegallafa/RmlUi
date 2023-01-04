@@ -30,58 +30,9 @@
 #define RMLUI_CORE_LAYOUTINLINEBOX_H
 
 #include "../../Include/RmlUi/Core/Box.h"
-#include "../../Include/RmlUi/Core/StyleTypes.h"
+#include "LayoutInlineLevelBox.h"
 
 namespace Rml {
-
-class Element;
-struct LayoutFragment;
-
-using LayoutOverflowHandle = int;
-
-struct BoxDisplay {
-	Element* offset_parent;
-	Vector2f position;
-	Vector2f size;
-	bool principal_box;
-	bool split_left;
-	bool split_right;
-};
-
-class InlineLevelBox {
-public:
-	virtual ~InlineLevelBox();
-
-	virtual LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) = 0;
-
-	// Position and size element's box.
-	virtual void Submit(BoxDisplay box_display, String /*text*/) = 0;
-
-	virtual String DebugDumpNameValue() const = 0;
-	virtual String DebugDumpTree(int depth) const;
-
-	void* operator new(size_t size);
-	void operator delete(void* chunk, size_t size);
-
-protected:
-	InlineLevelBox(Element* element) : element(element) {}
-
-	Element* GetElement() const { return element; }
-
-	void SubmitBox(Box box, const BoxDisplay& box_display);
-
-	void OnLayout() { element->OnLayout(); } // TODO
-
-private:
-	static void ZeroBoxEdge(Box& box, Box::Edge edge)
-	{
-		box.SetEdge(Box::PADDING, edge, 0.f);
-		box.SetEdge(Box::BORDER, edge, 0.f);
-		box.SetEdge(Box::MARGIN, edge, 0.f);
-	}
-
-	Element* element;
-};
 
 class InlineBoxBase : public InlineLevelBox {
 public:
@@ -121,54 +72,6 @@ public:
 private:
 	Box box;
 };
-
-class InlineLevelBox_Atomic final : public InlineLevelBox {
-public:
-	InlineLevelBox_Atomic(Element* element, const Box& box) : InlineLevelBox(element), box(box)
-	{
-		RMLUI_ASSERT(element);
-		RMLUI_ASSERT(box.GetSize().x >= 0.f && box.GetSize().y >= 0.f);
-	}
-
-	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) override;
-	void Submit(BoxDisplay box_display, String text) override;
-
-	String DebugDumpNameValue() const override { return "InlineLevelBox_Atomic"; }
-
-private:
-	Box box;
-};
-
-enum class FragmentType {
-	Invalid,    // Could not be placed.
-	InlineBox,  // An inline-box.
-	Principal,  // The element's first and main fragment for inline-level boxes that are not inline-boxes.
-	Additional, // Positioned relative to the element's principal fragment.
-};
-
-struct LayoutFragment {
-	LayoutFragment() = default;
-	LayoutFragment(FragmentType type, Vector2f layout_bounds, float spacing_left = 0.f, float spacing_right = 0.f,
-		LayoutOverflowHandle overflow_handle = {}, String text = {}) :
-		type(type),
-		layout_bounds(layout_bounds), spacing_left(spacing_left), spacing_right(spacing_right), overflow_handle(overflow_handle),
-		text(std::move(text))
-	{}
-
-	FragmentType type = FragmentType::Invalid;
-
-	Vector2f layout_bounds;
-
-	float spacing_left = 0.f;  // Padding-border-margin left
-	float spacing_right = 0.f; // Padding-border-margin right
-
-	// Overflow handle is non-zero when there is another fragment to be layed out.
-	LayoutOverflowHandle overflow_handle = {};
-
-	String text;
-};
-
-String LayoutElementName(Element* element);
 
 } // namespace Rml
 #endif

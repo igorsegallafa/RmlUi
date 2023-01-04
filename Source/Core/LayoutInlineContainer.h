@@ -33,7 +33,6 @@
 #include "../../Include/RmlUi/Core/Types.h"
 #include "LayoutBlockBox.h"
 #include "LayoutInlineBox.h"
-#include <stack>
 
 namespace Rml {
 

@@ -34,7 +34,7 @@
 #include "../../Include/RmlUi/Core/Property.h"
 #include "LayoutBlockBox.h"
 #include "LayoutEngine.h"
-#include "LayoutInlineBoxText.h"
+#include "LayoutInlineLevelBoxText.h"
 #include "LayoutInlineContainer.h"
 #include <numeric>
 

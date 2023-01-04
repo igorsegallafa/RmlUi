@@ -30,7 +30,6 @@
 #include "FontFace.h"
 #include "FontFamily.h"
 #include "FreeTypeInterface.h"
-#include "../LayoutInlineBoxText.h"
 #include "../../../Include/RmlUi/Core/Core.h"
 #include "../../../Include/RmlUi/Core/FileInterface.h"
 #include "../../../Include/RmlUi/Core/Log.h"
@@ -41,6 +40,25 @@
 namespace Rml {
 
 static FontProvider* g_font_provider = nullptr;
+
+static String FontFaceDescription(const String& font_family, Style::FontStyle style, Style::FontWeight weight)
+{
+	String font_attributes;
+
+	if (style == Style::FontStyle::Italic)
+		font_attributes += "italic, ";
+	if (weight == Style::FontWeight::Bold)
+		font_attributes += "bold, ";
+	else if (weight != Style::FontWeight::Auto && weight != Style::FontWeight::Normal)
+		font_attributes += "weight=" + ToString((int)weight) + ", ";
+
+	if (font_attributes.empty())
+		font_attributes = "regular";
+	else
+		font_attributes.resize(font_attributes.size() - 2);
+
+	return CreateString(font_attributes.size() + font_family.size() + 8, "'%s' [%s]", font_family.c_str(), font_attributes.c_str());
+}
 
 FontProvider::FontProvider()
 {

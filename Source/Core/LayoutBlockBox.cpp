@@ -591,7 +591,7 @@ const Box& BlockContainer::GetBox() const
 
 String BlockContainer::DebugDumpTree(int depth) const
 {
-	String value = String(depth * 2, ' ') + "BlockContainer" + " | " + LayoutElementName(element) + '\n';
+	String value = String(depth * 2, ' ') + "BlockContainer" + " | " + LayoutDetails::GetDebugElementName(element) + '\n';
 
 	for (auto&& block_box : block_boxes)
 		value += block_box->DumpLayoutTree(depth + 1);
