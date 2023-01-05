@@ -41,6 +41,13 @@
 
 namespace Rml {
 
+static void ZeroBoxEdge(Box& box, Box::Edge edge)
+{
+	box.SetEdge(Box::PADDING, edge, 0.f);
+	box.SetEdge(Box::BORDER, edge, 0.f);
+	box.SetEdge(Box::MARGIN, edge, 0.f);
+}
+
 void* InlineLevelBox::operator new(size_t size)
 {
 	return LayoutEngine::AllocateLayoutChunk(size);
@@ -51,23 +58,23 @@ void InlineLevelBox::operator delete(void* chunk, size_t size)
 	LayoutEngine::DeallocateLayoutChunk(chunk, size);
 }
 
-void InlineLevelBox::SubmitBox(Box box, const BoxDisplay& box_display)
+void InlineLevelBox::SubmitBox(Box box, const FragmentBox& fragment_box)
 {
-	RMLUI_ASSERT(element && element != box_display.offset_parent);
+	RMLUI_ASSERT(element && element != fragment_box.offset_parent);
 
-	box.SetContent(box_display.size);
+	box.SetContent(fragment_box.size);
 
-	if (box_display.split_left)
+	if (fragment_box.split_left)
 		ZeroBoxEdge(box, Box::LEFT);
-	if (box_display.split_right)
+	if (fragment_box.split_right)
 		ZeroBoxEdge(box, Box::RIGHT);
 
-	Vector2f offset = box_display.position;
+	Vector2f offset = fragment_box.position;
 	offset.x += box.GetEdge(Box::MARGIN, Box::LEFT);
 
-	if (box_display.principal_box)
+	if (fragment_box.principal_box)
 	{
-		element->SetOffset(offset, box_display.offset_parent);
+		element->SetOffset(offset, fragment_box.offset_parent);
 		element->SetBox(box);
 		OnLayout();
 	}
@@ -88,7 +95,13 @@ String InlineLevelBox::DebugDumpTree(int depth) const
 	return value;
 }
 
-LayoutFragment InlineLevelBox_Atomic::LayoutContent(bool first_box, float available_width, float right_spacing_width,
+InlineLevelBox_Atomic::InlineLevelBox_Atomic(Element* element, const Box& box) : InlineLevelBox(element), box(box)
+{
+	RMLUI_ASSERT(element);
+	RMLUI_ASSERT(box.GetSize().x >= 0.f && box.GetSize().y >= 0.f);
+}
+
+FragmentResult InlineLevelBox_Atomic::CreateFragment(bool first_box, float available_width, float right_spacing_width,
 	LayoutOverflowHandle /*overflow_handle*/)
 {
 	const Vector2f outer_size = {
@@ -97,15 +110,15 @@ LayoutFragment InlineLevelBox_Atomic::LayoutContent(bool first_box, float availa
 	};
 
 	if (first_box || outer_size.x + right_spacing_width <= available_width)
-		return LayoutFragment(FragmentType::Principal, outer_size, 0.f, 0.f);
+		return FragmentResult(FragmentType::Principal, outer_size, 0.f, 0.f);
 
 	return {};
 }
 
-void InlineLevelBox_Atomic::Submit(BoxDisplay box_display, String /*text*/)
+void InlineLevelBox_Atomic::Submit(FragmentBox fragment_box, String /*text*/)
 {
-	box_display.size = box.GetSize();
-	SubmitBox(box, box_display);
+	fragment_box.size = box.GetSize();
+	SubmitBox(box, fragment_box);
 }
 
 } // namespace Rml

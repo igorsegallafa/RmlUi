@@ -35,13 +35,18 @@ namespace Rml {
 
 class ElementText;
 
+/**
+    Inline-level text boxes represent text nodes.
+
+    Generates fragments to display its text, splitting it up as necessary to fit in the available space.
+ */
 class InlineLevelBox_Text final : public InlineLevelBox {
 public:
 	InlineLevelBox_Text(ElementText* element) : InlineLevelBox(element) {}
 
-	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) override;
+	FragmentResult CreateFragment(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) override;
 
-	void Submit(BoxDisplay box_display, String text) override;
+	void Submit(FragmentBox fragment_box, String text) override;
 
 	String DebugDumpNameValue() const override;
 

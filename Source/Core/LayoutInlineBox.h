@@ -41,7 +41,7 @@ public:
 	String DebugDumpTree(int depth) const override;
 
 protected:
-	InlineBoxBase(Element* element) : InlineLevelBox(element) {}
+	InlineBoxBase(Element* element);
 
 private:
 	using InlineLevelBoxList = Vector<UniquePtr<InlineLevelBox>>;
@@ -50,27 +50,40 @@ private:
 	InlineLevelBoxList children;
 };
 
-class InlineBoxRoot final : public InlineBoxBase {
-public:
-	InlineBoxRoot() : InlineBoxBase(nullptr) {}
+/**
+    Inline boxes are inline-level boxes whose contents (child boxes) participate in the same inline formatting context
+    as the box itself.
 
-	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) override;
-	void Submit(BoxDisplay box_display, String text) override;
-
-	String DebugDumpNameValue() const override { return "InlineBoxRoot"; }
-};
-
+    An inline box initially creates an unsized open fragment, since its width depend on its children. The fragment is
+    sized and placed later on, either when its line needs to be split or when its element is closed, which happens after
+    all its children in the element tree have already been placed.
+ */
 class InlineBox final : public InlineBoxBase {
 public:
-	InlineBox(Element* element, const Box& box) : InlineBoxBase(element), box(box) { RMLUI_ASSERT(element && box.GetSize().x < 0.f); }
+	InlineBox(Element* element, const Box& box);
 
-	LayoutFragment LayoutContent(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) override;
-	void Submit(BoxDisplay box_display, String text) override;
+	FragmentResult CreateFragment(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) override;
+	void Submit(FragmentBox fragment_box, String text) override;
 
 	String DebugDumpNameValue() const override { return "InlineBox"; }
 
 private:
 	Box box;
+};
+
+/**
+    The root inline box is contained directly within its inline container.
+
+    All content in the current inline formatting context is contained either within the root or one of its decendants.
+ */
+class InlineBoxRoot final : public InlineBoxBase {
+public:
+	InlineBoxRoot();
+
+	FragmentResult CreateFragment(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) override;
+	void Submit(FragmentBox fragment_box, String text) override;
+
+	String DebugDumpNameValue() const override { return "InlineBoxRoot"; }
 };
 
 } // namespace Rml

@@ -60,7 +60,7 @@ bool LayoutLineBox::AddBox(InlineLevelBox* box, bool wrap_content, float line_wi
 		// TODO: Subtract floats (or perhaps in passed-in line_width).
 		available_width = Math::Max(Math::RoundUpFloat(line_width - box_placement_cursor), 0.f);
 
-	LayoutFragment fragment = box->LayoutContent(first_box, available_width, open_spacing_right, inout_overflow_handle);
+	FragmentResult fragment = box->CreateFragment(first_box, available_width, open_spacing_right, inout_overflow_handle);
 
 	inout_overflow_handle = {};
 	bool continue_on_new_line = false;
@@ -132,7 +132,7 @@ UniquePtr<LayoutLineBox> LayoutLineBox::Close(Element* offset_parent, Vector2f l
 	for (const auto& fragment : fragments)
 	{
 		RMLUI_ASSERT(fragment.layout_bounds.x >= 0.f);
-		BoxDisplay box_display = {
+		FragmentBox fragment_box = {
 			offset_parent,
 			line_position + fragment.position,
 			fragment.layout_bounds,
@@ -140,7 +140,7 @@ UniquePtr<LayoutLineBox> LayoutLineBox::Close(Element* offset_parent, Vector2f l
 			fragment.split_left,
 			fragment.split_right,
 		};
-		fragment.inline_level_box->Submit(box_display, std::move(fragment.text));
+		fragment.inline_level_box->Submit(fragment_box, std::move(fragment.text));
 	}
 
 	is_closed = true;

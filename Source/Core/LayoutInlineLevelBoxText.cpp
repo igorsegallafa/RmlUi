@@ -41,7 +41,7 @@
 
 namespace Rml {
 
-LayoutFragment InlineLevelBox_Text::LayoutContent(bool first_box, float available_width, float right_spacing_width,
+FragmentResult InlineLevelBox_Text::CreateFragment(bool first_box, float available_width, float right_spacing_width,
 	LayoutOverflowHandle in_overflow_handle)
 {
 	ElementText* text_element = GetTextElement();
@@ -69,23 +69,23 @@ LayoutFragment InlineLevelBox_Text::LayoutContent(bool first_box, float availabl
 	const Vector2f fragment_size = {line_width, text_element->GetLineHeight()};
 	const FragmentType fragment_type = (line_begin == 0 ? FragmentType::Principal : FragmentType::Additional);
 
-	return LayoutFragment(fragment_type, fragment_size, 0.f, 0.f, out_overflow_handle, std::move(line_contents));
+	return FragmentResult(fragment_type, fragment_size, 0.f, 0.f, out_overflow_handle, std::move(line_contents));
 }
 
-void InlineLevelBox_Text::Submit(BoxDisplay box_display, String text)
+void InlineLevelBox_Text::Submit(FragmentBox fragment_box, String text)
 {
 	ElementText* text_element = GetTextElement();
 	Vector2f line_offset;
-	if (box_display.principal_box)
+	if (fragment_box.principal_box)
 	{
-		text_element->SetOffset(box_display.position, box_display.offset_parent);
+		text_element->SetOffset(fragment_box.position, fragment_box.offset_parent);
 		text_element->ClearLines();
 	}
 	else
 	{
 		// TODO: Will be wrong in case of relative positioning. (we really just want to subtract the value submitted to SetOffset in Submit() above).
 		const Vector2f element_offset = text_element->GetRelativeOffset(Box::BORDER);
-		line_offset = box_display.position - element_offset;
+		line_offset = fragment_box.position - element_offset;
 	}
 
 	text_element->AddLine(line_offset, std::move(text));

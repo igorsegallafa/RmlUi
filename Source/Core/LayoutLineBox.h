@@ -35,7 +35,7 @@ namespace Rml {
 
 class LayoutLineBox final {
 public:
-	LayoutLineBox() {}
+	LayoutLineBox() = default;
 	~LayoutLineBox();
 
 	// Returns true if the box should be placed again on a new line.
@@ -67,7 +67,7 @@ private:
 		Vector2f position;      // Outer (top,left) position relative to start of the line, disregarding floats.
 		Vector2f layout_bounds; // Outer size for replaced and inline blocks, inner size for inline boxes.
 
-		String text; // @performance Replace by a pointer? Don't need it for most fragments.
+		String text; // @performance Replace by a pointer or index? Don't need it for most fragments.
 
 		bool principal_fragment = true;
 		bool split_left = false;

@@ -37,8 +37,8 @@
 namespace Rml {
 
 /**
-    A container for inline-level boxes. Always a direct child of a block container, starts a new inline formatting context.
-    Not directly a CSS term, but effectively a "block container that only contains inline-level boxes".
+    A container for inline-level boxes. Always a direct child of a block container, starts a new inline formatting
+    context. Not directly a CSS term, but effectively a "block container that only contains inline-level boxes".
  */
 class InlineContainer final : public BlockLevelBox {
 public:
@@ -101,7 +101,7 @@ private:
 	InlineBoxBase* GetOpenInlineBox();
 
 	/// Close any open line box.
-	/// @param[out] out_split_line Optionally return any resulting split line, otherwise will be added as a new line box to this container.
+	/// @param[out] out_split_line Optionally return any resulting split line, otherwise it will be added as a new line box to this container.
 	void CloseOpenLineBox(UniquePtr<LayoutLineBox>* out_split_line = nullptr);
 
 	BlockContainer* parent; // [not-null]

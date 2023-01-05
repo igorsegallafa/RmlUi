@@ -60,30 +60,39 @@ String InlineBoxBase::DebugDumpTree(int depth) const
 	return value;
 }
 
-LayoutFragment InlineBoxRoot::LayoutContent(bool /*first_box*/, float /*available_width*/, float /*right_spacing_width*/,
+InlineBoxBase::InlineBoxBase(Element* element) : InlineLevelBox(element) {}
+
+InlineBoxRoot::InlineBoxRoot() : InlineBoxBase(nullptr) {}
+
+FragmentResult InlineBoxRoot::CreateFragment(bool /*first_box*/, float /*available_width*/, float /*right_spacing_width*/,
 	LayoutOverflowHandle /*overflow_handle*/)
 {
 	return {};
 }
 
-void InlineBoxRoot::Submit(BoxDisplay /*box_display*/, String /*text*/)
+void InlineBoxRoot::Submit(FragmentBox /*box_display*/, String /*text*/)
 {
 	RMLUI_ERROR;
 }
 
-LayoutFragment InlineBox::LayoutContent(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle)
+InlineBox::InlineBox(Element* element, const Box& box) : InlineBoxBase(element), box(box)
+{
+	RMLUI_ASSERT(element && box.GetSize().x < 0.f);
+}
+
+FragmentResult InlineBox::CreateFragment(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle /*overflow_handle*/)
 {
 	const float edge_left = GetEdgeSize(box, Box::LEFT);
 	const float edge_right = GetEdgeSize(box, Box::RIGHT);
 	if (first_box || right_spacing_width <= available_width + edge_left)
-		return LayoutFragment(FragmentType::InlineBox, Vector2f(-1.f, GetElement()->GetLineHeight()), edge_left, edge_right);
+		return FragmentResult(FragmentType::InlineBox, Vector2f(-1.f, GetElement()->GetLineHeight()), edge_left, edge_right);
 
 	return {};
 }
 
-void InlineBox::Submit(BoxDisplay box_display, String /*text*/)
+void InlineBox::Submit(FragmentBox fragment_box, String /*text*/)
 {
-	SubmitBox(box, box_display);
+	SubmitBox(box, fragment_box);
 }
 
 } // namespace Rml
