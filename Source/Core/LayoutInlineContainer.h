@@ -59,7 +59,6 @@ public:
 
 	/// Add a break to the last line.
 	void AddBreak(float line_height);
-
 	/// Adds a line box for resuming one that was previously split.
 	/// @param[in] open_line_box The line box overflowing from a previous inline container.
 	void AddChainedBox(UniquePtr<LayoutLineBox> open_line_box);
@@ -98,7 +97,7 @@ private:
 	using LineBoxList = Vector<UniquePtr<LayoutLineBox>>;
 
 	LayoutLineBox* EnsureOpenLineBox();
-	LayoutLineBox* GetOpenLineBox();
+	LayoutLineBox* GetOpenLineBox() const;
 	InlineBoxBase* GetOpenInlineBox();
 
 	/// Close any open line box.

@@ -173,8 +173,8 @@ Vector2f LayoutDetails::GetContainingBlock(const BlockContainer* containing_box)
 	Vector2f containing_block;
 
 	containing_block.x = containing_box->GetBox().GetSize(Box::CONTENT).x;
-	if (containing_box->GetElement() != nullptr)
-		containing_block.x -= containing_box->GetElement()->GetElementScroll()->GetScrollbarSize(ElementScroll::VERTICAL);
+	if (Element* element = containing_box->GetElement())
+		containing_block.x -= element->GetElementScroll()->GetScrollbarSize(ElementScroll::VERTICAL);
 
 	while ((containing_block.y = containing_box->GetBox().GetSize(Box::CONTENT).y) < 0)
 	{

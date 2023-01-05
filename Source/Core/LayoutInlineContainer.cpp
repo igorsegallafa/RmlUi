@@ -61,9 +61,13 @@ InlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
 	InlineBoxBase* open_inline_box = GetOpenInlineBox();
 
 	if (auto text_element = rmlui_dynamic_cast<ElementText*>(element))
+	{
 		inline_level_box = open_inline_box->AddChild(MakeUnique<InlineLevelBox_Text>(text_element));
+	}
 	else if (box.GetSize().x >= 0.f)
+	{
 		inline_level_box = open_inline_box->AddChild(MakeUnique<InlineLevelBox_Atomic>(element, box));
+	}
 	else
 	{
 		auto inline_box_ptr = MakeUnique<InlineBox>(element, box);
@@ -221,9 +225,7 @@ float InlineContainer::GetShrinkToFitWidth() const
 
 float InlineContainer::GetHeightIncludingOpenLine() const
 {
-	// TODO: Last line height
-	const float last_line_height = 0.0f; //= line_boxes.back()->GetDimensions().y;
-	return box_cursor + Math::Max(0.0f, last_line_height);
+	return box_cursor + (GetOpenLineBox() ? element_line_height : 0.f);
 }
 
 bool InlineContainer::GetBaselineOfLastLine(float& out_baseline) const
@@ -246,7 +248,7 @@ LayoutLineBox* InlineContainer::EnsureOpenLineBox()
 	return line_boxes.back().get();
 }
 
-LayoutLineBox* InlineContainer::GetOpenLineBox()
+LayoutLineBox* InlineContainer::GetOpenLineBox() const
 {
 	if (line_boxes.empty() || line_boxes.back()->IsClosed())
 		return nullptr;

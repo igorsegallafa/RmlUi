@@ -44,10 +44,10 @@ protected:
 	InlineBoxBase(Element* element) : InlineLevelBox(element) {}
 
 private:
-	using InlineBoxList = Vector<UniquePtr<InlineLevelBox>>;
+	using InlineLevelBoxList = Vector<UniquePtr<InlineLevelBox>>;
 
 	// @performance Use first_child, next_sibling instead to build the tree?
-	InlineBoxList children;
+	InlineLevelBoxList children;
 };
 
 class InlineBoxRoot final : public InlineBoxBase {
