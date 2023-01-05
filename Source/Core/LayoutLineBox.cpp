@@ -34,8 +34,8 @@
 #include "../../Include/RmlUi/Core/Property.h"
 #include "LayoutBlockBox.h"
 #include "LayoutEngine.h"
-#include "LayoutInlineLevelBoxText.h"
 #include "LayoutInlineContainer.h"
+#include "LayoutInlineLevelBoxText.h"
 #include <numeric>
 
 namespace Rml {
@@ -111,16 +111,18 @@ bool LayoutLineBox::AddBox(InlineLevelBox* box, bool wrap_content, float line_wi
 	return continue_on_new_line;
 }
 
-float LayoutLineBox::Close(Element* offset_parent, Vector2f line_position, float element_line_height)
+UniquePtr<LayoutLineBox> LayoutLineBox::Close(Element* offset_parent, Vector2f line_position, float element_line_height, float& out_height_of_line)
 {
 	RMLUI_ASSERT(!is_closed);
+
+	UniquePtr<LayoutLineBox> new_line_box = SplitLine();
+
 	RMLUI_ASSERTMSG(open_fragments.empty(), "All open fragments must be closed or split before the line can be closed.");
 
 	// Vertically align fragments and size line.
-	float height_of_line = element_line_height;
-
+	out_height_of_line = element_line_height;
 	for (const auto& fragment : fragments)
-		height_of_line = Math::Max(fragment.layout_bounds.y, height_of_line);
+		out_height_of_line = Math::Max(fragment.layout_bounds.y, out_height_of_line);
 
 	// TODO: Alignment
 
@@ -141,7 +143,7 @@ float LayoutLineBox::Close(Element* offset_parent, Vector2f line_position, float
 
 	is_closed = true;
 
-	return height_of_line;
+	return new_line_box;
 }
 
 UniquePtr<LayoutLineBox> LayoutLineBox::SplitLine()
@@ -161,11 +163,13 @@ UniquePtr<LayoutLineBox> LayoutLineBox::SplitLine()
 		}
 	}
 
+	if (open_fragments.empty())
+		return nullptr;
+
 	auto new_line = MakeUnique<LayoutLineBox>();
 
 	// Move all open fragments to the next line. Fragments that were placed on the previous line Split open fragments with content, move fragments
 	// without content.
-	// TODO: Maybe move into constructor?
 	new_line->open_fragments = std::move(open_fragments);
 	for (PlacedFragment& fragment : new_line->open_fragments)
 	{
@@ -189,8 +193,7 @@ void LayoutLineBox::CloseInlineBox(InlineBox* inline_box)
 {
 	if (open_fragments.empty() || open_fragments.back().inline_level_box != inline_box)
 	{
-		// TODO
-		// RMLUI_ERRORMSG("Inline box open/close mismatch.");
+		RMLUI_ERRORMSG("Inline box open/close mismatch.");
 		return;
 	}
 
@@ -204,6 +207,15 @@ void LayoutLineBox::CloseInlineBox(InlineBox* inline_box)
 
 	fragments.push_back(std::move(fragment));
 	open_fragments.pop_back();
+}
+
+InlineBox* LayoutLineBox::GetOpenInlineBox()
+{
+	if (open_fragments.empty())
+		return nullptr;
+
+	// TODO: We already know they should be inline boxes, store them as such?
+	return rmlui_dynamic_cast<InlineBox*>(open_fragments.back().inline_level_box);
 }
 
 String LayoutLineBox::DebugDumpTree(int depth) const

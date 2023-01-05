@@ -33,7 +33,7 @@
 
 namespace Rml {
 
-class LayoutLineBox {
+class LayoutLineBox final {
 public:
 	LayoutLineBox() {}
 	~LayoutLineBox();
@@ -41,14 +41,15 @@ public:
 	// Returns true if the box should be placed again on a new line.
 	bool AddBox(InlineLevelBox* box, bool wrap_content, float line_width, LayoutOverflowHandle& inout_overflow_handle);
 
-	// Returns height of line. Note: This can be different from the element's computed line-height property.
-	float Close(Element* offset_parent, Vector2f line_position, float element_line_height);
+	// Closes the line and returns the next line with any open fragments that had to be split or wrapped down.
+	// @param[out] out_height_of_line Height of line. Note: This can be different from the element's computed line-height property.
+	UniquePtr<LayoutLineBox> Close(Element* offset_parent, Vector2f line_position, float element_line_height, float& out_height_of_line);
 
-	UniquePtr<LayoutLineBox> SplitLine();
-
-	// Note: Only inline-boxes need to be closed. Other inline-level boxes does not contain child boxes considered in the current inline formatting
+	// Note: Only inline-boxes need to be closed. Other inline-level boxes do not contain child boxes considered in the current inline formatting
 	// context, and does not need to be closed.
 	void CloseInlineBox(InlineBox* inline_box);
+
+	InlineBox* GetOpenInlineBox();
 
 	float GetBoxCursor() const { return box_cursor; }
 	bool IsClosed() const { return is_closed; }
@@ -77,6 +78,9 @@ private:
 	};
 
 	using FragmentList = Vector<PlacedFragment>;
+
+	// Splits the line.
+	UniquePtr<LayoutLineBox> SplitLine();
 
 	// The horizontal cursor. This is the outer-right position of the last placed fragment.
 	float box_cursor = 0.f;

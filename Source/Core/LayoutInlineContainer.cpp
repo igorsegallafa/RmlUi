@@ -58,8 +58,7 @@ InlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
 
 	InlineBox* inline_box = nullptr;
 	InlineLevelBox* inline_level_box = nullptr;
-
-	InlineBoxBase* open_inline_box = (!open_inline_boxes.empty() ? open_inline_boxes.back() : static_cast<InlineBoxBase*>(&root_inline_box));
+	InlineBoxBase* open_inline_box = GetOpenInlineBox();
 
 	if (auto text_element = rmlui_dynamic_cast<ElementText*>(element))
 		inline_level_box = open_inline_box->AddChild(MakeUnique<InlineLevelBox_Text>(text_element));
@@ -72,50 +71,36 @@ InlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
 		inline_level_box = open_inline_box->AddChild(std::move(inline_box_ptr));
 	}
 
-	bool has_fragments_to_place = true;
 	LayoutOverflowHandle overflow_handle = {};
-	while (has_fragments_to_place)
+
+	while (true)
 	{
 		LayoutLineBox* line_box = EnsureOpenLineBox();
 
 		// TODO: subtract floats
 		const float line_width = box_size.x;
 
-		has_fragments_to_place = line_box->AddBox(inline_level_box, wrap_content, line_width, overflow_handle);
+		const bool add_to_new_line = line_box->AddBox(inline_level_box, wrap_content, line_width, overflow_handle);
+		if (!add_to_new_line)
+			break;
 
-		if (has_fragments_to_place)
-		{
-			auto new_line_box = line_box->SplitLine();
-			CloseOpenLineBox();
-			line_boxes.push_back(std::move(new_line_box));
-			// TODO need to add in the open inline boxes
-		}
+		// Keep adding boxes on a new line, either because the box couldn't fit on the current line at all, or because it had to be split.
+		CloseOpenLineBox();
 	}
-
-	if (inline_box)
-		open_inline_boxes.push_back(inline_box);
 
 	return inline_box;
 }
 
 void InlineContainer::CloseInlineElement(InlineBox* inline_box)
 {
-	if (!inline_box || open_inline_boxes.empty())
+	if (LayoutLineBox* line_box = GetOpenLineBox())
+	{
+		line_box->CloseInlineBox(inline_box);
+	}
+	else
 	{
 		RMLUI_ERROR;
-		return;
 	}
-
-	InlineBox* open_inline_box = open_inline_boxes.back();
-	if (open_inline_box != inline_box || line_boxes.empty())
-	{
-		// Calls to CloseInlineElement() should be submitted in reverse order to AddInlineElement().
-		RMLUI_ERROR;
-		return;
-	}
-
-	line_boxes.back()->CloseInlineBox(inline_box);
-	open_inline_boxes.pop_back();
 }
 
 void InlineContainer::AddBreak(float line_height)
@@ -127,20 +112,17 @@ void InlineContainer::AddBreak(float line_height)
 		box_cursor += line_height;
 }
 
-void InlineContainer::AddChainedBox(InlineBox* chained_box)
+void InlineContainer::AddChainedBox(UniquePtr<LayoutLineBox> open_line_box)
 {
-	// TODO
-	// line_boxes.back()->AddChainedBox(chained_box);
+	RMLUI_ASSERT(line_boxes.empty());
+	RMLUI_ASSERT(open_line_box && !open_line_box->IsClosed());
+	line_boxes.push_back(std::move(open_line_box));
 }
 
-InlineContainer::CloseResult InlineContainer::Close(InlineBox** out_open_inline_box)
+InlineContainer::CloseResult InlineContainer::Close(UniquePtr<LayoutLineBox>* out_open_line_box)
 {
-	// The parent container may need the open inline box to be split and resumed.
-	if (out_open_inline_box && !open_inline_boxes.empty())
-		// TODO: I guess we need to copy out the whole stack, otherwise we need to use parent on the inline blocks.
-		*out_open_inline_box = open_inline_boxes.back();
-
-	CloseOpenLineBox();
+	// The parent container may need the open line box to be split and resumed.
+	CloseOpenLineBox(out_open_line_box);
 
 	// Expand our content area if any line boxes had to push themselves out.
 	// TODO
@@ -171,7 +153,7 @@ InlineContainer::CloseResult InlineContainer::Close(InlineBox** out_open_inline_
 	return CloseResult::OK;
 }
 
-void InlineContainer::CloseOpenLineBox()
+void InlineContainer::CloseOpenLineBox(UniquePtr<LayoutLineBox>* out_split_line)
 {
 	// Find the position of the line box, relative to its parent's block box's offset parent.
 	if (LayoutLineBox* line_box = GetOpenLineBox())
@@ -180,13 +162,18 @@ void InlineContainer::CloseOpenLineBox()
 		const Vector2f relative_position = position - (offset_parent->GetPosition() - parent->GetOffsetRoot()->GetPosition());
 		const Vector2f line_position = {relative_position.x, relative_position.y + box_cursor};
 
-		// TODO: We don't really want to close them, but rather split them.
-		for (auto it = open_inline_boxes.rbegin(); it != open_inline_boxes.rend(); ++it)
-			line_box->CloseInlineBox(*it);
-
 		// TODO Position due to floats.
-		const float height_of_line = line_box->Close(offset_parent->GetElement(), line_position, element_line_height);
+		float height_of_line = 0.f;
+		UniquePtr<LayoutLineBox> split_line_box = line_box->Close(offset_parent->GetElement(), line_position, element_line_height, height_of_line);
 		box_cursor += height_of_line;
+
+		if (split_line_box)
+		{
+			if (out_split_line)
+				*out_split_line = std::move(split_line_box);
+			else
+				line_boxes.push_back(std::move(split_line_box));
+		}
 	}
 }
 
@@ -264,6 +251,16 @@ LayoutLineBox* InlineContainer::GetOpenLineBox()
 	if (line_boxes.empty() || line_boxes.back()->IsClosed())
 		return nullptr;
 	return line_boxes.back().get();
+}
+
+InlineBoxBase* InlineContainer::GetOpenInlineBox()
+{
+	if (LayoutLineBox* line_box = GetOpenLineBox())
+	{
+		if (InlineBox* inline_box = line_box->GetOpenInlineBox())
+			return inline_box;
+	}
+	return &root_inline_box;
 }
 
 String InlineContainer::DebugDumpTree(int depth) const

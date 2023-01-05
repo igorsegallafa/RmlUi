@@ -59,9 +59,7 @@ BlockContainer::BlockContainer(BlockContainer* _parent, Element* _element, const
 	space = MakeUnique<LayoutBlockBoxSpace>(this);
 
 	parent = _parent;
-
 	element = _element;
-	interrupted_chain = nullptr;
 
 	box_cursor = 0;
 	vertical_overflow = false;
@@ -270,6 +268,8 @@ BlockContainer::CloseResult BlockContainer::Close()
 		}
 	}
 
+	ResetInterruptedLineBox();
+
 	return CloseResult::OK;
 }
 
@@ -292,20 +292,24 @@ BlockContainer* BlockContainer::AddBlockElement(Element* element, const Box& box
 	// Close the inline container if there is one open.
 	if (InlineContainer* inline_container = GetOpenInlineContainer())
 	{
-		InlineBox* open_inline_box = nullptr;
+		UniquePtr<LayoutLineBox> open_line_box;
 
-		if (inline_container->Close(&open_inline_box) != CloseResult::OK)
+		if (inline_container->Close(&open_line_box) != CloseResult::OK)
 			return nullptr;
 
-		if (open_inline_box)
+		if (open_line_box)
 		{
+			// TODO: Is comment still valid?
 			// There's an open inline box chain, which means this block element is parented to it. The chain needs to
 			// be positioned (if it hasn't already), closed and duplicated after this block box closes. Also, this
 			// block needs to be aware of its parentage, so it can correctly compute its relative position. First of
 			// all, we need to close the inline box; this will position the last line if necessary, but it will also
 			// create a new line in the inline block box; we want this line to be in an inline box after our block
 			// element.
-			interrupted_chain = open_inline_box;
+
+			ResetInterruptedLineBox();
+
+			interrupted_line_box = std::move(open_line_box);
 		}
 	}
 
@@ -317,24 +321,9 @@ BlockContainer::InlineBoxHandle BlockContainer::AddInlineElement(Element* elemen
 {
 	RMLUI_ZoneScoped;
 
-	// If we have an open child rendering in an inline context, we can add this element into it.
-	InlineContainer* inline_container = GetOpenInlineContainer();
-
-	// Otherwise, we open a new inline container.
-	if (!inline_container)
-	{
-		const float line_height = element->GetLineHeight();
-		auto inline_container_ptr = MakeUnique<InlineContainer>(this, line_height, wrap_content);
-		inline_container = inline_container_ptr.get();
-		block_boxes.push_back(std::move(inline_container_ptr));
-
-		if (interrupted_chain)
-		{
-			inline_container->AddChainedBox(interrupted_chain);
-			interrupted_chain = nullptr;
-		}
-	}
-
+	// Inline-level elements need to be added to an inline container, open one if needed.
+	InlineContainer* inline_container = EnsureOpenInlineContainer();
+	
 	InlineBox* inline_box = inline_container->AddInlineElement(element, box);
 
 	return {inline_container, inline_box};
@@ -347,11 +336,14 @@ void BlockContainer::CloseInlineElement(InlineBoxHandle handle)
 		return;
 
 	// Check that the handle's inline container is still the open box, otherwise it has been closed already possibly
-	// by an intermediary block-level element.
-	// TODO: Maybe we need to close its cloned box in the new line container?
-	InlineContainer* inline_container = GetOpenInlineContainer();
+	// by an intermediary block-level element. If we don't have an open inline container at all, open a new one, 
+	// even if the sole purpose of the new line is to close this inline element.
+	InlineContainer* inline_container = EnsureOpenInlineContainer();
 	if (inline_container != handle.inline_container)
-		return;
+	{
+		// TODO: Not needed once everything works as intended.
+		Log::Message(Log::LT_INFO, "Inline element was split across a block-level element.");
+	}
 
 	inline_container->CloseInlineElement(handle.inline_box);
 }
@@ -606,6 +598,29 @@ InlineContainer* BlockContainer::GetOpenInlineContainer()
 	return nullptr;
 }
 
+InlineContainer* BlockContainer::EnsureOpenInlineContainer()
+{
+	// First check to see if we already have an open inline container.
+	InlineContainer* inline_container = GetOpenInlineContainer();
+
+	// Otherwise, we open a new inline container.
+	if (!inline_container)
+	{
+		const float line_height = element->GetLineHeight();
+		auto inline_container_ptr = MakeUnique<InlineContainer>(this, line_height, wrap_content);
+		inline_container = inline_container_ptr.get();
+		block_boxes.push_back(std::move(inline_container_ptr));
+
+		if (interrupted_line_box)
+		{
+			inline_container->AddChainedBox(std::move(interrupted_line_box));
+			interrupted_line_box.reset();
+		}
+	}
+
+	return inline_container;
+}
+
 const BlockContainer* BlockContainer::GetOpenBlockContainer() const
 {
 	if (!block_boxes.empty() && block_boxes.back()->GetType() == Type::BlockContainer)
@@ -616,9 +631,21 @@ const BlockContainer* BlockContainer::GetOpenBlockContainer() const
 BlockContainer::CloseResult BlockContainer::CloseInlineBlockBox()
 {
 	if (InlineContainer* inline_container = GetOpenInlineContainer())
-		return inline_container->Close();
+	{
+		ResetInterruptedLineBox();
+		return inline_container->Close(&interrupted_line_box);
+	}
 
 	return CloseResult::OK;
+}
+
+void BlockContainer::ResetInterruptedLineBox()
+{
+	if (interrupted_line_box)
+	{
+		Log::Message(Log::LT_WARNING, "Interrupted line box leaked.");
+		interrupted_line_box.reset();
+	}
 }
 
 void BlockContainer::PlaceFloat(Element* element, float offset)
@@ -650,7 +677,7 @@ bool BlockContainer::CatchVerticalOverflow(float cursor)
 			space = MakeUnique<LayoutBlockBoxSpace>(this);
 
 			box_cursor = 0;
-			interrupted_chain = nullptr;
+			interrupted_line_box.reset();
 
 			inner_content_size = Vector2f(0);
 

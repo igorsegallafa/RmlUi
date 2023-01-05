@@ -46,25 +46,28 @@ public:
 	InlineContainer(BlockContainer* parent, float element_line_height, bool wrap_content);
 	~InlineContainer();
 
-	/// Adds a new inline element to this inline-context box.
-	/// @param element[in] The new inline element.
-	/// @param box[in] The box defining the element's bounds.
-	/// @return The inline box representing the element. Once the element's children have been positioned, Close() must be called on it.
+	/// Adds a new inline-level element to this inline-context box.
+	/// @param[in] element The new inline-level element.
+	/// @param[in] box The box defining the element's bounds.
+	/// @return The inline box if one was generated for the elmeent, otherwise nullptr.
+	/// @note Any non-null return value must be closed with a call to CloseInlineElement().
 	InlineBox* AddInlineElement(Element* element, const Box& box);
-	// TODO
+	/// Closes the previously added inline box.
+	/// @param[in] inline_box The box to close.
+	/// @note Calls to this function should be submitted in reverse order to AddInlineElement().
 	void CloseInlineElement(InlineBox* inline_box);
 
 	/// Add a break to the last line.
 	void AddBreak(float line_height);
 
-	/// Adds an inline box for resuming an inline box that has been split.
-	/// @param[in] chained_box The box overflowed from a previous line.
-	void AddChainedBox(InlineBox* chained_box);
+	/// Adds a line box for resuming one that was previously split.
+	/// @param[in] open_line_box The line box overflowing from a previous inline container.
+	void AddChainedBox(UniquePtr<LayoutLineBox> open_line_box);
 
 	/// Closes the box. This will determine the element's height (if it was unspecified).
 	/// @param[out] Optionally, output the open inline box.
 	/// @return The result of the close; this may request a reformat of this element or our parent.
-	CloseResult Close(InlineBox** out_open_inline_box = nullptr);
+	CloseResult Close(UniquePtr<LayoutLineBox>* out_open_line_box);
 
 	/// Returns the offset from the top-left corner of this box's offset element the next child box will be positioned at.
 	/// @param[in] top_margin The top margin of the box. This will be collapsed as appropriate against other block boxes.
@@ -96,8 +99,11 @@ private:
 
 	LayoutLineBox* EnsureOpenLineBox();
 	LayoutLineBox* GetOpenLineBox();
+	InlineBoxBase* GetOpenInlineBox();
 
-	void CloseOpenLineBox();
+	/// Close any open line box.
+	/// @param[out] out_split_line Optionally return any resulting split line, otherwise will be added as a new line box to this container.
+	void CloseOpenLineBox(UniquePtr<LayoutLineBox>* out_split_line = nullptr);
 
 	BlockContainer* parent; // [not-null]
 
@@ -114,13 +120,8 @@ private:
 
 	InlineBoxRoot root_inline_box;
 
-	// The open inline box; this is nullptr if all inline boxes are closed.
-	// TODO: Add std::stack to Types.h?
-	// @performance Perhaps add parent to inline boxes, so we only need to store the leaf open node here, thereby avoiding allocations.
-	Vector<InlineBox*> open_inline_boxes;
-
 	// Used by inline contexts only; stores the list of line boxes flowing inline content.
-	// @performance Use first_child, next_sibling instead to build the tree?
+	// @performance Use first_child, next_sibling instead to build the list?
 	LineBoxList line_boxes;
 };
 

@@ -284,7 +284,7 @@ String LayoutDetails::GetDebugElementName(Element* element)
 	if (!element->GetId().empty())
 		return '#' + element->GetId();
 	if (auto element_text = rmlui_dynamic_cast<ElementText*>(element))
-		return '\"' + element_text->GetText().substr(0, 20) + '\"';
+		return '\"' + StringUtilities::StripWhitespace(element_text->GetText()).substr(0, 20) + '\"';
 	return element->GetAddress(false, false);
 }
 

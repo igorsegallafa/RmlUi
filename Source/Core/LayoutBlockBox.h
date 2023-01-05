@@ -218,10 +218,13 @@ private:
 	};
 
 	InlineContainer* GetOpenInlineContainer();
+	InlineContainer* EnsureOpenInlineContainer();
 	const BlockContainer* GetOpenBlockContainer() const;
 
 	// Closes our last block box, if it is an open inline block box.
 	CloseResult CloseInlineBlockBox();
+
+	void ResetInterruptedLineBox();
 
 	// Positions a floating element within this block box.
 	void PlaceFloat(Element* element, float offset = 0);
@@ -261,6 +264,8 @@ private:
 	// The vertical position of the next block box to be added to this box, relative to the top of this box.
 	float box_cursor;
 
+	// TODO: All comments in the following.
+
 	// Used by block contexts only; stores the list of block boxes under this box.
 	BlockBoxList block_boxes;
 	// Used by block contexts only; stores any elements that are to be absolutely positioned within this block box.
@@ -273,7 +278,7 @@ private:
 	ElementList queued_float_elements;
 	// Used by block contexts only; stores an inline element hierarchy that was interrupted by a child block box.
 	// The hierarchy will be resumed in an inline-context box once the intervening block box is completed.
-	InlineBox* interrupted_chain;
+	UniquePtr<LayoutLineBox> interrupted_line_box;
 	// Used by block contexts only; stores the value of the overflow property for the element.
 	Style::Overflow overflow_x_property;
 	Style::Overflow overflow_y_property;
