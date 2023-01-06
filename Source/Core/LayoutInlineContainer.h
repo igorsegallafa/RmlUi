@@ -68,18 +68,6 @@ public:
 	/// @return The result of the close; this may request a reformat of this element or our parent.
 	CloseResult Close(UniquePtr<LayoutLineBox>* out_open_line_box);
 
-	/// Returns the offset from the top-left corner of this box's offset element the next child box will be positioned at.
-	/// @param[in] top_margin The top margin of the box. This will be collapsed as appropriate against other block boxes.
-	/// @param[in] clear_property The value of the underlying element's clear property.
-	/// @return The box cursor position.
-	Vector2f NextBoxPosition(float top_margin = 0, Style::Clear clear_property = Style::Clear::None) const;
-	/// Returns the offset from the top-left corner of this box for the next line.
-	/// @param[out] box_width The available width for the line box.
-	/// @param[out] wrap_content Set to true if the line box should grow to fit inline boxes, false if it should wrap them.
-	/// @param[in] dimensions The minimum dimensions of the line.
-	/// @return The line box position.
-	Vector2f NextLineBoxPosition(float& out_box_width, bool& out_wrap_content, Vector2f dimensions) const;
-
 	/// Calculate the dimensions of the box's internal content width; i.e. the size used to calculate the shrink-to-fit width.
 	float GetShrinkToFitWidth() const;
 
@@ -103,6 +91,18 @@ private:
 	/// Close any open line box.
 	/// @param[out] out_split_line Optionally return any resulting split line, otherwise it will be added as a new line box to this container.
 	void CloseOpenLineBox(UniquePtr<LayoutLineBox>* out_split_line = nullptr);
+
+	/// Returns the offset from the top-left corner of this box's offset element the next child box will be positioned at.
+	/// @param[in] top_margin The top margin of the box. This will be collapsed as appropriate against other block boxes.
+	/// @param[in] clear_property The value of the underlying element's clear property.
+	/// @return The box cursor position.
+	Vector2f NextBoxPosition(float top_margin = 0, Style::Clear clear_property = Style::Clear::None) const;
+	/// Returns the offset from the top-left corner of this box for the next line.
+	/// @param[out] box_width The available width for the line box.
+	/// @param[out] wrap_content Set to true if the line box should grow to fit inline boxes, false if it should wrap them.
+	/// @param[in] dimensions The minimum dimensions of the line.
+	/// @return The line box position.
+	Vector2f NextLineBoxPosition(float& out_box_width, Vector2f dimensions) const;
 
 	BlockContainer* parent; // [not-null]
 

@@ -323,7 +323,7 @@ BlockContainer::InlineBoxHandle BlockContainer::AddInlineElement(Element* elemen
 
 	// Inline-level elements need to be added to an inline container, open one if needed.
 	InlineContainer* inline_container = EnsureOpenInlineContainer();
-	
+
 	InlineBox* inline_box = inline_container->AddInlineElement(element, box);
 
 	return {inline_container, inline_box};
@@ -336,7 +336,7 @@ void BlockContainer::CloseInlineElement(InlineBoxHandle handle)
 		return;
 
 	// Check that the handle's inline container is still the open box, otherwise it has been closed already possibly
-	// by an intermediary block-level element. If we don't have an open inline container at all, open a new one, 
+	// by an intermediary block-level element. If we don't have an open inline container at all, open a new one,
 	// even if the sole purpose of the new line is to close this inline element.
 	InlineContainer* inline_container = EnsureOpenInlineContainer();
 	if (inline_container != handle.inline_container)
@@ -600,10 +600,13 @@ InlineContainer* BlockContainer::GetOpenInlineContainer()
 
 InlineContainer* BlockContainer::EnsureOpenInlineContainer()
 {
+	// TODO: What if we already have an open block container, do we need to close it first?
+	// RMLUI_ASSERT(!GetOpenBlockContainer());
+
 	// First check to see if we already have an open inline container.
 	InlineContainer* inline_container = GetOpenInlineContainer();
 
-	// Otherwise, we open a new inline container.
+	// Otherwise, we open a new one.
 	if (!inline_container)
 	{
 		const float line_height = element->GetLineHeight();

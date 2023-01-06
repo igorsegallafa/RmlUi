@@ -183,7 +183,6 @@ void InlineContainer::CloseOpenLineBox(UniquePtr<LayoutLineBox>* out_split_line)
 
 Vector2f InlineContainer::NextBoxPosition(float top_margin, Style::Clear clear_property) const
 {
-	// If our element is establishing a new offset hierarchy, then any children of ours don't inherit our offset.
 	Vector2f box_position = position;
 	box_position.y += box_cursor;
 
@@ -195,14 +194,10 @@ Vector2f InlineContainer::NextBoxPosition(float top_margin, Style::Clear clear_p
 	return box_position;
 }
 
-Vector2f InlineContainer::NextLineBoxPosition(float& box_width, bool& _wrap_content, const Vector2f dimensions) const
+Vector2f InlineContainer::NextLineBoxPosition(float& out_box_width, const Vector2f dimensions) const
 {
 	const Vector2f cursor = NextBoxPosition();
-	const Vector2f box_position = parent->GetBlockBoxSpace()->NextBoxPosition(box_width, cursor.y, dimensions);
-
-	// TODO Also, probably shouldn't check for widths when positioning the box?
-	_wrap_content = wrap_content;
-
+	const Vector2f box_position = parent->GetBlockBoxSpace()->NextBoxPosition(out_box_width, cursor.y, dimensions);
 	return box_position;
 }
 

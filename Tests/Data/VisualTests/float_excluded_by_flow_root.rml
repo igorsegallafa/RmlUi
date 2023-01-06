@@ -35,12 +35,12 @@
 <body>
 <section>
 	<div class="float">Try to resize this outer float<handle size_target="#parent"/></div>
-	<div class="box"><p>Normal</p></div>
+	<div class="box"><p>Normal text</p></div>
 </section>
 <section>
 	<div class="float">Try to resize this outer float<handle size_target="#parent"/></div>
 	<div class="box flow-root">
-		<p><code>display:flow-root</code></p>
+		<p><code>display: flow-root</code></p>
 	</div>
 </section>
 <handle size_target="#document"/>
