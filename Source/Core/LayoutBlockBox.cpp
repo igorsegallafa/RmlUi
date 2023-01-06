@@ -427,8 +427,7 @@ void BlockContainer::CloseAbsoluteElements()
 Vector2f BlockContainer::NextBoxPosition(float top_margin, Style::Clear clear_property) const
 {
 	// If our element is establishing a new offset hierarchy, then any children of ours don't inherit our offset.
-	Vector2f box_position = GetPosition();
-	box_position += box.GetPosition();
+	Vector2f box_position = position + box.GetPosition();
 	box_position.y += box_cursor;
 
 	float clear_margin = space->DetermineClearPosition(box_position.y + top_margin, clear_property) - (box_position.y + top_margin);

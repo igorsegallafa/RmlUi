@@ -38,6 +38,11 @@ class Element;
 struct FragmentResult;
 struct FragmentBox;
 
+enum class InlineLayoutMode {
+	WrapAny,          // Allow wrapping to avoid overflow, even if nothing is placed.
+	WrapAfterContent, // Allow wrapping to avoid overflow, but first place at least *some* content on this line.
+	Nowrap,           // Place all content on this line, regardless of overflow.
+};
 using LayoutOverflowHandle = int;
 
 /**
@@ -50,7 +55,8 @@ public:
 	virtual ~InlineLevelBox();
 
 	// Create a fragment from this box, if it can fit within the available width.
-	virtual FragmentResult CreateFragment(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) = 0;
+	virtual FragmentResult CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool first_box,
+		LayoutOverflowHandle overflow_handle) = 0;
 
 	// Submit a fragment's position and size to be displayed on the underlying element.
 	virtual void Submit(FragmentBox fragment_box, String text) = 0;
@@ -83,7 +89,8 @@ class InlineLevelBox_Atomic final : public InlineLevelBox {
 public:
 	InlineLevelBox_Atomic(Element* element, const Box& box);
 
-	FragmentResult CreateFragment(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) override;
+	FragmentResult CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool first_box,
+		LayoutOverflowHandle overflow_handle) override;
 	void Submit(FragmentBox fragment_box, String text) override;
 
 	String DebugDumpNameValue() const override { return "InlineLevelBox_Atomic"; }

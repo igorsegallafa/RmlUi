@@ -6,7 +6,7 @@
 	<meta name="Description" content="Testing inline box split by resizing the document." />
 	<style>
 		body {
-			width: 920px;
+			width: 280px;
 			padding: 0;
 			border: 20dp #ddd;
 		}

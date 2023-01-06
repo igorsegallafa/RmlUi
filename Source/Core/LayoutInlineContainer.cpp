@@ -76,17 +76,35 @@ InlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
 	}
 
 	LayoutOverflowHandle overflow_handle = {};
+	float minimum_width_next = 0.f;
 
 	while (true)
 	{
 		LayoutLineBox* line_box = EnsureOpenLineBox();
 
-		// TODO: subtract floats
-		const float line_width = box_size.x;
+		const Vector2f minimum_dimensions = {
+			Math::Max(line_box->GetBoxCursor(), minimum_width_next),
+			element_line_height,
+		};
 
-		const bool add_to_new_line = line_box->AddBox(inline_level_box, wrap_content, line_width, overflow_handle);
+		float available_width = 0.f;
+		// TODO: This moves the line box down even with white-space: nowrap if the float overflows or takes all the
+		// width. It shouldn't, instead it should push the line box to the side.
+		// @performance: We could do this only once for each line, and instead update it if we get new inline floats.
+		Vector2f line_position = NextLineBoxPosition(available_width, minimum_dimensions); 
+		line_box->SetPosition(line_position);
+
+		// TODO: Cleanup logic
+		const bool line_shrinked_by_floats = (available_width < box_size.x);
+		const bool can_wrap_any = (line_shrinked_by_floats || !line_box->NoFragmentsPlaced());
+		const InlineLayoutMode layout_mode =
+			(wrap_content ? (can_wrap_any ? InlineLayoutMode::WrapAny : InlineLayoutMode::WrapAfterContent) : InlineLayoutMode::Nowrap);
+
+		const bool add_to_new_line = line_box->AddBox(inline_level_box, layout_mode, available_width, overflow_handle);
 		if (!add_to_new_line)
 			break;
+
+		minimum_width_next = (line_box->NoFragmentsPlaced() ? available_width + 1.f : 0.f);
 
 		// Keep adding boxes on a new line, either because the box couldn't fit on the current line at all, or because it had to be split.
 		CloseOpenLineBox();
@@ -162,14 +180,30 @@ void InlineContainer::CloseOpenLineBox(UniquePtr<LayoutLineBox>* out_split_line)
 	// Find the position of the line box, relative to its parent's block box's offset parent.
 	if (LayoutLineBox* line_box = GetOpenLineBox())
 	{
+		// TODO Cleanup: Move parent calls into function arguments.
+
+		// TODO: I guess we want to feed in here the height_of_line result from line_box->Close below somehow. Determine that first?
+		// const float line_box_cursor = line_box->GetBoxCursor();
+		// const Vector2f minimum_dimensions = {line_box_cursor, element_line_height};
+		// float available_width = 0.f;
+		// const Vector2f line_box_position = NextLineBoxPosition(available_width, minimum_dimensions);
+		const Vector2f line_box_position = line_box->GetPosition();
+
+		// Find the position of the line box, relative to its parent's block box's offset parent.
 		const BlockContainer* offset_parent = parent->GetOffsetParent();
-		const Vector2f relative_position = position - (offset_parent->GetPosition() - parent->GetOffsetRoot()->GetPosition());
-		const Vector2f line_position = {relative_position.x, relative_position.y + box_cursor};
+		const Vector2f relative_position = line_box_position - (offset_parent->GetPosition() - parent->GetOffsetRoot()->GetPosition());
+		const Vector2f line_position = {relative_position.x, relative_position.y};
 
 		// TODO Position due to floats.
 		float height_of_line = 0.f;
 		UniquePtr<LayoutLineBox> split_line_box = line_box->Close(offset_parent->GetElement(), line_position, element_line_height, height_of_line);
-		box_cursor += height_of_line;
+
+		// Move the cursor down, but only if our line has any width.
+		if (line_box->GetBoxCursor() > 0.f)
+			box_cursor = (line_position.y - position.y) + height_of_line;
+
+		// If we have any pending floating elements for our parent, then this would be an ideal time to place them.
+		parent->PlaceQueuedFloats(box_cursor);
 
 		if (split_line_box)
 		{
@@ -181,23 +215,10 @@ void InlineContainer::CloseOpenLineBox(UniquePtr<LayoutLineBox>* out_split_line)
 	}
 }
 
-Vector2f InlineContainer::NextBoxPosition(float top_margin, Style::Clear clear_property) const
-{
-	Vector2f box_position = position;
-	box_position.y += box_cursor;
-
-	const float clear_margin =
-		parent->GetBlockBoxSpace()->DetermineClearPosition(box_position.y + top_margin, clear_property) - (box_position.y + top_margin);
-	if (clear_margin > 0)
-		box_position.y += clear_margin;
-
-	return box_position;
-}
-
 Vector2f InlineContainer::NextLineBoxPosition(float& out_box_width, const Vector2f dimensions) const
 {
-	const Vector2f cursor = NextBoxPosition();
-	const Vector2f box_position = parent->GetBlockBoxSpace()->NextBoxPosition(out_box_width, cursor.y, dimensions);
+	const float ideal_position_y = position.y + box_cursor;
+	const Vector2f box_position = parent->GetBlockBoxSpace()->NextBoxPosition(out_box_width, ideal_position_y, dimensions);
 	return box_position;
 }
 

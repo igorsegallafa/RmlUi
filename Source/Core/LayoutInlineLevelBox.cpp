@@ -101,7 +101,7 @@ InlineLevelBox_Atomic::InlineLevelBox_Atomic(Element* element, const Box& box) :
 	RMLUI_ASSERT(box.GetSize().x >= 0.f && box.GetSize().y >= 0.f);
 }
 
-FragmentResult InlineLevelBox_Atomic::CreateFragment(bool first_box, float available_width, float right_spacing_width,
+FragmentResult InlineLevelBox_Atomic::CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool /*first_box*/,
 	LayoutOverflowHandle /*overflow_handle*/)
 {
 	const Vector2f outer_size = {
@@ -109,7 +109,7 @@ FragmentResult InlineLevelBox_Atomic::CreateFragment(bool first_box, float avail
 		box.GetSizeAcross(Box::VERTICAL, Box::MARGIN),
 	};
 
-	if (first_box || outer_size.x + right_spacing_width <= available_width)
+	if (mode != InlineLayoutMode::WrapAny || outer_size.x + right_spacing_width <= available_width)
 		return FragmentResult(FragmentType::Principal, outer_size, 0.f, 0.f);
 
 	return {};

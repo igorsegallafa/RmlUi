@@ -39,7 +39,7 @@ public:
 	~LayoutLineBox();
 
 	// Returns true if the box should be placed again on a new line.
-	bool AddBox(InlineLevelBox* box, bool wrap_content, float line_width, LayoutOverflowHandle& inout_overflow_handle);
+	bool AddBox(InlineLevelBox* box, InlineLayoutMode layout_mode, float line_width, LayoutOverflowHandle& inout_overflow_handle);
 
 	// Closes the line, submitting any fragments placed on this line.
 	// @param[out] out_height_of_line Height of line. Note: This can be different from the element's computed line-height property.
@@ -55,11 +55,15 @@ public:
 
 	float GetBoxCursor() const { return box_cursor; }
 	bool IsClosed() const { return is_closed; }
+	bool NoFragmentsPlaced() const { return fragments.empty(); }
 
 	String DebugDumpTree(int depth) const;
 
 	void* operator new(size_t size);
 	void operator delete(void* chunk, size_t size);
+
+	void SetPosition(Vector2f _line_position) { line_position = _line_position; }
+	Vector2f GetPosition() const { return line_position; }
 
 private:
 	struct PlacedFragment {
@@ -96,6 +100,8 @@ private:
 
 	// Splits the line, returning a new line if there are any open fragments.
 	UniquePtr<LayoutLineBox> SplitLine();
+
+	Vector2f line_position;
 
 	// The horizontal cursor. This is the outer-right position of the last placed fragment.
 	float box_cursor = 0.f;

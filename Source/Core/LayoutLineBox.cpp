@@ -42,7 +42,7 @@ namespace Rml {
 
 LayoutLineBox::~LayoutLineBox() {}
 
-bool LayoutLineBox::AddBox(InlineLevelBox* box, bool wrap_content, float line_width, LayoutOverflowHandle& inout_overflow_handle)
+bool LayoutLineBox::AddBox(InlineLevelBox* box, InlineLayoutMode layout_mode, float line_width, LayoutOverflowHandle& inout_overflow_handle)
 {
 	RMLUI_ASSERT(!is_closed);
 
@@ -55,12 +55,12 @@ bool LayoutLineBox::AddBox(InlineLevelBox* box, bool wrap_content, float line_wi
 	const float box_placement_cursor = box_cursor + open_spacing_left;
 	const bool first_box = fragments.empty();
 
+	// TODO: Maybe always pass the actual available width, and let the createfragment functions handle the mode correctly.
 	float available_width = FLT_MAX;
-	if (wrap_content)
-		// TODO: Subtract floats (or perhaps in passed-in line_width).
+	if (layout_mode != InlineLayoutMode::Nowrap)
 		available_width = Math::Max(Math::RoundUpFloat(line_width - box_placement_cursor), 0.f);
 
-	FragmentResult fragment = box->CreateFragment(first_box, available_width, open_spacing_right, inout_overflow_handle);
+	FragmentResult fragment = box->CreateFragment(layout_mode, available_width, open_spacing_right, first_box, inout_overflow_handle);
 
 	inout_overflow_handle = {};
 	bool continue_on_new_line = false;
@@ -104,7 +104,7 @@ bool LayoutLineBox::AddBox(InlineLevelBox* box, bool wrap_content, float line_wi
 	case FragmentType::Invalid:
 	{
 		// Could not place fragment on this line, try again on a new line.
-		RMLUI_ASSERT(!first_box);
+		RMLUI_ASSERT(layout_mode == InlineLayoutMode::WrapAny);
 		continue_on_new_line = true;
 	}
 	break;

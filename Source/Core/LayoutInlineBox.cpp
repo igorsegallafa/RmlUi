@@ -64,7 +64,7 @@ InlineBoxBase::InlineBoxBase(Element* element) : InlineLevelBox(element) {}
 
 InlineBoxRoot::InlineBoxRoot() : InlineBoxBase(nullptr) {}
 
-FragmentResult InlineBoxRoot::CreateFragment(bool /*first_box*/, float /*available_width*/, float /*right_spacing_width*/,
+FragmentResult InlineBoxRoot::CreateFragment(InlineLayoutMode /*mode*/, float /*available_width*/, float /*right_spacing_width*/, bool /*first_box*/,
 	LayoutOverflowHandle /*overflow_handle*/)
 {
 	return {};
@@ -80,11 +80,12 @@ InlineBox::InlineBox(Element* element, const Box& box) : InlineBoxBase(element),
 	RMLUI_ASSERT(element && box.GetSize().x < 0.f);
 }
 
-FragmentResult InlineBox::CreateFragment(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle /*overflow_handle*/)
+FragmentResult InlineBox::CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool /*first_box*/,
+	LayoutOverflowHandle /*overflow_handle*/)
 {
 	const float edge_left = GetEdgeSize(box, Box::LEFT);
 	const float edge_right = GetEdgeSize(box, Box::RIGHT);
-	if (first_box || right_spacing_width <= available_width + edge_left)
+	if (mode != InlineLayoutMode::WrapAny || right_spacing_width <= available_width + edge_left)
 		return FragmentResult(FragmentType::InlineBox, Vector2f(-1.f, GetElement()->GetLineHeight()), edge_left, edge_right);
 
 	return {};

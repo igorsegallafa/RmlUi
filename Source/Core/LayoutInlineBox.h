@@ -62,7 +62,8 @@ class InlineBox final : public InlineBoxBase {
 public:
 	InlineBox(Element* element, const Box& box);
 
-	FragmentResult CreateFragment(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) override;
+	FragmentResult CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool first_box,
+		LayoutOverflowHandle overflow_handle) override;
 	void Submit(FragmentBox fragment_box, String text) override;
 
 	String DebugDumpNameValue() const override { return "InlineBox"; }
@@ -80,7 +81,8 @@ class InlineBoxRoot final : public InlineBoxBase {
 public:
 	InlineBoxRoot();
 
-	FragmentResult CreateFragment(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) override;
+	FragmentResult CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool first_box,
+		LayoutOverflowHandle overflow_handle) override;
 	void Submit(FragmentBox fragment_box, String text) override;
 
 	String DebugDumpNameValue() const override { return "InlineBoxRoot"; }

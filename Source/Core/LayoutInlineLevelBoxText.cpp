@@ -41,14 +41,14 @@
 
 namespace Rml {
 
-FragmentResult InlineLevelBox_Text::CreateFragment(bool first_box, float available_width, float right_spacing_width,
+FragmentResult InlineLevelBox_Text::CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool first_box,
 	LayoutOverflowHandle in_overflow_handle)
 {
 	ElementText* text_element = GetTextElement();
 
 	// TODO: Allow empty if we have floats too, then we can wrap down. (But never if we cannot wrap?). Force it if we are the first content box of
 	// this line. That is, purely opened inline boxes that we are contained within should not count as a first box (we are then still the first box).
-	const bool allow_empty = !first_box;
+	const bool allow_empty = (mode == InlineLayoutMode::WrapAny);
 	const bool decode_escape_characters = true;
 
 	String line_contents;

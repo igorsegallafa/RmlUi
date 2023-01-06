@@ -44,7 +44,8 @@ class InlineLevelBox_Text final : public InlineLevelBox {
 public:
 	InlineLevelBox_Text(ElementText* element) : InlineLevelBox(element) {}
 
-	FragmentResult CreateFragment(bool first_box, float available_width, float right_spacing_width, LayoutOverflowHandle overflow_handle) override;
+	FragmentResult CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool first_box,
+		LayoutOverflowHandle overflow_handle) override;
 
 	void Submit(FragmentBox fragment_box, String text) override;
 
