@@ -75,11 +75,7 @@ public:
 	/// @return The appropriate vertical position for the clearing object.
 	float DetermineClearPosition(float cursor, Style::Clear clear_property) const;
 
-	/// Returns the top-left corner of the boxes within the space.
-	/// @return The space's offset.
-	Vector2f GetOffset() const;
-	/// Returns the dimensions of the boxes within the space.
-	/// @return The space's dimensions.
+	/// Returns the size of the rectangle encompassing all boxes within the space, relative to the parent's content box.
 	Vector2f GetDimensions() const;
 
 	void* operator new(size_t size);
@@ -107,9 +103,9 @@ private:
 	// The boxes floating in our space.
 	SpaceBoxList boxes[NUM_ANCHOR_EDGES];
 
-	// The offset and dimensions of the boxes added specifically into this space.
-	Vector2f offset;
-	Vector2f dimensions;
+	// The rectangle encompassing all boxes added specifically into this space, relative to our parent's content box.
+	Vector2f extent_top_left;
+	Vector2f extent_bottom_right;
 };
 
 } // namespace Rml

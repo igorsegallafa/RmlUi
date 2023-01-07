@@ -36,10 +36,7 @@
 
 namespace Rml {
 
-LayoutBlockBoxSpace::LayoutBlockBoxSpace(const BlockContainer* _parent) : offset(0, 0), dimensions(0, 0)
-{
-	parent = _parent;
-}
+LayoutBlockBoxSpace::LayoutBlockBoxSpace(const BlockContainer* _parent) : parent(_parent) {}
 
 LayoutBlockBoxSpace::~LayoutBlockBoxSpace() {}
 
@@ -60,7 +57,13 @@ Vector2f LayoutBlockBoxSpace::NextBoxPosition(float& box_width, float cursor, co
 
 float LayoutBlockBoxSpace::PlaceFloat(Element* element, float cursor)
 {
-	Vector2f element_size = element->GetBox().GetSize(Box::MARGIN);
+	const Box& element_box = element->GetBox();
+	const Vector2f element_margin_top_left = {element_box.GetEdge(Box::MARGIN, Box::LEFT), element_box.GetEdge(Box::MARGIN, Box::TOP)};
+	const Vector2f element_margin_bottom_right = {element_box.GetEdge(Box::MARGIN, Box::RIGHT), element_box.GetEdge(Box::MARGIN, Box::BOTTOM)};
+
+	const Vector2f element_border_size = element_box.GetSize(Box::BORDER);
+	const Vector2f element_margin_size = element_border_size + element_margin_top_left + element_margin_bottom_right;
+
 	Style::Float float_property = element->GetComputedValues().float_();
 
 	// Shift the cursor down (if necessary) so it isn't placed any higher than a previously-floated box.
@@ -76,23 +79,23 @@ float LayoutBlockBoxSpace::PlaceFloat(Element* element, float cursor)
 	// Find a place to put this box.
 	const bool nowrap = false;
 	float unused_maximum_box_width = 0;
-	Vector2f element_offset = NextBoxPosition(unused_maximum_box_width, cursor, element_size, nowrap, float_property);
+	Vector2f element_offset = NextBoxPosition(unused_maximum_box_width, cursor, element_margin_size, nowrap, float_property);
 
 	// It's been placed, so we can now add it to our list of floating boxes.
-	boxes[float_property == Style::Float::Left ? LEFT : RIGHT].push_back(SpaceBox(element_offset, element_size));
+	boxes[float_property == Style::Float::Left ? LEFT : RIGHT].push_back(SpaceBox(element_offset, element_margin_size));
 
-	// Set our offset and dimensions (if necessary) so they enclose the new box.
-	Vector2f normalised_offset = element_offset - (parent->GetPosition() + parent->GetBox().GetPosition());
-	offset.x = Math::Min(offset.x, normalised_offset.x);
-	offset.y = Math::Min(offset.y, normalised_offset.y);
-	dimensions.x = Math::Max(dimensions.x, normalised_offset.x + element_size.x);
-	dimensions.y = Math::Max(dimensions.y, normalised_offset.y + element_size.y);
+	// The element offset is defined using border-relative positions, push away the top-left margin.
+	element_offset += element_margin_top_left;
+
+	// Set our extents so they enclose the new box.
+	const Vector2f offset_relative_content_box = element_offset - (parent->GetPosition() + parent->GetBox().GetPosition());
+	extent_top_left = Math::Min(extent_top_left, offset_relative_content_box);
+	extent_bottom_right = Math::Max(extent_bottom_right, offset_relative_content_box + element_border_size);
 
 	// Shift the offset into the correct space relative to the element's offset parent.
-	element_offset += Vector2f(element->GetBox().GetEdge(Box::MARGIN, Box::LEFT), element->GetBox().GetEdge(Box::MARGIN, Box::TOP));
 	element->SetOffset(element_offset - parent->GetOffsetParent()->GetPosition(), parent->GetOffsetParent()->GetElement());
 
-	return element_offset.y + element_size.y;
+	return element_offset.y + element_margin_size.y;
 }
 
 float LayoutBlockBoxSpace::DetermineClearPosition(float cursor, Style::Clear clear_property) const
@@ -252,14 +255,13 @@ Vector2f LayoutBlockBoxSpace::NextBoxPosition(float& maximum_box_width, const fl
 	return box_position;
 }
 
-Vector2f LayoutBlockBoxSpace::GetOffset() const
-{
-	return offset;
-}
-
 Vector2f LayoutBlockBoxSpace::GetDimensions() const
 {
-	return dimensions - offset;
+	// For now, we don't really use the top-left extent, because it is not allowed in CSS to scroll to content located
+	// to the top or left, and thus we have no use for it currently. We could use it later to help detect overflow on
+	// the top-left sides. For example so we can hide parts of floats pushing outside the top-left sides of its parent
+	// which is set to 'overflow: auto'.
+	return extent_bottom_right;
 }
 
 void* LayoutBlockBoxSpace::operator new(size_t size)

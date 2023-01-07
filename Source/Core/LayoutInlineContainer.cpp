@@ -154,14 +154,13 @@ InlineContainer::CloseResult InlineContainer::Close(UniquePtr<LayoutLineBox>* ou
 	// Set this box's height.
 	box_size.y = Math::Max(box_cursor, 0.f);
 
-	// TODO: Looks like the overflow is pushed out too wide?
+	// TODO: Specify which coordinate system is used for overflow size.
 	Vector2f visible_overflow_size = {0.f, box_size.y};
 
 	// Find the largest line in this layout block
-	for (size_t i = 0; i < line_boxes.size(); i++)
+	for (const auto& line_box : line_boxes)
 	{
-		LayoutLineBox* line_box = line_boxes[i].get();
-		visible_overflow_size.x = Math::Max(visible_overflow_size.x, line_box->GetPosition().x + line_box->GetBoxCursor());
+		visible_overflow_size.x = Math::Max(visible_overflow_size.x, line_box->GetPosition().x - position.x + line_box->GetBoxCursor());
 	}
 
 	visible_overflow_size.x = Math::RoundDownFloat(visible_overflow_size.x);
@@ -180,15 +179,18 @@ void InlineContainer::CloseOpenLineBox(UniquePtr<LayoutLineBox>* out_split_line)
 	// Find the position of the line box, relative to its parent's block box's offset parent.
 	if (LayoutLineBox* line_box = GetOpenLineBox())
 	{
-		// TODO Cleanup: Move parent calls into function arguments.
+		// TODO Cleanup: Move calls to parent into function arguments where possible.
 
 		// Find the position of the line box relative to its parent's block box's offset parent.
 		const BlockContainer* offset_parent = parent->GetOffsetParent();
-		const Vector2f line_position = line_box->GetPosition() - (offset_parent->GetPosition() - parent->GetOffsetRoot()->GetPosition());
+		const Vector2f line_position = line_box->GetPosition();
 
-		// TODO Position due to floats.
+		// Make position relative to our own offset parent.
+		const Vector2f root_to_offset_parent_offset = offset_parent->GetPosition() - parent->GetOffsetRoot()->GetPosition();
+
 		float height_of_line = 0.f;
-		UniquePtr<LayoutLineBox> split_line_box = line_box->Close(offset_parent->GetElement(), line_position, element_line_height, height_of_line);
+		UniquePtr<LayoutLineBox> split_line_box =
+			line_box->Close(offset_parent->GetElement(), line_position - root_to_offset_parent_offset, element_line_height, height_of_line);
 
 		// Move the cursor down, but only if our line has any width.
 		if (line_box->GetBoxCursor() > 0.f)

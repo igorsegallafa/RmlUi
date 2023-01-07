@@ -154,11 +154,10 @@ public:
 	/// @return The box area used as the element's client area.
 	Box::Area GetClientArea() const;
 
-	/// Sets the dimensions of the element's internal content. This is the tightest fitting box surrounding all of
-	/// this element's logical children, plus the element's padding.
-	/// @param[in] content_offset The offset of the box's internal content.
-	/// @param[in] content_box The dimensions of the box's internal content.
-	void SetContentBox(Vector2f content_offset, Vector2f content_box);
+	/// Sets the dimensions of the element's scrollable overflow rectangle. This is the tightest fitting box surrounding
+	/// all of this element's logical children, and the element's padding box.
+	/// @param[in] scrollable_overflow_rectangle The dimensions of the box's scrollable content.
+	void SetScrollableOverflowRectangle(Vector2f scrollable_overflow_rectangle);
 	/// Sets the box describing the size of the element, and removes all others.
 	/// @param[in] box The new dimensions box for the element.
 	void SetBox(const Box& box);
@@ -780,9 +779,8 @@ private:
 	Box main_box;
 	PositionedBoxList additional_boxes;
 
-	// And of the element's internal content.
-	Vector2f content_offset;
-	Vector2f content_box;
+	// And of the element's scrollable content.
+	Vector2f scrollable_overflow_rectangle;
 
 	float baseline;
 	float z_index;

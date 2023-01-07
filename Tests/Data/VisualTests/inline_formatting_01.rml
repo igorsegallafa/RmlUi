@@ -6,7 +6,7 @@
 	<meta name="Description" content="Test various inline formatting details." />
 	<style>
 		body {
-			width: 1030px;
+			width: 1020px;
 			padding: 0;
 			border: 12px #ddd;
 		}

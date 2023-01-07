@@ -155,13 +155,21 @@ BlockContainer::CloseResult BlockContainer::Close()
 		box.SetContent(content_area);
 	}
 
+	// TODO: Properly compute the visible overflow size / scrollable overflow rectangle.
+	//       https://www.w3.org/TR/css-overflow-3/#scrollable
+	//
 	Vector2f visible_overflow_size;
 
 	// Set the computed box on the element.
 	if (element)
 	{
-		// Calculate the dimensions of the box's *internal* content; this is the tightest-fitting box around all of the
-		// internal elements, plus this element's padding.
+		// Calculate the dimensions of the box's scrollable overflow rectangle. This is the union of the tightest-
+		// fitting box around all of the internal elements, and this element's padding box. We really only care about
+		// overflow on the bottom-right sides, as these are the only ones allowed to be scrolled to in CSS.
+		//
+		// If we are a scroll container (use any other value than 'overflow: visible'), then any overflow outside our
+		// padding box should be caught here. Otherwise, our overflow should be included in the overflow calculations of
+		// our nearest scroll container ancestor.
 
 		// Start with the inner content size, as set by the child blocks boxes or external formatting contexts.
 		Vector2f content_box = inner_content_size;
@@ -170,14 +178,18 @@ BlockContainer::CloseResult BlockContainer::Close()
 		const Vector2f space_box = space->GetDimensions();
 		content_box.x = Math::Max(content_box.x, space_box.x);
 
-		// If our content is larger than our window, we can enable the horizontal scrollbar if
-		// we're set to auto-scrollbars. If we're set to always use scrollbars, then the horiontal
-		// scrollbar will already have been enabled in the constructor.
-		if (content_box.x > box.GetSize().x + 0.5f)
+		const Vector2f padding_top_left = {box.GetEdge(Box::PADDING, Box::LEFT), box.GetEdge(Box::PADDING, Box::TOP)};
+		const Vector2f padding_bottom_right = {box.GetEdge(Box::PADDING, Box::RIGHT), box.GetEdge(Box::PADDING, Box::BOTTOM)};
+		const Vector2f padding_size = box.GetSize() + padding_top_left + padding_bottom_right;
+
+		// If our content is larger than our window, we can enable the horizontal scrollbar if we're set to
+		// auto-scrollbars. If we're set to always use scrollbars, then the horiontal scrollbar will already have been
+		// enabled in the constructor.
+		if (content_box.x > box.GetSize().x + padding_bottom_right.x + 0.5f)
 		{
 			if (overflow_x_property == Style::Overflow::Auto)
 			{
-				element->GetElementScroll()->EnableScrollbar(ElementScroll::HORIZONTAL, box.GetSize(Box::PADDING).x);
+				element->GetElementScroll()->EnableScrollbar(ElementScroll::HORIZONTAL, padding_size.x);
 
 				if (!CatchVerticalOverflow())
 					return CloseResult::LayoutSelf;
@@ -189,17 +201,16 @@ BlockContainer::CloseResult BlockContainer::Close()
 		if (!CatchVerticalOverflow(content_box.y))
 			return CloseResult::LayoutSelf;
 
-		const Vector2f padding_edges = Vector2f(box.GetEdge(Box::PADDING, Box::LEFT) + box.GetEdge(Box::PADDING, Box::RIGHT),
-			box.GetEdge(Box::PADDING, Box::TOP) + box.GetEdge(Box::PADDING, Box::BOTTOM));
+		const Vector2f scrollable_overflow_size = Math::Max(padding_size, padding_top_left + content_box);
 
 		element->SetBox(box);
-		element->SetContentBox(space->GetOffset(), content_box + padding_edges);
+		element->SetScrollableOverflowRectangle(scrollable_overflow_size);
 
-		const Vector2f margin_size = box.GetSize(Box::MARGIN);
+		const Vector2f margin_size = padding_size + box.GetSizeAround(Box::MARGIN, Box::MARGIN);
 
-		// Set the visible overflow size so that ancestors can catch any overflow produced by us. That is, hiding it or providing a scrolling
-		// mechanism. If we catch our own overflow here, then just use the normal margin box as that will effectively remove the overflow from our
-		// ancestor's perspective.
+		// Set the visible overflow size so that ancestors can catch any overflow produced by us. That is, hiding it or
+		// providing a scrolling mechanism. If we catch our own overflow here, then just use the normal margin box as
+		// that will effectively remove the overflow from our ancestor's perspective.
 		if (overflow_x_property != Style::Overflow::Visible)
 			visible_overflow_size.x = margin_size.x;
 		else

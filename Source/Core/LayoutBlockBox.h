@@ -76,10 +76,12 @@ public:
 protected:
 	BlockLevelBox(Type type) : LayoutBox(OuterType::BlockLevel, type) {}
 
-	void SetVisibleOverflowSize(Vector2f new_visible_overflow_size) { visible_overflow_size = new_visible_overflow_size; }
+	//void SetScrollableOverflowRectangle(Vector2f size) { visible_overflow_size = size; }
+	void SetVisibleOverflowSize(Vector2f size) { visible_overflow_size = size; }
 
 private:
-	Vector2f visible_overflow_size;
+	// The extent 
+	Vector2f visible_overflow_size; 
 };
 
 // class InlineLevelBox : public LayoutBox {
@@ -172,12 +174,14 @@ public:
 	/// @param[in] top_margin The top margin of the box. This will be collapsed as appropriate against other block boxes.
 	/// @param[in] clear_property The value of the underlying element's clear property.
 	/// @return The box cursor position.
+	/// TODO/note: Returns the position in root-relative coordinates.
 	Vector2f NextBoxPosition(float top_margin = 0, Style::Clear clear_property = Style::Clear::None) const;
 	/// Returns the offset from the top-left corner of this box's offset element the next child block box, of the given dimensions,
 	/// will be positioned at. This will include the margins on the new block box.
 	/// @param[in] box The dimensions of the new box.
 	/// @param[in] clear_property The value of the underlying element's clear property.
 	/// @return The block box cursor position.
+	/// TODO/note: Returns the position in root-relative coordinates.
 	Vector2f NextBlockBoxPosition(const Box& box, Style::Clear clear_property) const;
 
 	// Places all queued floating elements.
@@ -204,6 +208,7 @@ public:
 	/// Returns the block box against which all positions of boxes in the hierarchy are set relative to.
 	const BlockContainer* GetOffsetParent() const;
 	/// Returns the block box against which all positions of boxes in the hierarchy are calculated relative to.
+	// The element we'll be computing our offset relative to during layout.
 	const BlockContainer* GetOffsetRoot() const;
 
 	/// Returns the block box's dimension box.
@@ -261,7 +266,7 @@ private:
 	// Used by inline contexts only; set to true if the block box's line boxes should stretch to fit their inline content instead of wrapping.
 	bool wrap_content;
 
-	// The vertical position of the next block box to be added to this box, relative to the top of this box.
+	// The vertical position of the next block box to be added to this box, relative to the top of our content box.
 	float box_cursor;
 
 	// TODO: All comments in the following.

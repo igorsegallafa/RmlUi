@@ -7,13 +7,19 @@
 	<link rel="source" href="https://developer.mozilla.org/en-US/docs/Web/Guide/CSS/Block_formatting_context#exclude_external_floats" />
 	<meta name="Description" content="The bottom block box should be placed next to its float (not overlap it), as it establishes a new block formatting context that prevent it from being affected by external floats." />
 	<style>
+		body {
+			padding: 10px;
+			border: 12px #ddd;
+			border-left: 25px;
+			width: 500px; /* outer width 557px */
+		}
 		section {
 			display: block;
 			min-height: 150px;
 		}
 		p {
 			border: 2px #fff;
-			white-space: nowrap;
+			/*white-space: nowrap;*/
 		}
 		.box {
 			background-color: #e0cef7;

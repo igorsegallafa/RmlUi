@@ -102,6 +102,7 @@ private:
 	/// @param[out] wrap_content Set to true if the line box should grow to fit inline boxes, false if it should wrap them.
 	/// @param[in] dimensions The minimum dimensions of the line.
 	/// @return The line box position.
+	/// TODO/note: Coordinates relative to our own offset parent.
 	Vector2f NextLineBoxPosition(float& out_box_width, Vector2f dimensions, bool nowrap) const;
 
 	BlockContainer* parent; // [not-null]

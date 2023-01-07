@@ -977,7 +977,7 @@ void WidgetTextInput::FormatElement()
 			scroll->EnableScrollbar(ElementScroll::HORIZONTAL, width);
 	}
 
-	parent->SetContentBox(Vector2f(0, 0), content_area);
+	parent->SetScrollableOverflowRectangle(content_area);
 	scroll->FormatScrollbars();
 }
 
