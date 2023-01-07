@@ -57,8 +57,9 @@ public:
 	/// @param[out] box_width The available width for the box.
 	/// @param[in] cursor The ideal vertical position for the box.
 	/// @param[in] dimensions The minimum available space required for the box.
+	/// @param[in] nowrap Restrict from wrapping down, returned vertical position always placed at ideal cursor.
 	/// @return The generated position for the box.
-	Vector2f NextBoxPosition(float& box_width, float cursor, Vector2f dimensions) const;
+	Vector2f NextBoxPosition(float& box_width, float cursor, Vector2f dimensions, bool nowrap) const;
 
 	/// Generates and sets the position for a floating box of a given size within our block box. The element's box
 	/// is then added into our list of floating boxes.
@@ -87,12 +88,8 @@ public:
 private:
 	enum AnchorEdge { LEFT = 0, RIGHT = 1, NUM_ANCHOR_EDGES = 2 };
 
-	/// Generates the position for an arbitrary box within our space layout, floated against either the left or right edge.
-	/// @param[out] maximum_box_width The maximum width at the box position.
-	/// @param[in] cursor The ideal vertical position for the box.
-	/// @param[in] dimensions The size of the box to place.
-	/// @return The generated position for the box.
-	Vector2f NextBoxPosition(float& maximum_box_width, float cursor, Vector2f dimensions, Style::Float float_property) const;
+	// Generates the position for an arbitrary box within our space layout, floated against either the left or right edge.
+	Vector2f NextBoxPosition(float& maximum_box_width, float cursor, Vector2f dimensions, bool nowrap, Style::Float float_property) const;
 
 	struct SpaceBox {
 		SpaceBox();

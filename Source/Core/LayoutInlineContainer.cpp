@@ -88,10 +88,10 @@ InlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
 		};
 
 		float available_width = 0.f;
-		// TODO: This moves the line box down even with white-space: nowrap if the float overflows or takes all the
-		// width. It shouldn't, instead it should push the line box to the side.
+		// TODO: We don't know the exact line height yet. Do we need to check placement after closing the line, or is
+		// this approximation alright? Perhaps experiment with a very tall inline-element.
 		// @performance: We could do this only once for each line, and instead update it if we get new inline floats.
-		Vector2f line_position = NextLineBoxPosition(available_width, minimum_dimensions); 
+		Vector2f line_position = NextLineBoxPosition(available_width, minimum_dimensions, !wrap_content);
 		line_box->SetPosition(line_position);
 
 		// TODO: Cleanup logic
@@ -151,17 +151,17 @@ InlineContainer::CloseResult InlineContainer::Close(UniquePtr<LayoutLineBox>* ou
 	// for (size_t i = 0; i < line_boxes.size(); i++)
 	//	box_size.x = Math::Max(box_size.x, line_boxes[i]->GetDimensions().x);
 
-	// Set this box's height, if necessary.
-	if (box_size.y < 0)
-		box_size.y = Math::Max(box_cursor, 0.f);
+	// Set this box's height.
+	box_size.y = Math::Max(box_cursor, 0.f);
 
-	Vector2f visible_overflow_size;
+	// TODO: Looks like the overflow is pushed out too wide?
+	Vector2f visible_overflow_size = {0.f, box_size.y};
 
 	// Find the largest line in this layout block
 	for (size_t i = 0; i < line_boxes.size(); i++)
 	{
 		LayoutLineBox* line_box = line_boxes[i].get();
-		visible_overflow_size.x = Math::Max(visible_overflow_size.x, line_box->GetBoxCursor()); // TODO: Should also add line position
+		visible_overflow_size.x = Math::Max(visible_overflow_size.x, line_box->GetPosition().x + line_box->GetBoxCursor());
 	}
 
 	visible_overflow_size.x = Math::RoundDownFloat(visible_overflow_size.x);
@@ -182,17 +182,9 @@ void InlineContainer::CloseOpenLineBox(UniquePtr<LayoutLineBox>* out_split_line)
 	{
 		// TODO Cleanup: Move parent calls into function arguments.
 
-		// TODO: I guess we want to feed in here the height_of_line result from line_box->Close below somehow. Determine that first?
-		// const float line_box_cursor = line_box->GetBoxCursor();
-		// const Vector2f minimum_dimensions = {line_box_cursor, element_line_height};
-		// float available_width = 0.f;
-		// const Vector2f line_box_position = NextLineBoxPosition(available_width, minimum_dimensions);
-		const Vector2f line_box_position = line_box->GetPosition();
-
-		// Find the position of the line box, relative to its parent's block box's offset parent.
+		// Find the position of the line box relative to its parent's block box's offset parent.
 		const BlockContainer* offset_parent = parent->GetOffsetParent();
-		const Vector2f relative_position = line_box_position - (offset_parent->GetPosition() - parent->GetOffsetRoot()->GetPosition());
-		const Vector2f line_position = {relative_position.x, relative_position.y};
+		const Vector2f line_position = line_box->GetPosition() - (offset_parent->GetPosition() - parent->GetOffsetRoot()->GetPosition());
 
 		// TODO Position due to floats.
 		float height_of_line = 0.f;
@@ -215,15 +207,16 @@ void InlineContainer::CloseOpenLineBox(UniquePtr<LayoutLineBox>* out_split_line)
 	}
 }
 
-Vector2f InlineContainer::NextLineBoxPosition(float& out_box_width, const Vector2f dimensions) const
+Vector2f InlineContainer::NextLineBoxPosition(float& out_box_width, const Vector2f dimensions, const bool nowrap) const
 {
 	const float ideal_position_y = position.y + box_cursor;
-	const Vector2f box_position = parent->GetBlockBoxSpace()->NextBoxPosition(out_box_width, ideal_position_y, dimensions);
+	const Vector2f box_position = parent->GetBlockBoxSpace()->NextBoxPosition(out_box_width, ideal_position_y, dimensions, nowrap);
 	return box_position;
 }
 
 float InlineContainer::GetShrinkToFitWidth() const
 {
+	// TODO: This is basically the same as visible overflow size?
 	float content_width = 0.0f;
 
 	// Find the largest line in this layout block
@@ -232,7 +225,7 @@ float InlineContainer::GetShrinkToFitWidth() const
 		// Perhaps a more robust solution is to modify how we set the line box dimension on 'line_box->close()'
 		// and use that, or add another value in the line_box ... but seems to work for now.
 		LayoutLineBox* line_box = line_boxes[i].get();
-		content_width = Math::Max(content_width, line_box->GetBoxCursor()); // TODO line positions due to floats?
+		content_width = Math::Max(content_width, line_box->GetPosition().x + line_box->GetBoxCursor());
 	}
 	content_width = Math::Min(content_width, box_size.x);
 

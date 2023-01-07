@@ -37,8 +37,13 @@
 namespace Rml {
 
 /**
-    A container for inline-level boxes. Always a direct child of a block container, starts a new inline formatting
-    context. Not directly a CSS term, but effectively a "block container that only contains inline-level boxes".
+    A container for inline-level boxes.
+
+    Always a direct child of a block container, and starts a new inline formatting context. Maintains a stack of line
+    boxes in which generated inline-level boxes are placed within. Not directly a CSS term, but effectively a "block
+    container that only contains inline-level boxes".
+
+    @author Michael R. P. Ragazzon
  */
 class InlineContainer final : public BlockLevelBox {
 public:
@@ -97,7 +102,7 @@ private:
 	/// @param[out] wrap_content Set to true if the line box should grow to fit inline boxes, false if it should wrap them.
 	/// @param[in] dimensions The minimum dimensions of the line.
 	/// @return The line box position.
-	Vector2f NextLineBoxPosition(float& out_box_width, Vector2f dimensions) const;
+	Vector2f NextLineBoxPosition(float& out_box_width, Vector2f dimensions, bool nowrap) const;
 
 	BlockContainer* parent; // [not-null]
 

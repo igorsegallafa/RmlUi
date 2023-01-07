@@ -13,7 +13,7 @@
 		}
 		p {
 			border: 2px #fff;
-			/*white-space: nowrap;*/
+			white-space: nowrap;
 		}
 		.box {
 			background-color: #e0cef7;
