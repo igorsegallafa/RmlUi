@@ -113,7 +113,8 @@ bool LayoutLineBox::AddBox(InlineLevelBox* box, InlineLayoutMode layout_mode, fl
 	return continue_on_new_line;
 }
 
-UniquePtr<LayoutLineBox> LayoutLineBox::Close(Element* offset_parent, Vector2f line_position, float element_line_height, float& out_height_of_line)
+UniquePtr<LayoutLineBox> LayoutLineBox::Close(Element* offset_parent, Vector2f line_position, float element_line_height, Style::TextAlign text_align,
+	float& out_height_of_line)
 {
 	RMLUI_ASSERT(!is_closed);
 
@@ -126,7 +127,20 @@ UniquePtr<LayoutLineBox> LayoutLineBox::Close(Element* offset_parent, Vector2f l
 	for (const auto& fragment : fragments)
 		out_height_of_line = Math::Max(fragment.layout_bounds.y, out_height_of_line);
 
-	// TODO: Alignment
+	// TODO: Vertical alignment
+
+	// Horizontal alignment using available space on our line.
+	if (box_cursor < line_width)
+	{
+		switch (text_align)
+		{
+		case Style::TextAlign::Center: offset_horizontal_alignment = (line_width - box_cursor) * 0.5f; break;
+		case Style::TextAlign::Right: offset_horizontal_alignment = (line_width - box_cursor); break;
+		case Style::TextAlign::Left:    // Already left-aligned.
+		case Style::TextAlign::Justify: // Justification occurs at the text level.
+			break;
+		}
+	}
 
 	// Position and size all inline-level boxes, place geometry boxes.
 	for (const auto& fragment : fragments)
@@ -134,7 +148,7 @@ UniquePtr<LayoutLineBox> LayoutLineBox::Close(Element* offset_parent, Vector2f l
 		RMLUI_ASSERT(fragment.layout_bounds.x >= 0.f);
 		FragmentBox fragment_box = {
 			offset_parent,
-			line_position + fragment.position,
+			line_position + fragment.position + Vector2f(offset_horizontal_alignment, 0.f),
 			fragment.layout_bounds,
 			fragment.principal_fragment,
 			fragment.split_left,
@@ -240,6 +254,21 @@ String LayoutLineBox::DebugDumpTree(int depth) const
 		String(depth * 2, ' ') + "LayoutLineBox (" + ToString(fragments.size()) + " fragment" + (fragments.size() == 1 ? "" : "s") + ")\n";
 
 	return value;
+}
+
+void LayoutLineBox::SetLineBox(Vector2f _line_position, float _line_width)
+{
+	line_position = _line_position;
+	line_width = _line_width;
+}
+
+
+// Returns the width of the contents of the line, relative to its position. Includes spacing due to horizontal alignment.
+
+float LayoutLineBox::GetExtentRight() const
+{
+	RMLUI_ASSERT(is_closed);
+	return box_cursor + offset_horizontal_alignment;
 }
 
 void* LayoutLineBox::operator new(size_t size)

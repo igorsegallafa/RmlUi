@@ -48,6 +48,7 @@ InlineContainer::InlineContainer(BlockContainer* _parent, float _element_line_he
 	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent);
 	box_size = Vector2f(containing_block.x, -1);
 	position = parent->NextBoxPosition();
+	text_align = parent->GetElement()->GetComputedValues().text_align();
 }
 
 InlineContainer::~InlineContainer() {}
@@ -92,7 +93,7 @@ InlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
 		// this approximation alright? Perhaps experiment with a very tall inline-element.
 		// @performance: We could do this only once for each line, and instead update it if we get new inline floats.
 		Vector2f line_position = NextLineBoxPosition(available_width, minimum_dimensions, !wrap_content);
-		line_box->SetPosition(line_position);
+		line_box->SetLineBox(line_position, available_width);
 
 		// TODO: Cleanup logic
 		const bool line_shrinked_by_floats = (available_width < box_size.x);
@@ -160,7 +161,7 @@ InlineContainer::CloseResult InlineContainer::Close(UniquePtr<LayoutLineBox>* ou
 	// Find the largest line in this layout block
 	for (const auto& line_box : line_boxes)
 	{
-		visible_overflow_size.x = Math::Max(visible_overflow_size.x, line_box->GetPosition().x - position.x + line_box->GetBoxCursor());
+		visible_overflow_size.x = Math::Max(visible_overflow_size.x, line_box->GetPosition().x - position.x + line_box->GetExtentRight());
 	}
 
 	visible_overflow_size.x = Math::RoundDownFloat(visible_overflow_size.x);
@@ -187,10 +188,11 @@ void InlineContainer::CloseOpenLineBox(UniquePtr<LayoutLineBox>* out_split_line)
 
 		// Make position relative to our own offset parent.
 		const Vector2f root_to_offset_parent_offset = offset_parent->GetPosition() - parent->GetOffsetRoot()->GetPosition();
+		const Vector2f line_position_offset_parent = line_position - root_to_offset_parent_offset;
 
 		float height_of_line = 0.f;
 		UniquePtr<LayoutLineBox> split_line_box =
-			line_box->Close(offset_parent->GetElement(), line_position - root_to_offset_parent_offset, element_line_height, height_of_line);
+			line_box->Close(offset_parent->GetElement(), line_position_offset_parent, element_line_height, text_align, height_of_line);
 
 		// Move the cursor down, but only if our line has any width.
 		if (line_box->GetBoxCursor() > 0.f)
@@ -227,7 +229,7 @@ float InlineContainer::GetShrinkToFitWidth() const
 		// Perhaps a more robust solution is to modify how we set the line box dimension on 'line_box->close()'
 		// and use that, or add another value in the line_box ... but seems to work for now.
 		LayoutLineBox* line_box = line_boxes[i].get();
-		content_width = Math::Max(content_width, line_box->GetPosition().x + line_box->GetBoxCursor());
+		content_width = Math::Max(content_width, line_box->GetPosition().x + line_box->GetExtentRight());
 	}
 	content_width = Math::Min(content_width, box_size.x);
 

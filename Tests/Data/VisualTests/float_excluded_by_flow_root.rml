@@ -20,6 +20,7 @@
 		p {
 			border: 2px #fff;
 			/*white-space: nowrap;*/
+			/*text-align: right;*/
 		}
 		.box {
 			background-color: #e0cef7;

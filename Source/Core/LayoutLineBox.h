@@ -44,7 +44,8 @@ public:
 	// Closes the line, submitting any fragments placed on this line.
 	// @param[out] out_height_of_line Height of line. Note: This can be different from the element's computed line-height property.
 	// @return The next line, containing any open fragments that had to be split or wrapped down.
-	UniquePtr<LayoutLineBox> Close(Element* offset_parent, Vector2f line_position, float element_line_height, float& out_height_of_line);
+	UniquePtr<LayoutLineBox> Close(Element* offset_parent, Vector2f line_position, float element_line_height, Style::TextAlign text_align,
+		float& out_height_of_line);
 
 	/// Close the open inline box.
 	/// @param[in] inline_box The inline box to be closed. Should match the currently open box, strictly used for verification.
@@ -59,11 +60,15 @@ public:
 
 	String DebugDumpTree(int depth) const;
 
+	void SetLineBox(Vector2f line_position, float line_width);
+	Vector2f GetPosition() const { return line_position; }
+	
+	// Returns the width of the contents of the line, relative to the line position. Includes spacing due to horizontal alignment.
+	// @note Only available after line has been closed.
+	float GetExtentRight() const;
+
 	void* operator new(size_t size);
 	void operator delete(void* chunk, size_t size);
-
-	void SetPosition(Vector2f _line_position) { line_position = _line_position; }
-	Vector2f GetPosition() const { return line_position; }
 
 private:
 	struct PlacedFragment {
@@ -101,7 +106,13 @@ private:
 	// Splits the line, returning a new line if there are any open fragments.
 	UniquePtr<LayoutLineBox> SplitLine();
 
+	// Position of the line, relative to our parent root.
 	Vector2f line_position;
+	// Available space for the line. Based on our parent box content width, possibly shrinked due to floating boxes.
+	float line_width = 0.f;
+
+	// Content offset due to space distribution from 'text-align'.
+	float offset_horizontal_alignment = 0.f;
 
 	// The horizontal cursor. This is the outer-right position of the last placed fragment.
 	float box_cursor = 0.f;
