@@ -113,36 +113,32 @@ void ElementText::OnRender()
 	}
 
 	const Vector2f translation = GetAbsoluteOffset();
-	
+
 	bool render = true;
 	Vector2i clip_origin;
 	Vector2i clip_dimensions;
 	if (GetContext()->GetActiveClipRegion(clip_origin, clip_dimensions))
 	{
+		const FontMetrics& font_metrics = GetFontEngineInterface()->GetFontMetrics(GetFontFaceHandle());
 		float clip_top = (float)clip_origin.y;
 		float clip_left = (float)clip_origin.x;
 		float clip_right = (float)(clip_origin.x + clip_dimensions.x);
 		float clip_bottom = (float)(clip_origin.y + clip_dimensions.y);
-		float line_height = (float)GetFontEngineInterface()->GetLineHeight(GetFontFaceHandle());
-		
+		float ascent = font_metrics.ascent;
+		float descent = font_metrics.descent;
+
 		render = false;
-		for (size_t i = 0; i < lines.size(); ++i)
-		{			
-			const Line& line = lines[i];
-			float x = translation.x + line.position.x;
+		for (const Line& line : lines)
+		{
+			float x_left = translation.x + line.position.x;
+			float x_right = x_left + line.width;
 			float y = translation.y + line.position.y;
-			
-			bool render_line = !(x > clip_right);
-			render_line = render_line && !(x + line.width < clip_left);
-			
-			render_line = render_line && !(y - line_height > clip_bottom);
-			render_line = render_line && !(y < clip_top);
-			
-			if (render_line)
-			{
-				render = true;
+			float y_top = y - ascent;
+			float y_bottom = y + descent;
+
+			render = !(x_left > clip_right || x_right < clip_left || y_top > clip_bottom || y_bottom < clip_top);
+			if (render)
 				break;
-			}
 		}
 	}
 	
@@ -329,7 +325,8 @@ void ElementText::AddLine(Vector2f line_position, String line)
 	if (font_effects_dirty)
 		UpdateFontEffects();
 
-	Vector2f baseline_position = line_position + Vector2f(0.0f, (float)GetFontEngineInterface()->GetLineHeight(font_face_handle) - GetFontEngineInterface()->GetBaseline(font_face_handle));
+	// TODO: Consider using the baseline position as input into this function.
+	Vector2f baseline_position = line_position + Vector2f(0.0f, GetFontEngineInterface()->GetFontMetrics(font_face_handle).ascent);
 	lines.emplace_back(std::move(line), baseline_position);
 
 	geometry_dirty = true;
@@ -487,14 +484,28 @@ void ElementText::GenerateGeometry(const FontFaceHandle font_face_handle, Line& 
 		geometry[i].SetHostElement(this);
 }
 
-// Generates any geometry necessary for rendering a line decoration (underline, strike-through, etc).
 void ElementText::GenerateDecoration(const FontFaceHandle font_face_handle)
 {
 	RMLUI_ZoneScopedC(0xA52A2A);
 	RMLUI_ASSERT(decoration);
-	
-	for(const Line& line : lines)
-		GeometryUtilities::GenerateLine(font_face_handle, decoration.get(), line.position, line.width, decoration_property, colour);
+
+	const FontMetrics& metrics = GetFontEngineInterface()->GetFontMetrics(font_face_handle);
+
+	float offset = 0.f;
+	switch (decoration_property)
+	{
+	case Style::TextDecoration::Underline: offset = metrics.underline_position; break;
+	case Style::TextDecoration::Overline: offset = -1.1f * metrics.ascent; break;
+	case Style::TextDecoration::LineThrough: offset = -0.65f * metrics.x_height; break;
+	case Style::TextDecoration::None: return;
+	}
+
+	for (const Line& line : lines)
+	{
+		const Vector2f position = {line.position.x, line.position.y + offset};
+		const Vector2f size = {(float)line.width, metrics.underline_thickness};
+		GeometryUtilities::GenerateLine(decoration.get(), position, size, colour);
+	}
 }
 
 static bool BuildToken(String& token, const char*& token_begin, const char* string_end, bool first_token, bool collapse_white_space, bool break_at_endline, Style::TextTransform text_transformation, bool decode_escape_characters)

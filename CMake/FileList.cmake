@@ -171,6 +171,7 @@ set(Core_PUB_HDR_FILES
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/FontEffectInstancer.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/FontEngineInterface.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/FontGlyph.h
+    ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/FontMetrics.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/Geometry.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/GeometryUtilities.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/Header.h

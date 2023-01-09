@@ -4,7 +4,6 @@
  * For the latest information, see http://github.com/mikke89/RmlUi
  *
  * Copyright (c) 2008-2010 CodePoint Ltd, Shift Technology Ltd
- * Copyright (c) 2019 The RmlUi Team, and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,29 +25,25 @@
  *
  */
 
-#ifndef RMLUI_CORE_FONTENGINEDEFAULT_FONTTYPES_H
-#define RMLUI_CORE_FONTENGINEDEFAULT_FONTTYPES_H
+#ifndef RMLUI_CORE_FONTMETRICS_H
+#define RMLUI_CORE_FONTMETRICS_H
 
-#include "../../../Include/RmlUi/Core/FontGlyph.h"
-#include "../../../Include/RmlUi/Core/StyleTypes.h"
-#include "../../../Include/RmlUi/Core/Types.h"
+#include "Header.h"
 
 namespace Rml {
 
-using FontFaceHandleFreetype = uintptr_t;
+struct FontMetrics {
+	int size; // Specified font size [px].
 
-struct FaceVariation {
-	Style::FontWeight weight;
-	uint16_t width;
-	int named_instance_index;
+	float ascent;       // Distance above the baseline to the upper grid coordinate [px, positive above baseline].
+	float descent;      // Distance below the baseline to the lower grid coordinate [px, positive below baseline].
+	float line_spacing; // Font-specified distance between two consecutive baselines [px].
+
+	float x_height; // Height of the lowercase 'x' character [px].
+
+	float underline_position;  // Position of the underline relative to the baseline [px, positive below baseline].
+	float underline_thickness; // Width of underline [px].
 };
-
-inline bool operator<(const FaceVariation& a, const FaceVariation& b)
-{
-	if (a.weight == b.weight)
-		return a.width < b.width;
-	return a.weight < b.weight;
-}
 
 } // namespace Rml
 #endif
