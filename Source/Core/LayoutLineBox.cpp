@@ -262,12 +262,10 @@ void LayoutLineBox::SetLineBox(Vector2f _line_position, float _line_width)
 	line_width = _line_width;
 }
 
-
-// Returns the width of the contents of the line, relative to its position. Includes spacing due to horizontal alignment.
-
 float LayoutLineBox::GetExtentRight() const
 {
-	RMLUI_ASSERT(is_closed);
+	// TODO
+	// RMLUI_ASSERT(is_closed);
 	return box_cursor + offset_horizontal_alignment;
 }
 
