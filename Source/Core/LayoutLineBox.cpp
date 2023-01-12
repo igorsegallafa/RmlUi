@@ -34,8 +34,10 @@
 #include "../../Include/RmlUi/Core/Property.h"
 #include "LayoutBlockBox.h"
 #include "LayoutEngine.h"
+#include "LayoutInlineBox.h"
 #include "LayoutInlineContainer.h"
 #include "LayoutInlineLevelBoxText.h"
+#include <algorithm>
 #include <numeric>
 
 namespace Rml {
@@ -50,10 +52,13 @@ bool LayoutLineBox::AddBox(InlineLevelBox* box, InlineLayoutMode layout_mode, fl
 	// but also for its parents which will close immediately after it.
 	// (Right edge width of all open fragments)
 	// TODO: We don't necessarily need to consider all the open boxes if there is content coming after this box.
-	const float open_spacing_right = std::accumulate(open_fragments.begin(), open_fragments.end(), 0.f,
-		[](float value, const auto& fragment) { return value + fragment.spacing_right; });
+	const bool first_box = !HasContent();
+
+	float open_spacing_right = 0.f;
+	for (int fragment_index : open_fragments)
+		open_spacing_right += fragments[fragment_index].spacing_right;
+
 	const float box_placement_cursor = box_cursor + open_spacing_left;
-	const bool first_box = fragments.empty();
 
 	// TODO: Maybe always pass the actual available width, and let the createfragment functions handle the mode correctly.
 	float available_width = FLT_MAX;
@@ -73,8 +78,25 @@ bool LayoutLineBox::AddBox(InlineLevelBox* box, InlineLayoutMode layout_mode, fl
 		RMLUI_ASSERT(fragment.layout_bounds.x < 0.f && fragment.layout_bounds.y >= 0.f);
 		RMLUI_ASSERT(rmlui_dynamic_cast<InlineBox*>(box));
 
-		open_fragments.push_back(OpenFragment{static_cast<InlineBox*>(box), {box_placement_cursor, 0.f}, fragment.layout_bounds.y,
-			fragment.spacing_left, fragment.spacing_right});
+		open_fragments.push_back((int)fragments.size());
+
+		// TODO simplify, combine with below.
+		fragments.push_back(Fragment{
+			Fragment::Type::InlineBox,
+			box,
+			{box_placement_cursor, 0.f},
+			fragment.layout_bounds,
+			std::move(fragment.text),
+			fragment.total_height_above_baseline,
+			fragment.total_depth_below_baseline,
+			true,
+			false,
+			false,
+			false,
+			fragment.spacing_left,
+			fragment.spacing_right,
+		});
+
 		open_spacing_left += fragment.spacing_left;
 	}
 	break;
@@ -84,8 +106,9 @@ bool LayoutLineBox::AddBox(InlineLevelBox* box, InlineLayoutMode layout_mode, fl
 		// Fixed-size fragment.
 		RMLUI_ASSERT(fragment.layout_bounds.x >= 0.f && fragment.layout_bounds.y >= 0.f);
 
-		fragments.push_back(PlacedFragment{box, {box_placement_cursor, 0.f}, fragment.layout_bounds, std::move(fragment.text),
-			(fragment.type == FragmentType::Principal)});
+		// TODO.
+		fragments.push_back(Fragment{Fragment::Type::SizedBox, box, {box_placement_cursor, 0.f}, fragment.layout_bounds, std::move(fragment.text),
+			fragment.total_height_above_baseline, fragment.total_depth_below_baseline, (fragment.type == FragmentType::Principal)});
 		box_cursor = box_placement_cursor + fragment.layout_bounds.x;
 		open_spacing_left = 0.f;
 
@@ -97,8 +120,8 @@ bool LayoutLineBox::AddBox(InlineLevelBox* box, InlineLayoutMode layout_mode, fl
 
 		// TODO: Mark open fragments as having content so we later know whether we should split or move them in case of overflow. There are probably
 		// better ways to go about this.
-		for (auto&& open_fragment : open_fragments)
-			open_fragment.has_content = true;
+		for (int fragment_index : open_fragments)
+			fragments[fragment_index].has_content = true;
 	}
 	break;
 	case FragmentType::Invalid:
@@ -113,8 +136,45 @@ bool LayoutLineBox::AddBox(InlineLevelBox* box, InlineLayoutMode layout_mode, fl
 	return continue_on_new_line;
 }
 
-UniquePtr<LayoutLineBox> LayoutLineBox::Close(Element* offset_parent, Vector2f line_position, float element_line_height, Style::TextAlign text_align,
-	float& out_height_of_line)
+// Returns the fragment's baseline relative to the parent's baseline.
+static float GetParentRelativeBaseline(const InlineLevelBox* parent, Style::VerticalAlign vertical_align, float height_above_baseline,
+	float depth_below_baseline)
+{
+	using Style::VerticalAlign;
+
+	// Let's specify two anchor points, one on the parent box and one local. The goal is to align the two points.
+	float parent_baseline_offset = 0.f; // The anchor on the parent, as an offset from its baseline.
+	float self_baseline_offset = 0.f;   // The offset from the parent anchor to our baseline.
+
+	switch (vertical_align.type)
+	{
+	case VerticalAlign::Baseline: parent_baseline_offset = 0.f; break;
+	case VerticalAlign::Length: parent_baseline_offset = -vertical_align.value; break;
+	case VerticalAlign::Sub: parent_baseline_offset = (1.f / 5.f) * (float)parent->GetFontMetrics().size; break;
+	case VerticalAlign::Super: parent_baseline_offset = (-1.f / 3.f) * (float)parent->GetFontMetrics().size; break;
+	case VerticalAlign::TextTop:
+		parent_baseline_offset = -parent->GetFontMetrics().ascent;
+		self_baseline_offset = height_above_baseline;
+		break;
+	case VerticalAlign::TextBottom:
+		parent_baseline_offset = parent->GetFontMetrics().descent;
+		self_baseline_offset = -depth_below_baseline;
+		break;
+	case VerticalAlign::Middle:
+		parent_baseline_offset = -0.5f * parent->GetFontMetrics().x_height;
+		self_baseline_offset = 0.5f * (height_above_baseline - depth_below_baseline);
+		break;
+	case VerticalAlign::Top:
+	case VerticalAlign::Bottom:
+		// These are relative to the line box and handled later.
+		break;
+	}
+
+	return parent_baseline_offset + self_baseline_offset;
+}
+
+UniquePtr<LayoutLineBox> LayoutLineBox::Close(const InlineBoxRoot* root_box, Element* offset_parent, Vector2f line_position,
+	Style::TextAlign text_align, float& out_height_of_line)
 {
 	RMLUI_ASSERT(!is_closed);
 
@@ -122,12 +182,69 @@ UniquePtr<LayoutLineBox> LayoutLineBox::Close(Element* offset_parent, Vector2f l
 
 	RMLUI_ASSERTMSG(open_fragments.empty(), "All open fragments must be closed or split before the line can be closed.");
 
-	// Vertically align fragments and size line.
-	out_height_of_line = element_line_height;
-	for (const auto& fragment : fragments)
-		out_height_of_line = Math::Max(fragment.layout_bounds.y, out_height_of_line);
+	// Vertical alignment.
+	//
+	// To do alignment, place all boxes relative to the root baseline. We iterate over the fragments and retrieve the
+	// current fragment's baseline relative to its parent baseline. Then it is just a matter of keeping track of the
+	// parent fragment's absolute baseline while iterating over the fragments. Then, when all baselines are resolved,
+	// find the maximum height above root baseline and maximum depth below root baseline. Their sum is the height of the
+	// line. Now, we can vertically position each box based on the line-box height above baseline, the box's root
+	// baseline offset, and the box's baseline-to-top height.
+	float max_ascent = 0.f;
+	float max_descent = 0.f;
 
-	// TODO: Vertical alignment
+	{
+		using Style::VerticalAlign;
+
+		// Absolute means relative to root box's baseline.
+		float parent_absolute_baseline = 0.f;
+
+		// We might be able to reuse the memory from this one (unless it was split).
+		open_fragments.clear();
+
+		for (int i = 0; i < (int)fragments.size(); i++)
+		{
+			if (!open_fragments.empty() && i == fragments[open_fragments.back()].children_end_index)
+			{
+				open_fragments.pop_back();
+				parent_absolute_baseline = (open_fragments.empty() ? 0.f : fragments[open_fragments.back()].baseline);
+			}
+
+			const InlineLevelBox* parent = (open_fragments.empty() ? root_box : fragments[open_fragments.back()].inline_level_box);
+
+			Fragment& fragment = fragments[i];
+			const VerticalAlign vertical_align = fragment.inline_level_box->GetVerticalAlign();
+
+			const float parent_relative_baseline =
+				GetParentRelativeBaseline(parent, vertical_align, fragment.total_height_above_baseline, fragment.total_depth_below_baseline);
+
+			fragment.baseline = parent_absolute_baseline + parent_relative_baseline;
+
+			if (fragment.type == Fragment::Type::InlineBox)
+			{
+				open_fragments.push_back(i);
+				parent_absolute_baseline = fragment.baseline;
+			}
+		}
+
+		open_fragments.clear();
+
+		root_box->GetStrut(max_ascent, max_descent);
+
+		for (const Fragment& fragment : fragments)
+		{
+			max_ascent = Math::Max(max_ascent, fragment.total_height_above_baseline + fragment.baseline);
+			max_descent = Math::Max(max_descent, fragment.total_depth_below_baseline + fragment.baseline);
+		}
+
+		for (Fragment& fragment : fragments)
+		{
+			fragment.position.y = max_ascent - fragment.total_height_above_baseline + fragment.baseline;
+		}
+	}
+
+	// Size line.
+	out_height_of_line = Math::Max(out_height_of_line, max_ascent + max_descent);
 
 	// Horizontal alignment using available space on our line.
 	if (box_cursor < line_width)
@@ -145,10 +262,14 @@ UniquePtr<LayoutLineBox> LayoutLineBox::Close(Element* offset_parent, Vector2f l
 	// Position and size all inline-level boxes, place geometry boxes.
 	for (const auto& fragment : fragments)
 	{
+		// Skip inline-boxes which have not been closed (moved down to next line).
+		if (fragment.type == Fragment::Type::InlineBox && fragment.children_end_index == 0)
+			continue;
+
 		RMLUI_ASSERT(fragment.layout_bounds.x >= 0.f);
 		FragmentBox fragment_box = {
 			offset_parent,
-			line_position + fragment.position + Vector2f(offset_horizontal_alignment, 0.f),
+			line_position + fragment.position + Vector2f(offset_horizontal_alignment, 0.f), // fragment.baseline + max_ascent
 			fragment.layout_bounds,
 			fragment.principal_fragment,
 			fragment.split_left,
@@ -162,50 +283,37 @@ UniquePtr<LayoutLineBox> LayoutLineBox::Close(Element* offset_parent, Vector2f l
 	return new_line_box;
 }
 
-LayoutLineBox::PlacedFragment& LayoutLineBox::PlaceFragment(const OpenFragment& open_fragment, float inner_right_position)
+LayoutLineBox::Fragment& LayoutLineBox::CloseFragment(int open_fragment_index, float inner_right_position)
 {
-	fragments.push_back({});
-	PlacedFragment& fragment = fragments.back();
+	// TODO: We only mark it as closing, don't really need anything else. Could achieve this in other ways too.
+	Fragment& open_fragment = fragments[open_fragment_index];
+	RMLUI_ASSERT(open_fragment.type == Fragment::Type::InlineBox);
 
-	fragment.inline_level_box = open_fragment.inline_box;
-	fragment.position = open_fragment.position;
+	open_fragment.children_end_index = (int)fragments.size();
 
-	// TODO: Maybe store layout bounds as outer size always?
-	fragment.layout_bounds.x =
+	// TODO: Maybe use outer position/size?
+	open_fragment.layout_bounds.x =
 		Math::Max(inner_right_position - (open_fragment.position.x + open_fragment.spacing_left * (open_fragment.split_left ? 0.f : 1.0f)), 0.f);
 
-	fragment.layout_bounds.y = open_fragment.layout_height_bound;
-
-	fragment.principal_fragment = open_fragment.principal_fragment;
-	fragment.split_left = open_fragment.split_left;
-	fragment.split_right = open_fragment.split_right;
-
-	return fragment;
+	return open_fragment;
 }
 
 UniquePtr<LayoutLineBox> LayoutLineBox::SplitLine()
 {
-	// Place any open fragments that have content, splitting their right side. An open copy is kept for split placement on the next line.
-	for (auto it = open_fragments.crbegin(); it != open_fragments.crend(); ++it)
-	{
-		const OpenFragment& open_fragment = *it;
-		if (open_fragment.has_content)
-		{
-			PlacedFragment& new_fragment = PlaceFragment(open_fragment, box_cursor);
-			new_fragment.split_right = true;
-		}
-	}
-
 	if (open_fragments.empty())
 		return nullptr;
 
+	// Make a new line with the open fragments.
 	auto new_line = MakeUnique<LayoutLineBox>();
+	new_line->fragments.reserve(open_fragments.size());
 
-	// Move all open fragments to the next line. Fragments that were placed on the previous line Split open fragments with content, move fragments
-	// without content.
-	new_line->open_fragments = std::move(open_fragments);
-	for (OpenFragment& fragment : new_line->open_fragments)
+	// Copy all open fragments to the next line. Fragments that had any content placed on the previous line is split,
+	// otherwise the whole fragment is moved down.
+	for (const int fragment_index : open_fragments)
 	{
+		new_line->fragments.push_back(Fragment{fragments[fragment_index]});
+
+		Fragment& fragment = new_line->fragments.back();
 		fragment.position.x = new_line->box_cursor;
 		if (fragment.has_content)
 		{
@@ -219,12 +327,27 @@ UniquePtr<LayoutLineBox> LayoutLineBox::SplitLine()
 		}
 	}
 
+	// Place any open fragments that have content, splitting their right side. An open copy is kept for split placement on the next line.
+	for (auto it = open_fragments.rbegin(); it != open_fragments.rend(); ++it)
+	{
+		const int fragment_index = *it;
+		if (fragments[fragment_index].has_content)
+		{
+			Fragment& closed_fragment = CloseFragment(fragment_index, box_cursor);
+			closed_fragment.split_right = true;
+		}
+	}
+
+	// Steal the open fragment vector memory, as it is no longer needed here.
+	new_line->open_fragments = std::move(open_fragments);
+	std::iota(new_line->open_fragments.begin(), new_line->open_fragments.end(), 0);
+
 	return new_line;
 }
 
 void LayoutLineBox::CloseInlineBox(InlineBox* inline_box)
 {
-	if (open_fragments.empty() || open_fragments.back().inline_box != inline_box)
+	if (open_fragments.empty() || fragments[open_fragments.back()].inline_level_box != inline_box)
 	{
 		RMLUI_ERRORMSG("Inline box open/close mismatch.");
 		return;
@@ -233,10 +356,9 @@ void LayoutLineBox::CloseInlineBox(InlineBox* inline_box)
 	box_cursor += open_spacing_left;
 	open_spacing_left = 0.f;
 
-	OpenFragment& open_fragment = open_fragments.back();
-	PlaceFragment(open_fragment, box_cursor);
+	Fragment& closed_fragment = CloseFragment(open_fragments.back(), box_cursor);
 
-	box_cursor += open_fragment.spacing_right;
+	box_cursor += closed_fragment.spacing_right;
 	open_fragments.pop_back();
 }
 
@@ -245,7 +367,7 @@ InlineBox* LayoutLineBox::GetOpenInlineBox()
 	if (open_fragments.empty())
 		return nullptr;
 
-	return open_fragments.back().inline_box;
+	return static_cast<InlineBox*>(fragments[open_fragments.back()].inline_level_box);
 }
 
 String LayoutLineBox::DebugDumpTree(int depth) const

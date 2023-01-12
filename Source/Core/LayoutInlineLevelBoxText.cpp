@@ -66,10 +66,13 @@ FragmentResult InlineLevelBox_Text::CreateFragment(InlineLayoutMode mode, float 
 	if (overflow)
 		out_overflow_handle = line_begin + line_length;
 
-	const Vector2f fragment_size = {line_width, text_element->GetLineHeight()};
+	const float line_height = text_element->GetLineHeight();
+	const FontMetrics& font_metrics = GetFontMetrics();
+
+	const Vector2f fragment_size = {line_width, line_height};
 	const FragmentType fragment_type = (line_begin == 0 ? FragmentType::Principal : FragmentType::Additional);
 
-	return FragmentResult(fragment_type, fragment_size, 0.f, 0.f, out_overflow_handle, std::move(line_contents));
+	return FragmentResult(fragment_type, fragment_size, font_metrics.ascent, font_metrics.descent, out_overflow_handle, std::move(line_contents));
 }
 
 void InlineLevelBox_Text::Submit(FragmentBox fragment_box, String text)
@@ -90,7 +93,6 @@ void InlineLevelBox_Text::Submit(FragmentBox fragment_box, String text)
 
 	text_element->AddLine(line_offset, std::move(text));
 
-	// TODO continued lines not handled
 	// TODO Use offset calculation from base function.
 	// TODO Maybe we want to size it?
 }

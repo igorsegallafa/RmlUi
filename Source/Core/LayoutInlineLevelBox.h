@@ -61,6 +61,10 @@ public:
 	// Submit a fragment's position and size to be displayed on the underlying element.
 	virtual void Submit(FragmentBox fragment_box, String text) = 0;
 
+	Style::VerticalAlign GetVerticalAlign() const { return element->GetComputedValues().vertical_align(); }
+
+	const FontMetrics& GetFontMetrics() const;
+
 	virtual String DebugDumpNameValue() const = 0;
 	virtual String DebugDumpTree(int depth) const;
 
@@ -68,11 +72,11 @@ public:
 	void operator delete(void* chunk, size_t size);
 
 protected:
-	InlineLevelBox(Element* element) : element(element) {}
-
-	Element* GetElement() const { return element; }
+	InlineLevelBox(Element* element) : element(element) { RMLUI_ASSERT(element); }
 
 	void SubmitBox(Box box, const FragmentBox& fragment_box);
+
+	Element* GetElement() const { return element; }
 
 	void OnLayout() { element->OnLayout(); } // TODO
 
@@ -108,11 +112,15 @@ enum class FragmentType {
 
 struct FragmentResult {
 	FragmentResult() = default;
-	FragmentResult(FragmentType type, Vector2f layout_bounds, float spacing_left = 0.f, float spacing_right = 0.f,
-		LayoutOverflowHandle overflow_handle = {}, String text = {}) :
+	FragmentResult(FragmentType type, Vector2f layout_bounds, float above_baseline, float below_baseline, float spacing_left, float spacing_right) :
+		type(type), layout_bounds(layout_bounds), spacing_left(spacing_left), spacing_right(spacing_right),
+		total_height_above_baseline(above_baseline), total_depth_below_baseline(below_baseline)
+	{}
+	FragmentResult(FragmentType type, Vector2f layout_bounds, float above_baseline, float below_baseline, LayoutOverflowHandle overflow_handle,
+		String text) :
 		type(type),
-		layout_bounds(layout_bounds), spacing_left(spacing_left), spacing_right(spacing_right), overflow_handle(overflow_handle),
-		text(std::move(text))
+		layout_bounds(layout_bounds), total_height_above_baseline(above_baseline), total_depth_below_baseline(below_baseline),
+		overflow_handle(overflow_handle), text(std::move(text))
 	{}
 
 	FragmentType type = FragmentType::Invalid;
@@ -120,6 +128,9 @@ struct FragmentResult {
 
 	float spacing_left = 0.f;  // Left margin-border-padding for inline boxes.
 	float spacing_right = 0.f; // Right margin-border-padding for inline boxes.
+
+	float total_height_above_baseline = 0.f;
+	float total_depth_below_baseline = 0.f;
 
 	// Overflow handle is non-zero when there is another fragment to be layed out.
 	LayoutOverflowHandle overflow_handle = {};

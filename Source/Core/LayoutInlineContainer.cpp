@@ -41,7 +41,8 @@
 namespace Rml {
 
 InlineContainer::InlineContainer(BlockContainer* _parent, float _element_line_height, bool _wrap_content) :
-	BlockLevelBox(Type::InlineContainer), parent(_parent), element_line_height(_element_line_height), wrap_content(_wrap_content)
+	BlockLevelBox(Type::InlineContainer), parent(_parent), element_line_height(_element_line_height), wrap_content(_wrap_content),
+	root_inline_box(_parent->GetElement())
 {
 	RMLUI_ASSERT(_parent);
 
@@ -97,7 +98,7 @@ InlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
 
 		// TODO: Cleanup logic
 		const bool line_shrinked_by_floats = (available_width < box_size.x);
-		const bool can_wrap_any = (line_shrinked_by_floats || !line_box->NoFragmentsPlaced());
+		const bool can_wrap_any = (line_shrinked_by_floats || line_box->HasContent());
 		const InlineLayoutMode layout_mode =
 			(wrap_content ? (can_wrap_any ? InlineLayoutMode::WrapAny : InlineLayoutMode::WrapAfterContent) : InlineLayoutMode::Nowrap);
 
@@ -105,7 +106,7 @@ InlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
 		if (!add_to_new_line)
 			break;
 
-		minimum_width_next = (line_box->NoFragmentsPlaced() ? available_width + 1.f : 0.f);
+		minimum_width_next = (line_box->HasContent() ? 0.f : available_width + 1.f);
 
 		// Keep adding boxes on a new line, either because the box couldn't fit on the current line at all, or because it had to be split.
 		CloseOpenLineBox();
@@ -192,7 +193,7 @@ void InlineContainer::CloseOpenLineBox(UniquePtr<LayoutLineBox>* out_split_line)
 
 		float height_of_line = 0.f;
 		UniquePtr<LayoutLineBox> split_line_box =
-			line_box->Close(offset_parent->GetElement(), line_position_offset_parent, element_line_height, text_align, height_of_line);
+			line_box->Close(&root_inline_box, offset_parent->GetElement(), line_position_offset_parent, text_align, height_of_line);
 
 		// Move the cursor down, but only if our line has any width.
 		if (line_box->GetBoxCursor() > 0.f)

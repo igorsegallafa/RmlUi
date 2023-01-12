@@ -38,6 +38,9 @@ class InlineBoxBase : public InlineLevelBox {
 public:
 	InlineLevelBox* AddChild(UniquePtr<InlineLevelBox> child);
 
+	// Get the total height above and depth below the baseline based on this element's line-height and font.
+	void GetStrut(float& out_total_height_above, float& out_total_depth_below) const;
+
 	String DebugDumpTree(int depth) const override;
 
 protected:
@@ -79,7 +82,7 @@ private:
  */
 class InlineBoxRoot final : public InlineBoxBase {
 public:
-	InlineBoxRoot();
+	InlineBoxRoot(Element* element);
 
 	FragmentResult CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool first_box,
 		LayoutOverflowHandle overflow_handle) override;

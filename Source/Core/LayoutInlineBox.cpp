@@ -52,6 +52,16 @@ InlineLevelBox* InlineBoxBase::AddChild(UniquePtr<InlineLevelBox> child)
 	return result;
 }
 
+void InlineBoxBase::GetStrut(float& out_total_height_above, float& out_total_depth_below) const
+{
+	const FontMetrics& font_metrics = GetFontMetrics();
+	const float line_height = GetElement()->GetLineHeight();
+
+	const float half_leading = 0.5f * (line_height - (font_metrics.ascent + font_metrics.descent));
+	out_total_height_above = font_metrics.ascent + half_leading;
+	out_total_depth_below = line_height - out_total_height_above;
+}
+
 String InlineBoxBase::DebugDumpTree(int depth) const
 {
 	String value = InlineLevelBox::DebugDumpTree(depth);
@@ -62,7 +72,7 @@ String InlineBoxBase::DebugDumpTree(int depth) const
 
 InlineBoxBase::InlineBoxBase(Element* element) : InlineLevelBox(element) {}
 
-InlineBoxRoot::InlineBoxRoot() : InlineBoxBase(nullptr) {}
+InlineBoxRoot::InlineBoxRoot(Element* element) : InlineBoxBase(element) {}
 
 FragmentResult InlineBoxRoot::CreateFragment(InlineLayoutMode /*mode*/, float /*available_width*/, float /*right_spacing_width*/, bool /*first_box*/,
 	LayoutOverflowHandle /*overflow_handle*/)
@@ -77,7 +87,7 @@ void InlineBoxRoot::Submit(FragmentBox /*box_display*/, String /*text*/)
 
 InlineBox::InlineBox(Element* element, const Box& box) : InlineBoxBase(element), box(box)
 {
-	RMLUI_ASSERT(element && box.GetSize().x < 0.f);
+	RMLUI_ASSERT(box.GetSize().x < 0.f);
 }
 
 FragmentResult InlineBox::CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool /*first_box*/,
@@ -85,14 +95,19 @@ FragmentResult InlineBox::CreateFragment(InlineLayoutMode mode, float available_
 {
 	const float edge_left = GetEdgeSize(box, Box::LEFT);
 	const float edge_right = GetEdgeSize(box, Box::RIGHT);
+
+	float ascent, descent;
+	GetStrut(ascent, descent);
+
 	if (mode != InlineLayoutMode::WrapAny || right_spacing_width <= available_width + edge_left)
-		return FragmentResult(FragmentType::InlineBox, Vector2f(-1.f, GetElement()->GetLineHeight()), edge_left, edge_right);
+		return FragmentResult(FragmentType::InlineBox, Vector2f(-1.f, ascent + descent), ascent, descent, edge_left, edge_right);
 
 	return {};
 }
 
 void InlineBox::Submit(FragmentBox fragment_box, String /*text*/)
 {
+	fragment_box.position.y -= box.GetEdge(Box::PADDING, Box::TOP) + box.GetEdge(Box::BORDER, Box::TOP);
 	SubmitBox(box, fragment_box);
 }
 

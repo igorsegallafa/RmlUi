@@ -33,6 +33,8 @@
 
 namespace Rml {
 
+class InlineBoxRoot;
+
 class LayoutLineBox final {
 public:
 	LayoutLineBox() = default;
@@ -44,7 +46,7 @@ public:
 	// Closes the line, submitting any fragments placed on this line.
 	// @param[out] out_height_of_line Height of line. Note: This can be different from the element's computed line-height property.
 	// @return The next line, containing any open fragments that had to be split or wrapped down.
-	UniquePtr<LayoutLineBox> Close(Element* offset_parent, Vector2f line_position, float element_line_height, Style::TextAlign text_align,
+	UniquePtr<LayoutLineBox> Close(const InlineBoxRoot* root_box, Element* offset_parent, Vector2f line_position, Style::TextAlign text_align,
 		float& out_height_of_line);
 
 	/// Close the open inline box.
@@ -56,13 +58,13 @@ public:
 
 	float GetBoxCursor() const { return box_cursor; }
 	bool IsClosed() const { return is_closed; }
-	bool NoFragmentsPlaced() const { return fragments.empty(); }
+	bool HasContent() const { return fragments.size() > open_fragments.size(); }
 
 	String DebugDumpTree(int depth) const;
 
 	void SetLineBox(Vector2f line_position, float line_width);
 	Vector2f GetPosition() const { return line_position; }
-	
+
 	// Returns the width of the contents of the line, relative to the line position. Includes spacing due to horizontal alignment.
 	// @note Only available after line has been closed.
 	float GetExtentRight() const;
@@ -71,37 +73,41 @@ public:
 	void operator delete(void* chunk, size_t size);
 
 private:
-	struct PlacedFragment {
+	using FragmentIndex = int;
+
+	struct Fragment {
+		enum class Type { SizedBox, InlineBox };
+
+		Type type = Type::SizedBox;
+
 		InlineLevelBox* inline_level_box;
-		Vector2f position;      // Outer (top,left) position relative to start of the line, disregarding floats.
+
+		Vector2f position;      // Outer (top-left) position relative to start of the line, disregarding floats.
 		Vector2f layout_bounds; // Outer size for replaced and inline blocks, inner size for inline boxes.
 
 		String text; // @performance Replace by a pointer or index? Don't need it for most fragments.
 
+		float total_height_above_baseline = 0.f;
+		float total_depth_below_baseline = 0.f;
+
 		bool principal_fragment = true;
 		bool split_left = false;
 		bool split_right = false;
-	};
 
-	struct OpenFragment {
-		InlineBox* inline_box;
-		Vector2f position;         // Outer (top,left) position relative to start of the line, disregarding floats.
-		float layout_height_bound; // Outer size for replaced and inline blocks, inner size for inline boxes.
-
-		float spacing_left = 0.f;  // Left margin-border-padding for inline boxes.
-		float spacing_right = 0.f; // Right margin-border-padding for inline boxes.
-
+		// For inline boxes
 		bool has_content = false;
-		bool principal_fragment = true;
-		bool split_left = false;
-		bool split_right = false;
+		float spacing_left = 0.f;             // Left margin-border-padding for inline boxes.
+		float spacing_right = 0.f;            // Right margin-border-padding for inline boxes.
+		FragmentIndex children_end_index = 0; // One-past-last-child of this box, as index into fragment list.
+
+		float baseline = 0.f; // Vertical offset from root baseline to our baseline.
 	};
 
-	using PlacedFragmentList = Vector<PlacedFragment>;
-	using OpenFragmentList = Vector<OpenFragment>;
+	using FragmentList = Vector<Fragment>;
+	using FragmentIndexList = Vector<FragmentIndex>;
 
 	// Place an open fragment.
-	PlacedFragment& PlaceFragment(const OpenFragment& open_fragment, float inner_right_position);
+	Fragment& CloseFragment(int open_fragment_index, float inner_right_position);
 
 	// Splits the line, returning a new line if there are any open fragments.
 	UniquePtr<LayoutLineBox> SplitLine();
@@ -120,11 +126,11 @@ private:
 	float open_spacing_left = 0.f;
 
 	// List of placed fragments in this line box.
-	PlacedFragmentList fragments;
+	FragmentList fragments;
 
-	// List of fragments from inline boxes that have been opened but are yet to be closed.
+	// List of fragments from inline boxes that have been opened but are yet to be closed, as indices into 'fragments'.
 	// @performance Store using parent pointers to avoid allocations.
-	OpenFragmentList open_fragments;
+	FragmentIndexList open_fragments;
 
 	bool is_closed = false;
 };

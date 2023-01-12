@@ -89,6 +89,17 @@ void InlineLevelBox::SubmitBox(Box box, const FragmentBox& fragment_box)
 
 InlineLevelBox::~InlineLevelBox() {}
 
+const FontMetrics& InlineLevelBox::GetFontMetrics() const
+{
+	if (FontFaceHandle handle = element->GetFontFaceHandle())
+		return GetFontEngineInterface()->GetFontMetrics(handle);
+
+	static const FontMetrics font_metrics = {};
+	// TODO
+	Log::Message(Log::LT_WARNING, "%s", "Font face not set.");
+	return font_metrics;
+}
+
 String InlineLevelBox::DebugDumpTree(int depth) const
 {
 	String value = String(depth * 2, ' ') + DebugDumpNameValue() + " | " + LayoutDetails::GetDebugElementName(GetElement()) + '\n';
@@ -109,8 +120,12 @@ FragmentResult InlineLevelBox_Atomic::CreateFragment(InlineLayoutMode mode, floa
 		box.GetSizeAcross(Box::VERTICAL, Box::MARGIN),
 	};
 
+	// TODO: Set baseline based on the element's specification.
+	float ascent = outer_size.y;
+	float descent = 0.f;
+
 	if (mode != InlineLayoutMode::WrapAny || outer_size.x + right_spacing_width <= available_width)
-		return FragmentResult(FragmentType::Principal, outer_size, 0.f, 0.f);
+		return FragmentResult(FragmentType::Principal, outer_size, ascent, descent, 0.f, 0.f);
 
 	return {};
 }
