@@ -80,7 +80,6 @@ public:
 	float GetHeightIncludingOpenLine() const;
 
 	/// Get the baseline of the last line.
-	/// @param[out] out_baseline
 	/// @return True if the baseline was found.
 	bool GetBaselineOfLastLine(float& out_baseline) const;
 

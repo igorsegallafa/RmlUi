@@ -69,6 +69,8 @@ public:
 	// @note Only available after line has been closed.
 	float GetExtentRight() const;
 
+	float GetBaseline() const;
+
 	void* operator new(size_t size);
 	void operator delete(void* chunk, size_t size);
 
@@ -117,9 +119,6 @@ private:
 	// Available space for the line. Based on our parent box content width, possibly shrinked due to floating boxes.
 	float line_width = 0.f;
 
-	// Content offset due to space distribution from 'text-align'.
-	float offset_horizontal_alignment = 0.f;
-
 	// The horizontal cursor. This is the outer-right position of the last placed fragment.
 	float box_cursor = 0.f;
 	// The contribution of opened inline boxes to the placement of the next fragment, due to their left edges (margin-border-padding).
@@ -133,6 +132,13 @@ private:
 	FragmentIndexList open_fragments;
 
 	bool is_closed = false;
+
+	// Content offset due to space distribution from 'text-align'. Available after close.
+	float offset_horizontal_alignment = 0.f;
+
+	// The line box's height above baseline. Available after close.
+	float total_height_above_baseline = 0.f;
+
 };
 
 } // namespace Rml

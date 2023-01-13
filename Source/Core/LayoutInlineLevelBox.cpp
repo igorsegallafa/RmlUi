@@ -119,9 +119,8 @@ FragmentResult InlineLevelBox_Atomic::CreateFragment(InlineLayoutMode mode, floa
 {
 	const Vector2f outer_size = box.GetSize(Box::MARGIN);
 
-	// TODO: Set baseline based on the element's specification.
-	float ascent = outer_size.y;
-	float descent = 0.f;
+	const float descent = GetElement()->GetBaseline();
+	const float ascent = outer_size.y - descent;
 
 	if (mode != InlineLayoutMode::WrapAny || outer_size.x + right_spacing_width <= available_width)
 		return FragmentResult(FragmentType::Principal, outer_size, ascent, descent, 0.f, 0.f);

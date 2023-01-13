@@ -190,6 +190,8 @@ UniquePtr<LayoutLineBox> LayoutLineBox::Close(const InlineBoxRoot* root_box, Ele
 	// find the maximum height above root baseline and maximum depth below root baseline. Their sum is the height of the
 	// line. Now, we can vertically position each box based on the line-box height above baseline, the box's root
 	// baseline offset, and the box's baseline-to-top height.
+	//
+	// TODO: Aligned subtree.
 	float max_ascent = 0.f;
 	float max_descent = 0.f;
 	root_box->GetStrut(max_ascent, max_descent);
@@ -255,6 +257,7 @@ UniquePtr<LayoutLineBox> LayoutLineBox::Close(const InlineBoxRoot* root_box, Ele
 
 		// Size line.
 		out_height_of_line = max_ascent + max_descent;
+		total_height_above_baseline = max_ascent;
 
 		// Now that the line is sized we can set the vertical position of the fragments.
 		for (Fragment& fragment : fragments)
@@ -408,9 +411,14 @@ void LayoutLineBox::SetLineBox(Vector2f _line_position, float _line_width)
 
 float LayoutLineBox::GetExtentRight() const
 {
-	// TODO
-	// RMLUI_ASSERT(is_closed);
+	RMLUI_ASSERT(is_closed);
 	return box_cursor + offset_horizontal_alignment;
+}
+
+float LayoutLineBox::GetBaseline() const
+{
+	RMLUI_ASSERT(is_closed);
+	return line_position.y + total_height_above_baseline;
 }
 
 void* LayoutLineBox::operator new(size_t size)

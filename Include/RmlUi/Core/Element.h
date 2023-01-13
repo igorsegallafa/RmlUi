@@ -177,8 +177,8 @@ public:
 	/// @return the number of boxes making up this element's geometry.
 	int GetNumBoxes();
 
-	/// Returns the baseline of the element, in pixels offset from the bottom of the element's content area.
-	/// @return The element's baseline. A negative baseline will be further 'up' the element, a positive on further 'down'. The default element will return 0.
+	/// Returns the baseline of the element, in pixel offset from the element's bottom margin edge.
+	/// @return The element's baseline. A negative baseline will be further 'up' the element, a positive one further 'down'. The default element will return 0.
 	virtual float GetBaseline() const;
 	/// Gets the intrinsic dimensions of this element, if it is of a type that has an inherent size. This size will
 	/// only be overriden by a styled width or height.

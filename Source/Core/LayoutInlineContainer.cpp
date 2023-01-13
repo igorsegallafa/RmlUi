@@ -230,7 +230,7 @@ float InlineContainer::GetShrinkToFitWidth() const
 		// Perhaps a more robust solution is to modify how we set the line box dimension on 'line_box->close()'
 		// and use that, or add another value in the line_box ... but seems to work for now.
 		LayoutLineBox* line_box = line_boxes[i].get();
-		content_width = Math::Max(content_width, line_box->GetPosition().x + line_box->GetExtentRight());
+		content_width = Math::Max(content_width, line_box->GetPosition().x - position.x + line_box->GetBoxCursor());
 	}
 	content_width = Math::Min(content_width, box_size.x);
 
@@ -244,15 +244,12 @@ float InlineContainer::GetHeightIncludingOpenLine() const
 
 bool InlineContainer::GetBaselineOfLastLine(float& out_baseline) const
 {
-	bool found_baseline = false;
-	for (int j = (int)line_boxes.size() - 1; j >= 0; j--)
+	if (!line_boxes.empty())
 	{
-		// TODO
-		// found_baseline = line_boxes[j]->GetBaselineOfLastLine(out_baseline);
-		if (found_baseline)
-			break;
+		out_baseline = line_boxes.back()->GetBaseline();
+		return true;
 	}
-	return found_baseline;
+	return false;
 }
 
 LayoutLineBox* InlineContainer::EnsureOpenLineBox()

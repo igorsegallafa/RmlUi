@@ -253,8 +253,9 @@ BlockContainer::CloseResult BlockContainer::Close()
 		// This is a special rule for inline-blocks (see CSS 2.1 Sec. 10.8.1).
 		if (element->GetDisplay() == Style::Display::InlineBlock)
 		{
-			bool found_baseline = false;
+			// Baseline relative to the border box of our children's offset parent.
 			float baseline = 0;
+			bool found_baseline = false;
 
 			for (int i = (int)block_boxes.size() - 1; i >= 0; i--)
 			{
@@ -274,7 +275,13 @@ BlockContainer::CloseResult BlockContainer::Close()
 					baseline = 0;
 				}
 
-				element->SetBaseline(baseline);
+				// It is assumed here that we are the offset parent of our children. If this is not the case, we might need
+				// to take into account the offset between this box's position and our children's offset parent.
+				RMLUI_ASSERT(this == offset_parent);
+
+				// Set the element baseline which is the distance from the margin bottom of the element to its baseline.
+				const float element_baseline = box.GetSizeAcross(Box::VERTICAL, Box::BORDER) + box.GetEdge(Box::MARGIN, Box::BOTTOM) - baseline;
+				element->SetBaseline(element_baseline);
 			}
 		}
 	}
