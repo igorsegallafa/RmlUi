@@ -110,6 +110,18 @@ void InlineBox::Submit(FragmentBox fragment_box, String /*text*/)
 	// Inline boxes are vertically positioned in inline layout as if they have no edges, while SubmitBox expects
 	// margin-box position.
 	fragment_box.position.y -= GetEdgeSize(box, Box::TOP);
+
+	// TODO: Ugly. Same for every fragment, move to constructor.
+	float ascent, descent;
+	GetStrut(ascent, descent);
+
+	const FontMetrics& font_metrics = GetFontMetrics();
+	// The line box content height does not depend on the 'line-height' property, only on the font, and is not exactly
+	// specified by CSS. Here we choose to size the content height equal to the default line-height given the font-size.
+	fragment_box.size.y = 1.2f * (float)font_metrics.size;
+	// Position the box around the baseline, by adding half-leading to each side to achieve the above height.
+	fragment_box.position.y += ascent - 0.5f * (fragment_box.size.y + font_metrics.ascent - font_metrics.descent);
+
 	SubmitBox(box, fragment_box);
 }
 

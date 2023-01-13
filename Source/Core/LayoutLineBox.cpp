@@ -294,7 +294,7 @@ UniquePtr<LayoutLineBox> LayoutLineBox::Close(const InlineBoxRoot* root_box, Ele
 		RMLUI_ASSERT(fragment.layout_bounds.x >= 0.f);
 		FragmentBox fragment_box = {
 			offset_parent,
-			line_position + fragment.position + Vector2f(offset_horizontal_alignment, 0.f), // fragment.baseline + max_ascent
+			line_position + fragment.position + Vector2f(offset_horizontal_alignment, 0.f),
 			fragment.layout_bounds,
 			fragment.principal_fragment,
 			fragment.split_left,

@@ -89,8 +89,8 @@ private:
 
 		String text; // @performance Replace by a pointer or index? Don't need it for most fragments.
 
-		float total_height_above_baseline = 0.f;
-		float total_depth_below_baseline = 0.f;
+		float total_height_above_baseline = 0.f; // Fragment contribution to the line box height above this fragment's baseline.
+		float total_depth_below_baseline = 0.f;  // Fragment contribution to the line box height below this fragment's baseline.
 
 		bool principal_fragment = true;
 		bool split_left = false;
@@ -138,7 +138,6 @@ private:
 
 	// The line box's height above baseline. Available after close.
 	float total_height_above_baseline = 0.f;
-
 };
 
 } // namespace Rml
