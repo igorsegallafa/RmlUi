@@ -100,7 +100,7 @@ private:
 		float spacing_right = 0.f;            // Right margin-border-padding for inline boxes.
 		FragmentIndex children_end_index = 0; // One-past-last-child of this box, as index into fragment list.
 
-		float baseline = 0.f; // Vertical offset from root baseline to our baseline.
+		float baseline_offset = 0.f; // Vertical offset from root baseline to our baseline.
 	};
 
 	using FragmentList = Vector<Fragment>;

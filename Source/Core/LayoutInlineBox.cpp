@@ -107,7 +107,9 @@ FragmentResult InlineBox::CreateFragment(InlineLayoutMode mode, float available_
 
 void InlineBox::Submit(FragmentBox fragment_box, String /*text*/)
 {
-	fragment_box.position.y -= box.GetEdge(Box::PADDING, Box::TOP) + box.GetEdge(Box::BORDER, Box::TOP);
+	// Inline boxes are vertically positioned in inline layout as if they have no edges, while SubmitBox expects
+	// margin-box position.
+	fragment_box.position.y -= GetEdgeSize(box, Box::TOP);
 	SubmitBox(box, fragment_box);
 }
 

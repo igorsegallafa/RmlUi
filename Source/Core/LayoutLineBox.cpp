@@ -192,6 +192,7 @@ UniquePtr<LayoutLineBox> LayoutLineBox::Close(const InlineBoxRoot* root_box, Ele
 	// baseline offset, and the box's baseline-to-top height.
 	float max_ascent = 0.f;
 	float max_descent = 0.f;
+	root_box->GetStrut(max_ascent, max_descent);
 
 	{
 		using Style::VerticalAlign;
@@ -207,7 +208,7 @@ UniquePtr<LayoutLineBox> LayoutLineBox::Close(const InlineBoxRoot* root_box, Ele
 			if (!open_fragments.empty() && i == fragments[open_fragments.back()].children_end_index)
 			{
 				open_fragments.pop_back();
-				parent_absolute_baseline = (open_fragments.empty() ? 0.f : fragments[open_fragments.back()].baseline);
+				parent_absolute_baseline = (open_fragments.empty() ? 0.f : fragments[open_fragments.back()].baseline_offset);
 			}
 
 			const InlineLevelBox* parent = (open_fragments.empty() ? root_box : fragments[open_fragments.back()].inline_level_box);
@@ -218,33 +219,54 @@ UniquePtr<LayoutLineBox> LayoutLineBox::Close(const InlineBoxRoot* root_box, Ele
 			const float parent_relative_baseline =
 				GetParentRelativeBaseline(parent, vertical_align, fragment.total_height_above_baseline, fragment.total_depth_below_baseline);
 
-			fragment.baseline = parent_absolute_baseline + parent_relative_baseline;
+			fragment.baseline_offset = parent_absolute_baseline + parent_relative_baseline;
 
 			if (fragment.type == Fragment::Type::InlineBox)
 			{
 				open_fragments.push_back(i);
-				parent_absolute_baseline = fragment.baseline;
+				parent_absolute_baseline = fragment.baseline_offset;
 			}
 		}
 
 		open_fragments.clear();
 
-		root_box->GetStrut(max_ascent, max_descent);
-
 		for (const Fragment& fragment : fragments)
 		{
-			max_ascent = Math::Max(max_ascent, fragment.total_height_above_baseline + fragment.baseline);
-			max_descent = Math::Max(max_descent, fragment.total_depth_below_baseline + fragment.baseline);
+			const VerticalAlign vertical_align = fragment.inline_level_box->GetVerticalAlign();
+			if (vertical_align.type != VerticalAlign::Top && vertical_align.type != VerticalAlign::Bottom)
+			{
+				max_ascent = Math::Max(max_ascent, fragment.total_height_above_baseline - fragment.baseline_offset);
+				max_descent = Math::Max(max_descent, fragment.total_depth_below_baseline + fragment.baseline_offset);
+			}
 		}
 
 		for (Fragment& fragment : fragments)
 		{
-			fragment.position.y = max_ascent - fragment.total_height_above_baseline + fragment.baseline;
+			const VerticalAlign vertical_align = fragment.inline_level_box->GetVerticalAlign();
+			if (vertical_align.type == VerticalAlign::Top)
+			{
+				max_descent = Math::Max(max_descent, fragment.layout_bounds.y - max_ascent);
+			}
+			else if (vertical_align.type == VerticalAlign::Bottom)
+			{
+				max_ascent = Math::Max(max_ascent, fragment.layout_bounds.y - max_descent);
+			}
+		}
+
+		// Size line.
+		out_height_of_line = max_ascent + max_descent;
+
+		// Now that the line is sized we can set the vertical position of the fragments.
+		for (Fragment& fragment : fragments)
+		{
+			switch (fragment.inline_level_box->GetVerticalAlign().type)
+			{
+			case VerticalAlign::Top: fragment.position.y = 0.f; break;
+			case VerticalAlign::Bottom: fragment.position.y = out_height_of_line - fragment.layout_bounds.y; break;
+			default: fragment.position.y = max_ascent - fragment.total_height_above_baseline + fragment.baseline_offset; break;
+			}
 		}
 	}
-
-	// Size line.
-	out_height_of_line = Math::Max(out_height_of_line, max_ascent + max_descent);
 
 	// Horizontal alignment using available space on our line.
 	if (box_cursor < line_width)

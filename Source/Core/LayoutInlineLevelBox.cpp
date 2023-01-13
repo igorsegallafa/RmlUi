@@ -69,8 +69,10 @@ void InlineLevelBox::SubmitBox(Box box, const FragmentBox& fragment_box)
 	if (fragment_box.split_right)
 		ZeroBoxEdge(box, Box::RIGHT);
 
-	Vector2f offset = fragment_box.position;
-	offset.x += box.GetEdge(Box::MARGIN, Box::LEFT);
+	// Boxes are positioned based on their margin-box in inline layout, while element offsets are specified relative to
+	// their border-box. Thus, add the margin edge to the element offset here.
+	const Vector2f margin_edge = Vector2f{box.GetEdge(Box::MARGIN, Box::LEFT), box.GetEdge(Box::MARGIN, Box::TOP)};
+	const Vector2f offset = fragment_box.position + margin_edge;
 
 	if (fragment_box.principal_box)
 	{
@@ -115,10 +117,7 @@ InlineLevelBox_Atomic::InlineLevelBox_Atomic(Element* element, const Box& box) :
 FragmentResult InlineLevelBox_Atomic::CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool /*first_box*/,
 	LayoutOverflowHandle /*overflow_handle*/)
 {
-	const Vector2f outer_size = {
-		box.GetSizeAcross(Box::HORIZONTAL, Box::MARGIN),
-		box.GetSizeAcross(Box::VERTICAL, Box::MARGIN),
-	};
+	const Vector2f outer_size = box.GetSize(Box::MARGIN);
 
 	// TODO: Set baseline based on the element's specification.
 	float ascent = outer_size.y;
