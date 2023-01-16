@@ -317,17 +317,10 @@ void ElementText::ClearLines()
 // Adds a new line into the text element.
 void ElementText::AddLine(Vector2f line_position, String line)
 {
-	FontFaceHandle font_face_handle = GetFontFaceHandle();
-
-	if (font_face_handle == 0)
-		return;
-
 	if (font_effects_dirty)
 		UpdateFontEffects();
 
-	// TODO: Consider using the baseline position as input into this function.
-	Vector2f baseline_position = line_position + Vector2f(0.0f, GetFontEngineInterface()->GetFontMetrics(font_face_handle).ascent);
-	lines.emplace_back(std::move(line), baseline_position);
+	lines.emplace_back(std::move(line), line_position);
 
 	geometry_dirty = true;
 }

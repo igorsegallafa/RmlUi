@@ -985,6 +985,10 @@ Vector2f WidgetTextInput::FormatText(float height_constraint)
 {
 	Vector2f content_area(0, 0);
 
+	const FontFaceHandle font_handle = parent->GetFontFaceHandle();
+	if (!font_handle)
+		return content_area;
+
 	// Clear the old lines, and all the lines in the text elements.
 	lines.clear();
 	text_element->ClearLines();
@@ -998,12 +1002,13 @@ Vector2f WidgetTextInput::FormatText(float height_constraint)
 
 	// Determine the line-height of the text element.
 	const float line_height = parent->GetLineHeight();
+	const float font_baseline = GetFontEngineInterface()->GetFontMetrics(font_handle).ascent;
 	// When the selection contains endlines we expand the selection area by this width.
 	const int endline_selection_width = int(0.4f * parent->GetComputedValues().font_size());
 
 	const float client_width = parent->GetClientWidth();
 	int line_begin = 0;
-	Vector2f line_position(0, 0);
+	Vector2f line_position(0, font_baseline);
 	bool last_line = false;
 
 	// Keep generating lines until all the text content is placed.
@@ -1101,7 +1106,7 @@ Vector2f WidgetTextInput::FormatText(float height_constraint)
 			selection_vertices.resize(selection_vertices.size() + 4);
 			selection_indices.resize(selection_indices.size() + 6);
 			GeometryUtilities::GenerateQuad(&selection_vertices[selection_vertices.size() - 4], &selection_indices[selection_indices.size() - 6],
-				line_position, selection_size, selection_colour, (int)selection_vertices.size() - 4);
+				line_position - Vector2f(0.f, font_baseline), selection_size, selection_colour, (int)selection_vertices.size() - 4);
 
 			line_position.x += selection_width;
 		}

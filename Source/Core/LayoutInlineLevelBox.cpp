@@ -123,7 +123,7 @@ FragmentResult InlineLevelBox_Atomic::CreateFragment(InlineLayoutMode mode, floa
 	const float ascent = outer_size.y - descent;
 
 	if (mode != InlineLayoutMode::WrapAny || outer_size.x + right_spacing_width <= available_width)
-		return FragmentResult(FragmentType::Principal, outer_size, ascent, descent, 0.f, 0.f);
+		return FragmentResult(FragmentType::SizedBox, true, outer_size, ascent, descent, 0.f, 0.f);
 
 	return {};
 }

@@ -100,7 +100,7 @@ FragmentResult InlineBox::CreateFragment(InlineLayoutMode mode, float available_
 	GetStrut(ascent, descent);
 
 	if (mode != InlineLayoutMode::WrapAny || right_spacing_width <= available_width + edge_left)
-		return FragmentResult(FragmentType::InlineBox, Vector2f(-1.f, ascent + descent), ascent, descent, edge_left, edge_right);
+		return FragmentResult(FragmentType::InlineBox, true, Vector2f(-1.f, ascent + descent), ascent, descent, edge_left, edge_right);
 
 	return {};
 }

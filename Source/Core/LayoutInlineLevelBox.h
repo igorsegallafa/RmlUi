@@ -104,26 +104,30 @@ private:
 };
 
 enum class FragmentType {
-	Invalid,    // Could not be placed.
-	InlineBox,  // An inline box.
-	Principal,  // The element's first and main fragment for inline-level boxes that are not inline-boxes.
-	Additional, // Positioned relative to the element's principal fragment.
+	Invalid,   // Could not be placed.
+	InlineBox, // An inline box.
+	SizedBox,  // Sized inline-level boxes that are not inline-boxes.
+	TextRun,   // Text runs.
 };
 
 struct FragmentResult {
 	FragmentResult() = default;
-	FragmentResult(FragmentType type, Vector2f layout_bounds, float above_baseline, float below_baseline, float spacing_left, float spacing_right) :
-		type(type), layout_bounds(layout_bounds), spacing_left(spacing_left), spacing_right(spacing_right),
+	FragmentResult(FragmentType type, bool principal_fragment, Vector2f layout_bounds, float above_baseline, float below_baseline, float spacing_left,
+		float spacing_right) :
+		type(type),
+		principal_fragment(principal_fragment), layout_bounds(layout_bounds), spacing_left(spacing_left), spacing_right(spacing_right),
 		total_height_above_baseline(above_baseline), total_depth_below_baseline(below_baseline)
 	{}
-	FragmentResult(FragmentType type, Vector2f layout_bounds, float above_baseline, float below_baseline, LayoutOverflowHandle overflow_handle,
-		String text) :
+	FragmentResult(FragmentType type, bool principal_fragment, Vector2f layout_bounds, float above_baseline, float below_baseline,
+		LayoutOverflowHandle overflow_handle, String text) :
 		type(type),
-		layout_bounds(layout_bounds), total_height_above_baseline(above_baseline), total_depth_below_baseline(below_baseline),
-		overflow_handle(overflow_handle), text(std::move(text))
+		principal_fragment(principal_fragment), layout_bounds(layout_bounds), total_height_above_baseline(above_baseline),
+		total_depth_below_baseline(below_baseline), overflow_handle(overflow_handle), text(std::move(text))
 	{}
 
 	FragmentType type = FragmentType::Invalid;
+	bool principal_fragment = false; // The element's main fragment, all other fragments are positioned relative to it.
+
 	Vector2f layout_bounds;
 
 	float spacing_left = 0.f;  // Left margin-border-padding for inline boxes.

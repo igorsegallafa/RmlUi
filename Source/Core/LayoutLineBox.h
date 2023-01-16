@@ -78,9 +78,7 @@ private:
 	using FragmentIndex = int;
 
 	struct Fragment {
-		enum class Type { SizedBox, InlineBox };
-
-		Type type = Type::SizedBox;
+		FragmentType type = FragmentType::Invalid;
 
 		InlineLevelBox* inline_level_box;
 

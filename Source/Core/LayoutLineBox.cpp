@@ -82,7 +82,7 @@ bool LayoutLineBox::AddBox(InlineLevelBox* box, InlineLayoutMode layout_mode, fl
 
 		// TODO simplify, combine with below.
 		fragments.push_back(Fragment{
-			Fragment::Type::InlineBox,
+			FragmentType::InlineBox,
 			box,
 			{box_placement_cursor, 0.f},
 			fragment.layout_bounds,
@@ -100,15 +100,15 @@ bool LayoutLineBox::AddBox(InlineLevelBox* box, InlineLayoutMode layout_mode, fl
 		open_spacing_left += fragment.spacing_left;
 	}
 	break;
-	case FragmentType::Principal:
-	case FragmentType::Additional:
+	case FragmentType::SizedBox:
+	case FragmentType::TextRun:
 	{
 		// Fixed-size fragment.
 		RMLUI_ASSERT(fragment.layout_bounds.x >= 0.f && fragment.layout_bounds.y >= 0.f);
 
 		// TODO.
-		fragments.push_back(Fragment{Fragment::Type::SizedBox, box, {box_placement_cursor, 0.f}, fragment.layout_bounds, std::move(fragment.text),
-			fragment.total_height_above_baseline, fragment.total_depth_below_baseline, (fragment.type == FragmentType::Principal)});
+		fragments.push_back(Fragment{fragment.type, box, {box_placement_cursor, 0.f}, fragment.layout_bounds, std::move(fragment.text),
+			fragment.total_height_above_baseline, fragment.total_depth_below_baseline, fragment.principal_fragment});
 		box_cursor = box_placement_cursor + fragment.layout_bounds.x;
 		open_spacing_left = 0.f;
 
@@ -192,15 +192,13 @@ UniquePtr<LayoutLineBox> LayoutLineBox::Close(const InlineBoxRoot* root_box, Ele
 	// baseline offset, and the box's baseline-to-top height.
 	//
 	// TODO: Aligned subtree.
-	float max_ascent = 0.f;
-	float max_descent = 0.f;
-	root_box->GetStrut(max_ascent, max_descent);
 
 	{
 		using Style::VerticalAlign;
 
-		// Absolute means relative to root box's baseline.
-		float parent_absolute_baseline = 0.f;
+		float max_ascent = 0.f;
+		float max_descent = 0.f;
+		root_box->GetStrut(max_ascent, max_descent);
 
 		// We might be able to reuse the memory from this one (unless it was split).
 		open_fragments.clear();
@@ -208,14 +206,14 @@ UniquePtr<LayoutLineBox> LayoutLineBox::Close(const InlineBoxRoot* root_box, Ele
 		for (int i = 0; i < (int)fragments.size(); i++)
 		{
 			if (!open_fragments.empty() && i == fragments[open_fragments.back()].children_end_index)
-			{
 				open_fragments.pop_back();
-				parent_absolute_baseline = (open_fragments.empty() ? 0.f : fragments[open_fragments.back()].baseline_offset);
-			}
 
-			const InlineLevelBox* parent = (open_fragments.empty() ? root_box : fragments[open_fragments.back()].inline_level_box);
+			// Absolute means relative to root box's baseline.
+			const float parent_absolute_baseline = (open_fragments.empty() ? 0.f : fragments[open_fragments.back()].baseline_offset);
 
 			Fragment& fragment = fragments[i];
+
+			const InlineLevelBox* parent = (open_fragments.empty() ? root_box : fragments[open_fragments.back()].inline_level_box);
 			const VerticalAlign vertical_align = fragment.inline_level_box->GetVerticalAlign();
 
 			const float parent_relative_baseline =
@@ -223,19 +221,18 @@ UniquePtr<LayoutLineBox> LayoutLineBox::Close(const InlineBoxRoot* root_box, Ele
 
 			fragment.baseline_offset = parent_absolute_baseline + parent_relative_baseline;
 
-			if (fragment.type == Fragment::Type::InlineBox)
-			{
+			if (fragment.type == FragmentType::InlineBox)
 				open_fragments.push_back(i);
-				parent_absolute_baseline = fragment.baseline_offset;
-			}
 		}
 
 		open_fragments.clear();
 
 		for (const Fragment& fragment : fragments)
 		{
+			// TODO: Cache vertical align?
 			const VerticalAlign vertical_align = fragment.inline_level_box->GetVerticalAlign();
-			if (vertical_align.type != VerticalAlign::Top && vertical_align.type != VerticalAlign::Bottom)
+
+			if (fragment.type != FragmentType::TextRun && vertical_align.type != VerticalAlign::Top && vertical_align.type != VerticalAlign::Bottom)
 			{
 				max_ascent = Math::Max(max_ascent, fragment.total_height_above_baseline - fragment.baseline_offset);
 				max_descent = Math::Max(max_descent, fragment.total_depth_below_baseline + fragment.baseline_offset);
@@ -288,7 +285,7 @@ UniquePtr<LayoutLineBox> LayoutLineBox::Close(const InlineBoxRoot* root_box, Ele
 	for (const auto& fragment : fragments)
 	{
 		// Skip inline-boxes which have not been closed (moved down to next line).
-		if (fragment.type == Fragment::Type::InlineBox && fragment.children_end_index == 0)
+		if (fragment.type == FragmentType::InlineBox && fragment.children_end_index == 0)
 			continue;
 
 		RMLUI_ASSERT(fragment.layout_bounds.x >= 0.f);
@@ -312,13 +309,13 @@ LayoutLineBox::Fragment& LayoutLineBox::CloseFragment(int open_fragment_index, f
 {
 	// TODO: We only mark it as closing, don't really need anything else. Could achieve this in other ways too.
 	Fragment& open_fragment = fragments[open_fragment_index];
-	RMLUI_ASSERT(open_fragment.type == Fragment::Type::InlineBox);
+	RMLUI_ASSERT(open_fragment.type == FragmentType::InlineBox);
 
 	open_fragment.children_end_index = (int)fragments.size();
 
 	// TODO: Maybe use outer position/size?
 	open_fragment.layout_bounds.x =
-		Math::Max(inner_right_position - (open_fragment.position.x + open_fragment.spacing_left * (open_fragment.split_left ? 0.f : 1.0f)), 0.f);
+		Math::Max(inner_right_position - open_fragment.position.x - (open_fragment.split_left ? 0.f : open_fragment.spacing_left), 0.f);
 
 	return open_fragment;
 }
