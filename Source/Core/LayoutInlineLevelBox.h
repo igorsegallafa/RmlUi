@@ -74,7 +74,7 @@ public:
 protected:
 	InlineLevelBox(Element* element) : element(element) { RMLUI_ASSERT(element); }
 
-	void SubmitBox(Box box, const FragmentBox& fragment_box);
+	void SubmitBox(Box box, Vector2f content_size, const FragmentBox& fragment_box);
 
 	Element* GetElement() const { return element; }
 
@@ -112,23 +112,23 @@ enum class FragmentType {
 
 struct FragmentResult {
 	FragmentResult() = default;
-	FragmentResult(FragmentType type, bool principal_fragment, Vector2f layout_bounds, float above_baseline, float below_baseline, float spacing_left,
+	FragmentResult(FragmentType type, bool principal_fragment, float outer_width, float above_baseline, float below_baseline, float spacing_left,
 		float spacing_right) :
 		type(type),
-		principal_fragment(principal_fragment), layout_bounds(layout_bounds), spacing_left(spacing_left), spacing_right(spacing_right),
+		principal_fragment(principal_fragment), outer_width(outer_width), spacing_left(spacing_left), spacing_right(spacing_right),
 		total_height_above_baseline(above_baseline), total_depth_below_baseline(below_baseline)
 	{}
-	FragmentResult(FragmentType type, bool principal_fragment, Vector2f layout_bounds, float above_baseline, float below_baseline,
+	FragmentResult(FragmentType type, bool principal_fragment, float outer_width, float above_baseline, float below_baseline,
 		LayoutOverflowHandle overflow_handle, String text) :
 		type(type),
-		principal_fragment(principal_fragment), layout_bounds(layout_bounds), total_height_above_baseline(above_baseline),
+		principal_fragment(principal_fragment), outer_width(outer_width), total_height_above_baseline(above_baseline),
 		total_depth_below_baseline(below_baseline), overflow_handle(overflow_handle), text(std::move(text))
 	{}
 
 	FragmentType type = FragmentType::Invalid;
 	bool principal_fragment = false; // The element's main fragment, all other fragments are positioned relative to it.
 
-	Vector2f layout_bounds;
+	float outer_width = 0.f;
 
 	float spacing_left = 0.f;  // Left margin-border-padding for inline boxes.
 	float spacing_right = 0.f; // Right margin-border-padding for inline boxes.
@@ -145,7 +145,7 @@ struct FragmentResult {
 struct FragmentBox {
 	Element* offset_parent;
 	Vector2f position;
-	Vector2f size;
+	float layout_width;
 	bool principal_box;
 	bool split_left;
 	bool split_right;

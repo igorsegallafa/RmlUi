@@ -85,9 +85,15 @@ void InlineBoxRoot::Submit(FragmentBox /*box_display*/, String /*text*/)
 	RMLUI_ERROR;
 }
 
-InlineBox::InlineBox(Element* element, const Box& box) : InlineBoxBase(element), box(box)
+InlineBox::InlineBox(Element* element, const Box& _box) : InlineBoxBase(element), box(_box)
 {
-	RMLUI_ASSERT(box.GetSize().x < 0.f);
+	RMLUI_ASSERT(box.GetSize().x < 0.f && box.GetSize().y < 0.f);
+
+	const FontMetrics& font_metrics = GetFontMetrics();
+
+	// The line box content height does not depend on the 'line-height' property, only on the font, and is not exactly
+	// specified by CSS. Here we choose to size the content height equal to the default line-height given the font-size.
+	box.SetContent(Vector2f(-1.f, 1.2f * (float)font_metrics.size));
 }
 
 FragmentResult InlineBox::CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool /*first_box*/,
@@ -95,34 +101,37 @@ FragmentResult InlineBox::CreateFragment(InlineLayoutMode mode, float available_
 {
 	const float edge_left = GetEdgeSize(box, Box::LEFT);
 	const float edge_right = GetEdgeSize(box, Box::RIGHT);
+	const float margin_height = box.GetSizeAcross(Box::VERTICAL, Box::MARGIN);
 
 	float ascent, descent;
 	GetStrut(ascent, descent);
 
 	if (mode != InlineLayoutMode::WrapAny || right_spacing_width <= available_width + edge_left)
-		return FragmentResult(FragmentType::InlineBox, true, Vector2f(-1.f, ascent + descent), ascent, descent, edge_left, edge_right);
+		return FragmentResult(FragmentType::InlineBox, true, -1.f, ascent, descent, edge_left, edge_right);
 
 	return {};
 }
 
 void InlineBox::Submit(FragmentBox fragment_box, String /*text*/)
 {
-	// Inline boxes are vertically positioned in inline layout as if they have no edges, while SubmitBox expects
-	// margin-box position.
-	fragment_box.position.y -= GetEdgeSize(box, Box::TOP);
-
 	// TODO: Ugly. Same for every fragment, move to constructor.
 	float ascent, descent;
 	GetStrut(ascent, descent);
 
 	const FontMetrics& font_metrics = GetFontMetrics();
-	// The line box content height does not depend on the 'line-height' property, only on the font, and is not exactly
+	// TODO The line box content height does not depend on the 'line-height' property, only on the font, and is not exactly
 	// specified by CSS. Here we choose to size the content height equal to the default line-height given the font-size.
-	fragment_box.size.y = 1.2f * (float)font_metrics.size;
-	// Position the box around the baseline, by adding half-leading to each side to achieve the above height.
-	fragment_box.position.y += ascent - 0.5f * (fragment_box.size.y + font_metrics.ascent - font_metrics.descent);
 
-	SubmitBox(box, fragment_box);
+	const float inner_height = box.GetSize().y;
+
+	const float half_leading = 0.5f * (inner_height - (font_metrics.ascent + font_metrics.descent));
+
+	// Position the box around the baseline, by adding half-leading to each side to achieve the above height.
+	fragment_box.position.y -= font_metrics.ascent + half_leading + GetEdgeSize(box, Box::TOP);
+
+	const float inner_width = fragment_box.layout_width;
+
+	SubmitBox(box, Vector2f(inner_width, inner_height), fragment_box);
 }
 
 } // namespace Rml

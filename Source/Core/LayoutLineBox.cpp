@@ -66,36 +66,50 @@ bool LayoutLineBox::AddBox(InlineLevelBox* box, InlineLayoutMode layout_mode, fl
 		available_width = Math::Max(Math::RoundUpFloat(line_width - box_placement_cursor), 0.f);
 
 	FragmentResult fragment = box->CreateFragment(layout_mode, available_width, open_spacing_right, first_box, inout_overflow_handle);
-
 	inout_overflow_handle = {};
+
+	if (fragment.type == FragmentType::Invalid)
+	{
+		// Could not place fragment on this line, try again on a new line.
+		RMLUI_ASSERT(layout_mode == InlineLayoutMode::WrapAny);
+		return true;
+	}
+
 	bool continue_on_new_line = false;
+
+	Fragment new_fragment{
+		fragment.type,
+		box->GetVerticalAlign(),
+		box,
+		{box_placement_cursor, 0.f},
+		fragment.outer_width,
+		std::move(fragment.text),
+		fragment.total_height_above_baseline,
+		fragment.total_depth_below_baseline,
+		fragment.principal_fragment,
+		false,
+		false,
+		false,
+		fragment.spacing_left,
+		fragment.spacing_right,
+	};
+	// TODO: Temporary max_ascent/descent
+	new_fragment.max_ascent = new_fragment.total_height_above_baseline;
+	new_fragment.max_descent = new_fragment.total_depth_below_baseline;
+	new_fragment.parent_fragment = GetOpenParent();
+	new_fragment.aligned_subtree_root = GetOpenAlignedSubtreeRoot();
 
 	switch (fragment.type)
 	{
 	case FragmentType::InlineBox:
 	{
 		// Opens up an inline box.
-		RMLUI_ASSERT(fragment.layout_bounds.x < 0.f && fragment.layout_bounds.y >= 0.f);
+		RMLUI_ASSERT(fragment.outer_width < 0.f);
 		RMLUI_ASSERT(rmlui_dynamic_cast<InlineBox*>(box));
 
 		open_fragments.push_back((int)fragments.size());
 
-		// TODO simplify, combine with below.
-		fragments.push_back(Fragment{
-			FragmentType::InlineBox,
-			box,
-			{box_placement_cursor, 0.f},
-			fragment.layout_bounds,
-			std::move(fragment.text),
-			fragment.total_height_above_baseline,
-			fragment.total_depth_below_baseline,
-			true,
-			false,
-			false,
-			false,
-			fragment.spacing_left,
-			fragment.spacing_right,
-		});
+		fragments.push_back(std::move(new_fragment));
 
 		open_spacing_left += fragment.spacing_left;
 	}
@@ -104,12 +118,11 @@ bool LayoutLineBox::AddBox(InlineLevelBox* box, InlineLayoutMode layout_mode, fl
 	case FragmentType::TextRun:
 	{
 		// Fixed-size fragment.
-		RMLUI_ASSERT(fragment.layout_bounds.x >= 0.f && fragment.layout_bounds.y >= 0.f);
+		RMLUI_ASSERT(fragment.outer_width >= 0.f);
 
-		// TODO.
-		fragments.push_back(Fragment{fragment.type, box, {box_placement_cursor, 0.f}, fragment.layout_bounds, std::move(fragment.text),
-			fragment.total_height_above_baseline, fragment.total_depth_below_baseline, fragment.principal_fragment});
-		box_cursor = box_placement_cursor + fragment.layout_bounds.x;
+		fragments.push_back(std::move(new_fragment));
+
+		box_cursor = box_placement_cursor + fragment.outer_width;
 		open_spacing_left = 0.f;
 
 		if (fragment.overflow_handle)
@@ -125,12 +138,8 @@ bool LayoutLineBox::AddBox(InlineLevelBox* box, InlineLayoutMode layout_mode, fl
 	}
 	break;
 	case FragmentType::Invalid:
-	{
-		// Could not place fragment on this line, try again on a new line.
-		RMLUI_ASSERT(layout_mode == InlineLayoutMode::WrapAny);
-		continue_on_new_line = true;
-	}
-	break;
+		RMLUI_ERROR; // Handled above;
+		break;
 	}
 
 	return continue_on_new_line;
@@ -173,6 +182,50 @@ static float GetParentRelativeBaseline(const InlineLevelBox* parent, Style::Vert
 	return parent_baseline_offset + self_baseline_offset;
 }
 
+void LayoutLineBox::VerticallyAlignSubtree(AlignedSubtree& subtree, FragmentIndexList& /*aligned_subtree_indices*/)
+{
+	using Style::VerticalAlign;
+
+	const int subtree_root_index = subtree.root_index;
+	const int children_begin_index = subtree.root_index + 1;
+	const int children_end_index = subtree.child_end_index;
+
+	float& max_ascent = subtree.max_ascent;
+	float& max_descent = subtree.max_descent;
+
+	// Position baseline of fragments relative to their parents.
+	for (int i = children_begin_index; i < children_end_index; i++)
+	{
+		Fragment& fragment = fragments[i];
+
+		if (fragment.aligned_subtree_root != subtree_root_index || IsAlignedSubtreeRoot(fragment))
+			continue;
+
+		const InlineLevelBox* parent = (fragment.parent_fragment < 0 ? subtree.root_box : fragments[fragment.parent_fragment].inline_level_box);
+
+		const float baseline_to_parent =
+			GetParentRelativeBaseline(parent, fragment.vertical_align, fragment.total_height_above_baseline, fragment.total_depth_below_baseline);
+
+		const float parent_absolute_baseline = (fragment.parent_fragment < 0 ? 0.f : fragments[fragment.parent_fragment].baseline_offset);
+		fragment.baseline_offset = parent_absolute_baseline + baseline_to_parent;
+	}
+
+	// Expand this aligned subtree's height based on the height contributions of its descendants.
+	for (int i = children_begin_index; i < children_end_index; i++)
+	{
+		Fragment& fragment = fragments[i];
+		const VerticalAlign::Type vertical_align = fragment.vertical_align.type;
+
+		// TODO The two last ones should not be necessary?
+		if (fragment.aligned_subtree_root == subtree_root_index && fragment.type != FragmentType::TextRun && vertical_align != VerticalAlign::Top &&
+			vertical_align != VerticalAlign::Bottom)
+		{
+			max_ascent = Math::Max(max_ascent, fragment.total_height_above_baseline - fragment.baseline_offset);
+			max_descent = Math::Max(max_descent, fragment.total_depth_below_baseline + fragment.baseline_offset);
+		}
+	}
+}
+
 UniquePtr<LayoutLineBox> LayoutLineBox::Close(const InlineBoxRoot* root_box, Element* offset_parent, Vector2f line_position,
 	Style::TextAlign text_align, float& out_height_of_line)
 {
@@ -190,80 +243,70 @@ UniquePtr<LayoutLineBox> LayoutLineBox::Close(const InlineBoxRoot* root_box, Ele
 	// find the maximum height above root baseline and maximum depth below root baseline. Their sum is the height of the
 	// line. Now, we can vertically position each box based on the line-box height above baseline, the box's root
 	// baseline offset, and the box's baseline-to-top height.
-	//
-	// TODO: Aligned subtree.
 
 	{
 		using Style::VerticalAlign;
 
-		float max_ascent = 0.f;
-		float max_descent = 0.f;
-		root_box->GetStrut(max_ascent, max_descent);
-
 		// We might be able to reuse the memory from this one (unless it was split).
 		open_fragments.clear();
 
-		for (int i = 0; i < (int)fragments.size(); i++)
+		FragmentIndexList unused_aligned_subtree_indices; // TODO
+
+		float max_ascent = 0.f;
+		float max_descent = 0.f;
+
 		{
-			if (!open_fragments.empty() && i == fragments[open_fragments.back()].children_end_index)
-				open_fragments.pop_back();
+			AlignedSubtree aligned_subtree = {};
+			aligned_subtree.root_box = root_box;
+			root_box->GetStrut(aligned_subtree.max_ascent, aligned_subtree.max_descent);
+			aligned_subtree.root_index = -1;
+			aligned_subtree.child_end_index = (int)fragments.size();
 
-			// Absolute means relative to root box's baseline.
-			const float parent_absolute_baseline = (open_fragments.empty() ? 0.f : fragments[open_fragments.back()].baseline_offset);
+			VerticallyAlignSubtree(aligned_subtree, unused_aligned_subtree_indices);
 
-			Fragment& fragment = fragments[i];
-
-			const InlineLevelBox* parent = (open_fragments.empty() ? root_box : fragments[open_fragments.back()].inline_level_box);
-			const VerticalAlign vertical_align = fragment.inline_level_box->GetVerticalAlign();
-
-			const float parent_relative_baseline =
-				GetParentRelativeBaseline(parent, vertical_align, fragment.total_height_above_baseline, fragment.total_depth_below_baseline);
-
-			fragment.baseline_offset = parent_absolute_baseline + parent_relative_baseline;
-
-			if (fragment.type == FragmentType::InlineBox)
-				open_fragments.push_back(i);
+			max_ascent = aligned_subtree.max_ascent;
+			max_descent = aligned_subtree.max_descent;
 		}
 
-		open_fragments.clear();
+		for (AlignedSubtree& aligned_subtree : aligned_subtree_list)
+		{
+			VerticallyAlignSubtree(aligned_subtree, unused_aligned_subtree_indices);
+			fragments[aligned_subtree.root_index].max_ascent = aligned_subtree.max_ascent;
+			fragments[aligned_subtree.root_index].max_descent = aligned_subtree.max_descent;
+		}
 
+		// Increase the line box size to fit all line-relative aligned fragments.
 		for (const Fragment& fragment : fragments)
 		{
-			// TODO: Cache vertical align?
-			const VerticalAlign vertical_align = fragment.inline_level_box->GetVerticalAlign();
-
-			if (fragment.type != FragmentType::TextRun && vertical_align.type != VerticalAlign::Top && vertical_align.type != VerticalAlign::Bottom)
+			const VerticalAlign::Type vertical_align = fragment.vertical_align.type;
+			if (vertical_align == VerticalAlign::Top)
 			{
-				max_ascent = Math::Max(max_ascent, fragment.total_height_above_baseline - fragment.baseline_offset);
-				max_descent = Math::Max(max_descent, fragment.total_depth_below_baseline + fragment.baseline_offset);
+				max_descent = Math::Max(max_descent, fragment.max_ascent + fragment.max_descent - max_ascent);
+			}
+			else if (vertical_align == VerticalAlign::Bottom)
+			{
+				max_ascent = Math::Max(max_ascent, fragment.max_ascent + fragment.max_descent - max_descent);
 			}
 		}
 
-		for (Fragment& fragment : fragments)
-		{
-			const VerticalAlign vertical_align = fragment.inline_level_box->GetVerticalAlign();
-			if (vertical_align.type == VerticalAlign::Top)
-			{
-				max_descent = Math::Max(max_descent, fragment.layout_bounds.y - max_ascent);
-			}
-			else if (vertical_align.type == VerticalAlign::Bottom)
-			{
-				max_ascent = Math::Max(max_ascent, fragment.layout_bounds.y - max_descent);
-			}
-		}
-
-		// Size line.
+		// Size the line
 		out_height_of_line = max_ascent + max_descent;
 		total_height_above_baseline = max_ascent;
 
 		// Now that the line is sized we can set the vertical position of the fragments.
 		for (Fragment& fragment : fragments)
 		{
-			switch (fragment.inline_level_box->GetVerticalAlign().type)
+			switch (fragment.vertical_align.type)
 			{
-			case VerticalAlign::Top: fragment.position.y = 0.f; break;
-			case VerticalAlign::Bottom: fragment.position.y = out_height_of_line - fragment.layout_bounds.y; break;
-			default: fragment.position.y = max_ascent - fragment.total_height_above_baseline + fragment.baseline_offset; break;
+			case VerticalAlign::Top: fragment.position.y = fragment.max_ascent; break;
+			case VerticalAlign::Bottom: fragment.position.y = out_height_of_line - fragment.max_descent; break;
+			default:
+			{
+				const float aligned_absolute_baseline =
+					(fragment.aligned_subtree_root < 0 ? max_ascent : fragments[fragment.aligned_subtree_root].max_ascent);
+				fragment.position.y = aligned_absolute_baseline + fragment.baseline_offset;
+			}
+			break;
 			}
 		}
 	}
@@ -288,11 +331,12 @@ UniquePtr<LayoutLineBox> LayoutLineBox::Close(const InlineBoxRoot* root_box, Ele
 		if (fragment.type == FragmentType::InlineBox && fragment.children_end_index == 0)
 			continue;
 
-		RMLUI_ASSERT(fragment.layout_bounds.x >= 0.f);
+		RMLUI_ASSERT(fragment.layout_width >= 0.f);
+
 		FragmentBox fragment_box = {
 			offset_parent,
 			line_position + fragment.position + Vector2f(offset_horizontal_alignment, 0.f),
-			fragment.layout_bounds,
+			fragment.layout_width,
 			fragment.principal_fragment,
 			fragment.split_left,
 			fragment.split_right,
@@ -305,17 +349,27 @@ UniquePtr<LayoutLineBox> LayoutLineBox::Close(const InlineBoxRoot* root_box, Ele
 	return new_line_box;
 }
 
-LayoutLineBox::Fragment& LayoutLineBox::CloseFragment(int open_fragment_index, float inner_right_position)
+LayoutLineBox::Fragment& LayoutLineBox::CloseFragment(int open_fragment_index, float right_inner_edge_position)
 {
 	// TODO: We only mark it as closing, don't really need anything else. Could achieve this in other ways too.
 	Fragment& open_fragment = fragments[open_fragment_index];
 	RMLUI_ASSERT(open_fragment.type == FragmentType::InlineBox);
 
 	open_fragment.children_end_index = (int)fragments.size();
+	open_fragment.layout_width =
+		Math::Max(right_inner_edge_position - open_fragment.position.x - (open_fragment.split_left ? 0.f : open_fragment.spacing_left), 0.f);
 
-	// TODO: Maybe use outer position/size?
-	open_fragment.layout_bounds.x =
-		Math::Max(inner_right_position - open_fragment.position.x - (open_fragment.split_left ? 0.f : open_fragment.spacing_left), 0.f);
+	// If the inline box has line-relative alignment, then it starts a new aligned subtree for its descendants.
+	if (IsAlignedSubtreeRoot(open_fragment))
+	{
+		aligned_subtree_list.push_back(AlignedSubtree{
+			open_fragment.inline_level_box,
+			open_fragment_index,
+			open_fragment.children_end_index,
+			open_fragment.total_height_above_baseline,
+			open_fragment.total_depth_below_baseline,
+		});
+	}
 
 	return open_fragment;
 }
@@ -378,9 +432,9 @@ void LayoutLineBox::CloseInlineBox(InlineBox* inline_box)
 	box_cursor += open_spacing_left;
 	open_spacing_left = 0.f;
 
-	Fragment& closed_fragment = CloseFragment(open_fragments.back(), box_cursor);
-
+	const Fragment& closed_fragment = CloseFragment(open_fragments.back(), box_cursor);
 	box_cursor += closed_fragment.spacing_right;
+
 	open_fragments.pop_back();
 }
 

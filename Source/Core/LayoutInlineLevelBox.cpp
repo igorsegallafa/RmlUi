@@ -58,11 +58,11 @@ void InlineLevelBox::operator delete(void* chunk, size_t size)
 	LayoutEngine::DeallocateLayoutChunk(chunk, size);
 }
 
-void InlineLevelBox::SubmitBox(Box box, const FragmentBox& fragment_box)
+void InlineLevelBox::SubmitBox(Box box, Vector2f content_size, const FragmentBox& fragment_box)
 {
 	RMLUI_ASSERT(element && element != fragment_box.offset_parent);
 
-	box.SetContent(fragment_box.size);
+	box.SetContent(content_size);
 
 	if (fragment_box.split_left)
 		ZeroBoxEdge(box, Box::LEFT);
@@ -123,15 +123,21 @@ FragmentResult InlineLevelBox_Atomic::CreateFragment(InlineLayoutMode mode, floa
 	const float ascent = outer_size.y - descent;
 
 	if (mode != InlineLayoutMode::WrapAny || outer_size.x + right_spacing_width <= available_width)
-		return FragmentResult(FragmentType::SizedBox, true, outer_size, ascent, descent, 0.f, 0.f);
+		return FragmentResult(FragmentType::SizedBox, true, outer_size.x, ascent, descent, 0.f, 0.f);
 
 	return {};
 }
 
 void InlineLevelBox_Atomic::Submit(FragmentBox fragment_box, String /*text*/)
 {
-	fragment_box.size = box.GetSize();
-	SubmitBox(box, fragment_box);
+	const Vector2f outer_size = box.GetSize(Box::MARGIN);
+
+	const float descent = GetElement()->GetBaseline();
+	const float ascent = outer_size.y - descent;
+
+	fragment_box.position.y -= ascent;
+
+	SubmitBox(box, box.GetSize(), fragment_box);
 }
 
 } // namespace Rml
