@@ -63,7 +63,16 @@ bool LayoutLineBox::AddBox(InlineLevelBox* box, InlineLayoutMode layout_mode, fl
 	// TODO: Maybe always pass the actual available width, and let the createfragment functions handle the mode correctly.
 	float available_width = FLT_MAX;
 	if (layout_mode != InlineLayoutMode::Nowrap)
-		available_width = Math::Max(Math::RoundUpFloat(line_width - box_placement_cursor), 0.f);
+	{
+		available_width = Math::RoundUpFloat(line_width - box_placement_cursor);
+		if (available_width < 0.f)
+		{
+			if (layout_mode == InlineLayoutMode::WrapAny)
+				return true;
+			else
+				available_width = 0.f;
+		}
+	}
 
 	FragmentResult fragment = box->CreateFragment(layout_mode, available_width, open_spacing_right, first_box, inout_overflow_handle);
 	inout_overflow_handle = {};
