@@ -255,18 +255,7 @@ BlockContainer::CloseResult BlockContainer::Close()
 		{
 			// Baseline relative to the border box of our children's offset parent.
 			float baseline = 0;
-			bool found_baseline = false;
-
-			for (int i = (int)block_boxes.size() - 1; i >= 0; i--)
-			{
-				if (block_boxes[i]->GetType() == Type::InlineContainer)
-				{
-					InlineContainer* inline_container = static_cast<InlineContainer*>(block_boxes[i].get());
-					found_baseline = inline_container->GetBaselineOfLastLine(baseline);
-					if (found_baseline)
-						break;
-				}
-			}
+			bool found_baseline = GetBaselineOfLastLine(baseline);
 
 			if (found_baseline)
 			{
@@ -706,6 +695,17 @@ bool BlockContainer::CatchVerticalOverflow(float cursor)
 	}
 
 	return true;
+}
+
+bool BlockContainer::GetBaselineOfLastLine(float& out_baseline) const
+{
+	for (int i = (int)block_boxes.size() - 1; i >= 0; i--)
+	{
+		if (block_boxes[i]->GetBaselineOfLastLine(out_baseline))
+			return true;
+	}
+
+	return false;
 }
 
 } // namespace Rml

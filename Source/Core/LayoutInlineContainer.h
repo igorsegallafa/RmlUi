@@ -81,7 +81,7 @@ public:
 
 	/// Get the baseline of the last line.
 	/// @return True if the baseline was found.
-	bool GetBaselineOfLastLine(float& out_baseline) const;
+	bool GetBaselineOfLastLine(float& out_baseline) const override;
 
 	String DebugDumpTree(int depth) const override;
 

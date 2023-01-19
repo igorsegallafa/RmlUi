@@ -73,6 +73,8 @@ public:
 	// @note Only available after the box has been closed.
 	Vector2f GetVisibleOverflowSize() const { return visible_overflow_size; }
 
+	virtual bool GetBaselineOfLastLine(float& /*out_baseline*/) const { return false; }
+
 protected:
 	BlockLevelBox(Type type) : LayoutBox(OuterType::BlockLevel, type) {}
 
@@ -238,6 +240,9 @@ private:
 	// be enabled and our block boxes will be destroyed. All content will need to re-formatted. Returns true if no
 	// overflow occured, false if it did.
 	bool CatchVerticalOverflow(float cursor = -1);
+
+	// Return the baseline of the last line box of this or any descendant inline-level boxes.
+	bool GetBaselineOfLastLine(float& out_baseline) const override;
 
 	// Debug dump layout tree.
 	String DebugDumpTree(int depth) const override;
