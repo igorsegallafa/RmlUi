@@ -79,23 +79,26 @@ float LayoutBlockBoxSpace::PlaceFloat(Element* element, float cursor)
 	// Find a place to put this box.
 	const bool nowrap = false;
 	float unused_maximum_box_width = 0;
-	Vector2f element_offset = NextBoxPosition(unused_maximum_box_width, cursor, element_margin_size, nowrap, float_property);
+	const Vector2f element_margin_offset = NextBoxPosition(unused_maximum_box_width, cursor, element_margin_size, nowrap, float_property);
+	const Vector2f element_border_offset = element_margin_offset + element_margin_top_left;
 
 	// It's been placed, so we can now add it to our list of floating boxes.
-	boxes[float_property == Style::Float::Left ? LEFT : RIGHT].push_back(SpaceBox(element_offset, element_margin_size));
+	boxes[float_property == Style::Float::Left ? LEFT : RIGHT].push_back(SpaceBox(element_margin_offset, element_margin_size));
 
-	// The element offset is defined using border-relative positions, push away the top-left margin.
-	element_offset += element_margin_top_left;
+	// Determine offsets relative to our container.
+	const Vector2f parent_content_offset = parent->GetPosition() + parent->GetBox().GetPosition();
+	const Vector2f margin_offset = element_margin_offset - parent_content_offset;
+	const Vector2f border_offset = element_border_offset - parent_content_offset;
 
 	// Set our extents so they enclose the new box.
-	const Vector2f offset_relative_content_box = element_offset - (parent->GetPosition() + parent->GetBox().GetPosition());
-	extent_top_left = Math::Min(extent_top_left, offset_relative_content_box);
-	extent_bottom_right = Math::Max(extent_bottom_right, offset_relative_content_box + element_border_size);
+	extent_top_left_border = Math::Min(extent_top_left_border, border_offset);
+	extent_bottom_right_margin = Math::Max(extent_bottom_right_margin, margin_offset + element_margin_size);
+	extent_bottom_right_border = Math::Max(extent_bottom_right_border, border_offset + element_border_size);
 
 	// Shift the offset into the correct space relative to the element's offset parent.
-	element->SetOffset(element_offset - parent->GetOffsetParent()->GetPosition(), parent->GetOffsetParent()->GetElement());
+	element->SetOffset(element_border_offset - parent->GetOffsetParent()->GetPosition(), parent->GetOffsetParent()->GetElement());
 
-	return element_offset.y + element_margin_size.y;
+	return element_margin_offset.y + element_margin_size.y;
 }
 
 float LayoutBlockBoxSpace::DetermineClearPosition(float cursor, Style::Clear clear_property) const
@@ -255,13 +258,13 @@ Vector2f LayoutBlockBoxSpace::NextBoxPosition(float& maximum_box_width, const fl
 	return box_position;
 }
 
-Vector2f LayoutBlockBoxSpace::GetDimensions() const
+Vector2f LayoutBlockBoxSpace::GetDimensions(LayoutFloatBoxEdge edge) const
 {
 	// For now, we don't really use the top-left extent, because it is not allowed in CSS to scroll to content located
 	// to the top or left, and thus we have no use for it currently. We could use it later to help detect overflow on
 	// the top-left sides. For example so we can hide parts of floats pushing outside the top-left sides of its parent
 	// which is set to 'overflow: auto'.
-	return extent_bottom_right;
+	return edge == LayoutFloatBoxEdge::Border ? extent_bottom_right_border : extent_bottom_right_margin;
 }
 
 void* LayoutBlockBoxSpace::operator new(size_t size)

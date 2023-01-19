@@ -37,6 +37,8 @@ namespace Rml {
 class Element;
 class BlockContainer;
 
+enum class LayoutFloatBoxEdge { Border, Margin };
+
 /**
     Each block box has a space object for managing the space occupied by its floating elements, and those of its
     ancestors as relevant.
@@ -76,7 +78,9 @@ public:
 	float DetermineClearPosition(float cursor, Style::Clear clear_property) const;
 
 	/// Returns the size of the rectangle encompassing all boxes within the space, relative to the parent's content box.
-	Vector2f GetDimensions() const;
+	/// @param[in] edges Which edge of the boxes to encompass.
+	/// @note Generally, the border box is used when determining overflow, while the margin box is used for layout sizing.
+	Vector2f GetDimensions(LayoutFloatBoxEdge edge) const;
 
 	void* operator new(size_t size);
 	void operator delete(void* chunk, size_t size);
@@ -104,8 +108,9 @@ private:
 	SpaceBoxList boxes[NUM_ANCHOR_EDGES];
 
 	// The rectangle encompassing all boxes added specifically into this space, relative to our parent's content box.
-	Vector2f extent_top_left;
-	Vector2f extent_bottom_right;
+	Vector2f extent_top_left_border;
+	Vector2f extent_bottom_right_border;
+	Vector2f extent_bottom_right_margin;
 };
 
 } // namespace Rml

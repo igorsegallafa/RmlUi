@@ -150,7 +150,7 @@ BlockContainer::CloseResult BlockContainer::Close()
 		content_area.y = Math::Clamp(box_cursor, min_height, max_height);
 
 		if (element)
-			content_area.y = Math::Max(content_area.y, space->GetDimensions().y);
+			content_area.y = Math::Max(content_area.y, space->GetDimensions(LayoutFloatBoxEdge::Margin).y);
 
 		box.SetContent(content_area);
 	}
@@ -175,7 +175,7 @@ BlockContainer::CloseResult BlockContainer::Close()
 		Vector2f content_box = inner_content_size;
 
 		// Check how big our floated area is.
-		const Vector2f space_box = space->GetDimensions();
+		const Vector2f space_box = space->GetDimensions(LayoutFloatBoxEdge::Border);
 		content_box.x = Math::Max(content_box.x, space_box.x);
 
 		const Vector2f padding_top_left = {box.GetEdge(Box::PADDING, Box::LEFT), box.GetEdge(Box::PADDING, Box::TOP)};

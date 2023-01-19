@@ -77,6 +77,9 @@ InlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
 		inline_level_box = open_inline_box->AddChild(std::move(inline_box_ptr));
 	}
 
+	// TODO: Move to InlineLevelBox?
+	const float minimum_line_height = Math::Max(element_line_height, (box.GetSize().y >= 0.f ? box.GetSizeAcross(Box::VERTICAL, Box::MARGIN) : 0.f));
+
 	LayoutOverflowHandle overflow_handle = {};
 	float minimum_width_next = 0.f;
 
@@ -86,7 +89,7 @@ InlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
 
 		const Vector2f minimum_dimensions = {
 			Math::Max(line_box->GetBoxCursor(), minimum_width_next),
-			element_line_height,
+			minimum_line_height,
 		};
 
 		float available_width = 0.f;
@@ -147,6 +150,9 @@ InlineContainer::CloseResult InlineContainer::Close(UniquePtr<LayoutLineBox>* ou
 {
 	// The parent container may need the open line box to be split and resumed.
 	CloseOpenLineBox(out_open_line_box);
+
+	// It is possible that floats were queued between the last line close and this container close, if so place them now.
+	parent->PlaceQueuedFloats(box_cursor);
 
 	// Expand our content area if any line boxes had to push themselves out.
 	// TODO
