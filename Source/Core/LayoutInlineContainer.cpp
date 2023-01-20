@@ -202,7 +202,7 @@ void InlineContainer::CloseOpenLineBox(UniquePtr<LayoutLineBox>* out_split_line)
 			line_box->Close(&root_inline_box, offset_parent->GetElement(), line_position_offset_parent, text_align, height_of_line);
 
 		// Move the cursor down, but only if our line has any width.
-		if (line_box->GetBoxCursor() > 0.f)
+		if (line_box->GetBoxCursor() != 0.f)
 			box_cursor = (line_position.y - position.y) + height_of_line;
 
 		// If we have any pending floating elements for our parent, then this would be an ideal time to place them.
@@ -243,9 +243,19 @@ float InlineContainer::GetShrinkToFitWidth() const
 	return content_width;
 }
 
-float InlineContainer::GetHeightIncludingOpenLine() const
+Vector2f InlineContainer::GetStaticPositionEstimate(bool inline_level_box) const
 {
-	return box_cursor + (GetOpenLineBox() ? element_line_height : 0.f);
+	Vector2f result = {0.f, box_cursor};
+
+	if (const LayoutLineBox* line_box = GetOpenLineBox())
+	{
+		if (inline_level_box)
+			result.x += line_box->GetBoxCursor();
+		else
+			result.y += element_line_height;
+	}
+
+	return result;
 }
 
 bool InlineContainer::GetBaselineOfLastLine(float& out_baseline) const

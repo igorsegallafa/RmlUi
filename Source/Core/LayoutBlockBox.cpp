@@ -388,10 +388,14 @@ void BlockContainer::AddAbsoluteElement(Element* element)
 	absolute_element.element = element;
 	absolute_element.position = NextBoxPosition();
 
-	// If we have an open inline-context block box as our last child, then the absolute element must appear after it,
-	// but not actually close the box.
+	// Position the box as if it had static position (10.6.4). If the element is inline-level, position it on the open
+	// line if we have one. Otherwise, block-level elements are positioned on a hypothetical next line.
 	if (InlineContainer* inline_container = GetOpenInlineContainer())
-		absolute_element.position.y += inline_container->GetHeightIncludingOpenLine();
+	{
+		const Style::Display display = element->GetDisplay();
+		const bool inline_level_element = (display == Style::Display::Inline || display == Style::Display::InlineBlock);
+		absolute_element.position += inline_container->GetStaticPositionEstimate(inline_level_element);
+	}
 
 	// Find the positioned parent for this element.
 	BlockContainer* absolute_parent = this;

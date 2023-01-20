@@ -76,8 +76,8 @@ public:
 	/// Calculate the dimensions of the box's internal content width; i.e. the size used to calculate the shrink-to-fit width.
 	float GetShrinkToFitWidth() const;
 
-	/// Returns the height of this inline container, including the last line even if it is still open.
-	float GetHeightIncludingOpenLine() const;
+	/// Returns an estimate for the position of a hypothetical next box to be placed, relative to the content box of this container.
+	Vector2f GetStaticPositionEstimate(bool inline_level_box) const;
 
 	/// Get the baseline of the last line.
 	/// @return True if the baseline was found.
@@ -116,7 +116,7 @@ private:
 	// The element's text-align property.
 	Style::TextAlign text_align;
 
-	// The vertical position of the next block box to be added to this box, relative to the top of this box.
+	// The vertical position of the currently open line, or otherwise the next one to be placed, relative to the top of this box.
 	float box_cursor = 0;
 
 	// The root of the tree of inline boxes located in this inline container.
