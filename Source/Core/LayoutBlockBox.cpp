@@ -138,6 +138,8 @@ BlockContainer::~BlockContainer() {}
 
 BlockContainer::CloseResult BlockContainer::Close()
 {
+	using Style::Overflow;
+
 	// If the last child of this block box is an inline box, then we haven't closed it; close it now!
 	CloseResult result = CloseInlineBlockBox();
 	if (result != CloseResult::OK)
@@ -187,7 +189,7 @@ BlockContainer::CloseResult BlockContainer::Close()
 		// enabled in the constructor.
 		if (content_box.x > box.GetSize().x + padding_bottom_right.x + 0.5f)
 		{
-			if (overflow_x_property == Style::Overflow::Auto)
+			if (overflow_x_property == Overflow::Auto)
 			{
 				element->GetElementScroll()->EnableScrollbar(ElementScroll::HORIZONTAL, padding_size.x);
 
@@ -201,7 +203,13 @@ BlockContainer::CloseResult BlockContainer::Close()
 		if (!CatchVerticalOverflow(content_box.y))
 			return CloseResult::LayoutSelf;
 
-		const Vector2f scrollable_overflow_size = Math::Max(padding_size, padding_top_left + content_box);
+		const bool catches_overflow = (overflow_x_property != Overflow::Visible || overflow_y_property != Overflow::Visible);
+
+		const Vector2f scrollbar_size = {
+			catches_overflow ? element->GetElementScroll()->GetScrollbarSize(ElementScroll::VERTICAL) : 0.f,
+			catches_overflow ? element->GetElementScroll()->GetScrollbarSize(ElementScroll::HORIZONTAL) : 0.f,
+		};
+		const Vector2f scrollable_overflow_size = Math::Max(padding_size - scrollbar_size, padding_top_left + content_box);
 
 		element->SetBox(box);
 		element->SetScrollableOverflowRectangle(scrollable_overflow_size);
@@ -211,20 +219,22 @@ BlockContainer::CloseResult BlockContainer::Close()
 		// Set the visible overflow size so that ancestors can catch any overflow produced by us. That is, hiding it or
 		// providing a scrolling mechanism. If we catch our own overflow here, then just use the normal margin box as
 		// that will effectively remove the overflow from our ancestor's perspective.
-		if (overflow_x_property != Style::Overflow::Visible)
+		if (catches_overflow)
+		{
 			visible_overflow_size.x = margin_size.x;
+			visible_overflow_size.y = margin_size.y;
+
+			// Format any scrollbars which were enabled on this element.
+			element->GetElementScroll()->FormatScrollbars();
+		}
 		else
+		{
 			visible_overflow_size.x = Math::Max(margin_size.x,
 				content_box.x + box.GetEdge(Box::MARGIN, Box::LEFT) + box.GetEdge(Box::BORDER, Box::LEFT) + box.GetEdge(Box::PADDING, Box::LEFT));
 
-		if (overflow_y_property != Style::Overflow::Visible)
-			visible_overflow_size.y = margin_size.y;
-		else
 			visible_overflow_size.y = Math::Max(margin_size.y,
 				content_box.y + box.GetEdge(Box::MARGIN, Box::TOP) + box.GetEdge(Box::BORDER, Box::TOP) + box.GetEdge(Box::PADDING, Box::TOP));
-
-		// Format any scrollbars which were enabled on this element.
-		element->GetElementScroll()->FormatScrollbars();
+		}
 	}
 
 	SetVisibleOverflowSize(visible_overflow_size);
@@ -259,7 +269,7 @@ BlockContainer::CloseResult BlockContainer::Close()
 
 			if (found_baseline)
 			{
-				if (baseline < 0 && (overflow_x_property != Style::Overflow::Visible || overflow_y_property != Style::Overflow::Visible))
+				if (baseline < 0 && (overflow_x_property != Overflow::Visible || overflow_y_property != Overflow::Visible))
 				{
 					baseline = 0;
 				}

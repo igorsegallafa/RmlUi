@@ -68,8 +68,8 @@ private:
 
 class BlockLevelBox : public LayoutBox {
 public:
-	// Returns the outer size of this box including overflowing content. Similar to scroll width, but shrinked if overflow is caught
-	// here. This can be wider than the box if we are overflowing.
+	// Returns the outer size of this box including overflowing content. Similar to scroll width, but shrinked if
+	// overflow is caught here. This can be wider than the box if we are overflowing.
 	// @note Only available after the box has been closed.
 	Vector2f GetVisibleOverflowSize() const { return visible_overflow_size; }
 
@@ -78,12 +78,10 @@ public:
 protected:
 	BlockLevelBox(Type type) : LayoutBox(OuterType::BlockLevel, type) {}
 
-	//void SetScrollableOverflowRectangle(Vector2f size) { visible_overflow_size = size; }
 	void SetVisibleOverflowSize(Vector2f size) { visible_overflow_size = size; }
 
 private:
-	// The extent 
-	Vector2f visible_overflow_size; 
+	Vector2f visible_overflow_size;
 };
 
 // class InlineLevelBox : public LayoutBox {
