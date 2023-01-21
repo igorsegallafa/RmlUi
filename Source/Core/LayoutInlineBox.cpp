@@ -94,9 +94,7 @@ InlineBox::InlineBox(const InlineLevelBox* parent, Element* element, const Box& 
 
 	float height_above_baseline, depth_below_baseline;
 	GetStrut(height_above_baseline, depth_below_baseline);
-	SetHeightForLine(height_above_baseline, depth_below_baseline);
-
-	SetVerticalAlignment(parent);
+	SetHeightAndVerticalAlignment(height_above_baseline, depth_below_baseline, parent);
 
 	const float edge_left = box.GetCumulativeEdge(Box::PADDING, Box::LEFT);
 	const float edge_right = box.GetCumulativeEdge(Box::PADDING, Box::RIGHT);

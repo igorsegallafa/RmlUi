@@ -203,9 +203,6 @@ UniquePtr<LayoutLineBox> LayoutLineBox::Close(const InlineBoxRoot* root_box, Ele
 	{
 		using Style::VerticalAlign;
 
-		// We might be able to reuse the memory from this one (unless it was split).
-		open_fragments.clear();
-
 		FragmentIndexList unused_aligned_subtree_indices; // TODO
 
 		float max_ascent = 0.f;
@@ -259,7 +256,7 @@ UniquePtr<LayoutLineBox> LayoutLineBox::Close(const InlineBoxRoot* root_box, Ele
 			default:
 			{
 				const float aligned_absolute_baseline =
-					(fragment.aligned_subtree_root < 0 ? max_ascent : fragments[fragment.aligned_subtree_root].max_ascent);
+					(fragment.aligned_subtree_root < 0 ? max_ascent : fragments[fragment.aligned_subtree_root].position.y);
 				fragment.position.y = aligned_absolute_baseline + fragment.baseline_offset;
 			}
 			break;

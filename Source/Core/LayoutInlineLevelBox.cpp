@@ -52,15 +52,25 @@ void InlineLevelBox::SubmitElementOnLayout()
 	element->OnLayout();
 }
 
-void InlineLevelBox::SetVerticalAlignment(const InlineLevelBox* parent)
+const FontMetrics& InlineLevelBox::GetFontMetrics() const
 {
-	vertical_align = element->GetComputedValues().vertical_align();
-	vertical_offset_from_parent = DetermineVerticalOffsetFromParent(parent);
+	if (FontFaceHandle handle = element->GetFontFaceHandle())
+		return GetFontEngineInterface()->GetFontMetrics(handle);
+
+	static const FontMetrics font_metrics = {};
+	// TODO
+	Log::Message(Log::LT_WARNING, "%s", "Font face not set.");
+	return font_metrics;
 }
 
-float InlineLevelBox::DetermineVerticalOffsetFromParent(const InlineLevelBox* parent) const
+void InlineLevelBox::SetHeightAndVerticalAlignment(float _height_above_baseline, float _depth_below_baseline, const InlineLevelBox* parent)
 {
+	RMLUI_ASSERT(parent);
 	using Style::VerticalAlign;
+
+	height_above_baseline = _height_above_baseline;
+	depth_below_baseline = _depth_below_baseline;
+	vertical_align = element->GetComputedValues().vertical_align();
 
 	// Determine the offset from the parent baseline.
 	float parent_baseline_offset = 0.f; // The anchor on the parent, as an offset from its baseline.
@@ -90,19 +100,13 @@ float InlineLevelBox::DetermineVerticalOffsetFromParent(const InlineLevelBox* pa
 		break;
 	}
 
-	return parent_baseline_offset + self_baseline_offset;
+	vertical_offset_from_parent = parent_baseline_offset + self_baseline_offset;
 }
 
-
-const FontMetrics& InlineLevelBox::GetFontMetrics() const
+void InlineLevelBox::SetInlineBoxSpacing(float _spacing_left, float _spacing_right)
 {
-	if (FontFaceHandle handle = element->GetFontFaceHandle())
-		return GetFontEngineInterface()->GetFontMetrics(handle);
-
-	static const FontMetrics font_metrics = {};
-	// TODO
-	Log::Message(Log::LT_WARNING, "%s", "Font face not set.");
-	return font_metrics;
+	spacing_left = _spacing_left;
+	spacing_right = _spacing_right;
 }
 
 String InlineLevelBox::DebugDumpTree(int depth) const
@@ -121,9 +125,7 @@ InlineLevelBox_Atomic::InlineLevelBox_Atomic(const InlineLevelBox* parent, Eleme
 
 	const float descent = GetElement()->GetBaseline();
 	const float ascent = outer_size.y - descent;
-	SetHeightForLine(ascent, descent);
-
-	SetVerticalAlignment(parent);
+	SetHeightAndVerticalAlignment(ascent, descent, parent);
 }
 
 FragmentResult InlineLevelBox_Atomic::CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool /*first_box*/,

@@ -63,13 +63,12 @@ public:
 	// Submit a fragment's position and size to be displayed on the underlying element.
 	virtual void Submit(FragmentBox fragment_box) = 0;
 
-	// Layout properties.
 	float GetHeightAboveBaseline() const { return height_above_baseline; }
 	float GetDepthBelowBaseline() const { return depth_below_baseline; }
-	float GetSpacingLeft() const { return spacing_left; }
-	float GetSpacingRight() const { return spacing_right; }
 	float GetVerticalOffsetFromParent() const { return vertical_offset_from_parent; }
 	Style::VerticalAlign GetVerticalAlign() const { return vertical_align; }
+	float GetSpacingLeft() const { return spacing_left; }
+	float GetSpacingRight() const { return spacing_right; }
 
 	virtual String DebugDumpNameValue() const = 0;
 	virtual String DebugDumpTree(int depth) const;
@@ -83,33 +82,22 @@ protected:
 	Element* GetElement() const { return element; }
 	const FontMetrics& GetFontMetrics() const;
 
-	void SetHeightForLine(float _height_above_baseline, float _depth_below_baseline)
-	{
-		height_above_baseline = _height_above_baseline;
-		depth_below_baseline = _depth_below_baseline;
-	}
-	void SetInlineBoxSpacing(float _spacing_left, float _spacing_right)
-	{
-		spacing_left = _spacing_left;
-		spacing_right = _spacing_right;
-	}
+	// Set the height used for inline layout, and the vertical offset relative to our parent box.
+	void SetHeightAndVerticalAlignment(float height_above_baseline, float depth_below_baseline, const InlineLevelBox* parent);
 
-	// Find and set the vertical offset relative to our parent box. Assumes the height is already set using 'SetHeightForLine'.
-	void SetVerticalAlignment(const InlineLevelBox* parent);
+	// Set the inner-to-outer spacing (margin + border + padding) for inline boxes.
+	void SetInlineBoxSpacing(float spacing_left, float spacing_right);
 
 	// Calls Element::OnLayout (proxy for private access to Element).
 	void SubmitElementOnLayout();
 
 private:
-	float DetermineVerticalOffsetFromParent(const InlineLevelBox* parent) const;
-
 	float height_above_baseline = 0.f;
 	float depth_below_baseline = 0.f;
 
 	Style::VerticalAlign vertical_align;
 	float vertical_offset_from_parent = 0.f;
 
-	// For inline boxes.
 	float spacing_left = 0.f;  // Left margin-border-padding for inline boxes.
 	float spacing_right = 0.f; // Right margin-border-padding for inline boxes.
 
@@ -150,13 +138,10 @@ struct FragmentResult {
 	{}
 
 	FragmentType type = FragmentType::Invalid;
-
 	float layout_width = 0.f;
 
 	LayoutFragmentHandle fragment_handle = {}; // Handle to enable the inline-level box to reference any fragment-specific data.
-
-	// Overflow handle is non-zero when there is another fragment to be layed out. TODO: Combine with fragment handle?
-	LayoutOverflowHandle overflow_handle = {};
+	LayoutOverflowHandle overflow_handle = {}; // Overflow handle is non-zero when there is another fragment to be layed out.
 };
 
 struct FragmentBox {
