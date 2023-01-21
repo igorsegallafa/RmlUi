@@ -30,6 +30,7 @@
 #include "../../Include/RmlUi/Core/ComputedValues.h"
 #include "../../Include/RmlUi/Core/Element.h"
 #include "../../Include/RmlUi/Core/ElementScroll.h"
+#include "../../Include/RmlUi/Core/ElementText.h"
 #include "../../Include/RmlUi/Core/ElementUtilities.h"
 #include "../../Include/RmlUi/Core/Profiling.h"
 #include "../../Include/RmlUi/Core/Property.h"
@@ -60,21 +61,21 @@ InlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
 
 	InlineBox* inline_box = nullptr;
 	InlineLevelBox* inline_level_box = nullptr;
-	InlineBoxBase* open_inline_box = GetOpenInlineBox();
+	InlineBoxBase* parent_box = GetOpenInlineBox();
 
 	if (auto text_element = rmlui_dynamic_cast<ElementText*>(element))
 	{
-		inline_level_box = open_inline_box->AddChild(MakeUnique<InlineLevelBox_Text>(text_element));
+		inline_level_box = parent_box->AddChild(MakeUnique<InlineLevelBox_Text>(text_element));
 	}
 	else if (box.GetSize().x >= 0.f)
 	{
-		inline_level_box = open_inline_box->AddChild(MakeUnique<InlineLevelBox_Atomic>(element, box));
+		inline_level_box = parent_box->AddChild(MakeUnique<InlineLevelBox_Atomic>(parent_box, element, box));
 	}
 	else
 	{
-		auto inline_box_ptr = MakeUnique<InlineBox>(element, box);
+		auto inline_box_ptr = MakeUnique<InlineBox>(parent_box, element, box);
 		inline_box = inline_box_ptr.get();
-		inline_level_box = open_inline_box->AddChild(std::move(inline_box_ptr));
+		inline_level_box = parent_box->AddChild(std::move(inline_box_ptr));
 	}
 
 	// TODO: Move to InlineLevelBox?

@@ -37,6 +37,7 @@ namespace Rml {
 
 class LayoutBlockBoxSpace;
 class LayoutEngine;
+class InlineBox;
 class InlineContainer;
 
 class LayoutBox {

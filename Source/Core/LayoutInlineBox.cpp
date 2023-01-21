@@ -27,22 +27,17 @@
  */
 
 #include "LayoutInlineBox.h"
-#include "../../Include/RmlUi/Core/ComputedValues.h"
-#include "../../Include/RmlUi/Core/Core.h"
-#include "../../Include/RmlUi/Core/ElementText.h"
-#include "../../Include/RmlUi/Core/ElementUtilities.h"
-#include "../../Include/RmlUi/Core/FontEngineInterface.h"
-#include "../../Include/RmlUi/Core/Property.h"
-#include "LayoutBlockBox.h"
-#include "LayoutEngine.h"
-
-// TODO: Includes
+#include "../../Include/RmlUi/Core/Box.h"
+#include "../../Include/RmlUi/Core/Element.h"
+#include "../../Include/RmlUi/Core/FontMetrics.h"
 
 namespace Rml {
 
-static float GetEdgeSize(const Box& box, Box::Edge edge)
+static void ZeroBoxEdge(Box& box, Box::Edge edge)
 {
-	return box.GetEdge(Box::PADDING, edge) + box.GetEdge(Box::BORDER, edge) + box.GetEdge(Box::MARGIN, edge);
+	box.SetEdge(Box::PADDING, edge, 0.f);
+	box.SetEdge(Box::BORDER, edge, 0.f);
+	box.SetEdge(Box::MARGIN, edge, 0.f);
 }
 
 InlineLevelBox* InlineBoxBase::AddChild(UniquePtr<InlineLevelBox> child)
@@ -77,61 +72,82 @@ InlineBoxRoot::InlineBoxRoot(Element* element) : InlineBoxBase(element) {}
 FragmentResult InlineBoxRoot::CreateFragment(InlineLayoutMode /*mode*/, float /*available_width*/, float /*right_spacing_width*/, bool /*first_box*/,
 	LayoutOverflowHandle /*overflow_handle*/)
 {
+	RMLUI_ERROR;
 	return {};
 }
 
-void InlineBoxRoot::Submit(FragmentBox /*box_display*/, String /*text*/)
+void InlineBoxRoot::Submit(FragmentBox /*box_display*/)
 {
 	RMLUI_ERROR;
 }
 
-InlineBox::InlineBox(Element* element, const Box& _box) : InlineBoxBase(element), box(_box)
+InlineBox::InlineBox(const InlineLevelBox* parent, Element* element, const Box& _box) : InlineBoxBase(element), box(_box)
 {
 	RMLUI_ASSERT(box.GetSize().x < 0.f && box.GetSize().y < 0.f);
 
 	const FontMetrics& font_metrics = GetFontMetrics();
 
-	// The line box content height does not depend on the 'line-height' property, only on the font, and is not exactly
-	// specified by CSS. Here we choose to size the content height equal to the default line-height given the font-size.
-	box.SetContent(Vector2f(-1.f, 1.2f * (float)font_metrics.size));
+	// The inline box content height does not depend on the 'line-height' property, only on the font, and is not exactly
+	// specified by CSS. Here we choose to size the content height equal to the default line-height for the font-size.
+	const float inner_height = 1.2f * (float)font_metrics.size;
+	box.SetContent(Vector2f(-1.f, inner_height));
+
+	float height_above_baseline, depth_below_baseline;
+	GetStrut(height_above_baseline, depth_below_baseline);
+	SetHeightForLine(height_above_baseline, depth_below_baseline);
+
+	SetVerticalAlignment(parent);
+
+	const float edge_left = box.GetCumulativeEdge(Box::PADDING, Box::LEFT);
+	const float edge_right = box.GetCumulativeEdge(Box::PADDING, Box::RIGHT);
+	SetInlineBoxSpacing(edge_left, edge_right);
+
+	// Vertically position the box so that its content box is equally spaced around its font ascent and descent metrics.
+	const float half_leading = 0.5f * (inner_height - (font_metrics.ascent + font_metrics.descent));
+	baseline_to_border_height = font_metrics.ascent + half_leading + box.GetEdge(Box::BORDER, Box::TOP) + box.GetEdge(Box::PADDING, Box::TOP);
 }
 
 FragmentResult InlineBox::CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool /*first_box*/,
 	LayoutOverflowHandle /*overflow_handle*/)
 {
-	const float edge_left = GetEdgeSize(box, Box::LEFT);
-	const float edge_right = GetEdgeSize(box, Box::RIGHT);
-	const float margin_height = box.GetSizeAcross(Box::VERTICAL, Box::MARGIN);
-
-	float ascent, descent;
-	GetStrut(ascent, descent);
-
-	if (mode != InlineLayoutMode::WrapAny || right_spacing_width <= available_width + edge_left)
-		return FragmentResult(FragmentType::InlineBox, true, -1.f, ascent, descent, edge_left, edge_right);
+	if (mode != InlineLayoutMode::WrapAny || right_spacing_width <= available_width + GetSpacingLeft())
+		return FragmentResult(FragmentType::InlineBox, -1.f);
 
 	return {};
 }
 
-void InlineBox::Submit(FragmentBox fragment_box, String /*text*/)
+void InlineBox::Submit(FragmentBox fragment_box)
 {
-	// TODO: Ugly. Same for every fragment, move to constructor.
-	float ascent, descent;
-	GetStrut(ascent, descent);
+	Element* element = GetElement();
+	RMLUI_ASSERT(element && element != fragment_box.offset_parent);
 
-	const FontMetrics& font_metrics = GetFontMetrics();
-	// TODO The line box content height does not depend on the 'line-height' property, only on the font, and is not exactly
-	// specified by CSS. Here we choose to size the content height equal to the default line-height given the font-size.
+	Box element_box = box;
+	element_box.SetContent({fragment_box.layout_width, element_box.GetSize().y});
 
-	const float inner_height = box.GetSize().y;
+	if (fragment_box.split_left)
+		ZeroBoxEdge(element_box, Box::LEFT);
+	if (fragment_box.split_right)
+		ZeroBoxEdge(element_box, Box::RIGHT);
 
-	const float half_leading = 0.5f * (inner_height - (font_metrics.ascent + font_metrics.descent));
+	// In inline layout, fragments are positioned in terms of (x: margin edge, y: baseline), while element offsets are
+	// specified relative to their border box. Thus, find the offset from the fragment position to the border edge.
+	const Vector2f border_position = fragment_box.position + Vector2f{element_box.GetEdge(Box::MARGIN, Box::LEFT), -baseline_to_border_height};
 
-	// Position the box around the baseline, by adding half-leading to each side to achieve the above height.
-	fragment_box.position.y -= font_metrics.ascent + half_leading + GetEdgeSize(box, Box::TOP);
+	// We can determine the principal fragment based on its left split: Only the principal one has its left side intact,
+	// subsequent fragments have their left side split.
+	const bool principal_box = !fragment_box.split_left;
 
-	const float inner_width = fragment_box.layout_width;
-
-	SubmitBox(box, Vector2f(inner_width, inner_height), fragment_box);
+	if (principal_box)
+	{
+		element_offset = border_position;
+		element->SetOffset(border_position, fragment_box.offset_parent);
+		element->SetBox(element_box);
+		SubmitElementOnLayout();
+	}
+	else
+	{
+		element->AddBox(element_box, border_position - element_offset);
+	}
 }
 
 } // namespace Rml

@@ -42,17 +42,20 @@ class ElementText;
  */
 class InlineLevelBox_Text final : public InlineLevelBox {
 public:
-	InlineLevelBox_Text(ElementText* element) : InlineLevelBox(element) {}
+	InlineLevelBox_Text(ElementText* element);
 
 	FragmentResult CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool first_box,
 		LayoutOverflowHandle overflow_handle) override;
 
-	void Submit(FragmentBox fragment_box, String text) override;
+	void Submit(FragmentBox fragment_box) override;
 
 	String DebugDumpNameValue() const override;
 
 private:
 	ElementText* GetTextElement();
+
+	Vector2f element_offset;
+	StringList fragments;
 };
 
 String FontFaceDescription(const String& font_family, Style::FontStyle style, Style::FontWeight weight);

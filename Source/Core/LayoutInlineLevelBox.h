@@ -37,6 +37,7 @@ namespace Rml {
 class Element;
 struct FragmentResult;
 struct FragmentBox;
+struct FontMetrics;
 
 enum class InlineLayoutMode {
 	WrapAny,          // Allow wrapping to avoid overflow, even if nothing is placed.
@@ -44,6 +45,7 @@ enum class InlineLayoutMode {
 	Nowrap,           // Place all content on this line, regardless of overflow.
 };
 using LayoutOverflowHandle = int;
+using LayoutFragmentHandle = int;
 
 /**
     A box that takes part in inline layout.
@@ -59,11 +61,15 @@ public:
 		LayoutOverflowHandle overflow_handle) = 0;
 
 	// Submit a fragment's position and size to be displayed on the underlying element.
-	virtual void Submit(FragmentBox fragment_box, String text) = 0;
+	virtual void Submit(FragmentBox fragment_box) = 0;
 
-	Style::VerticalAlign GetVerticalAlign() const { return element->GetComputedValues().vertical_align(); }
-
-	const FontMetrics& GetFontMetrics() const;
+	// Layout properties.
+	float GetHeightAboveBaseline() const { return height_above_baseline; }
+	float GetDepthBelowBaseline() const { return depth_below_baseline; }
+	float GetSpacingLeft() const { return spacing_left; }
+	float GetSpacingRight() const { return spacing_right; }
+	float GetVerticalOffsetFromParent() const { return vertical_offset_from_parent; }
+	Style::VerticalAlign GetVerticalAlign() const { return vertical_align; }
 
 	virtual String DebugDumpNameValue() const = 0;
 	virtual String DebugDumpTree(int depth) const;
@@ -74,13 +80,39 @@ public:
 protected:
 	InlineLevelBox(Element* element) : element(element) { RMLUI_ASSERT(element); }
 
-	void SubmitBox(Box box, Vector2f content_size, const FragmentBox& fragment_box);
-
 	Element* GetElement() const { return element; }
+	const FontMetrics& GetFontMetrics() const;
 
-	void OnLayout() { element->OnLayout(); } // TODO
+	void SetHeightForLine(float _height_above_baseline, float _depth_below_baseline)
+	{
+		height_above_baseline = _height_above_baseline;
+		depth_below_baseline = _depth_below_baseline;
+	}
+	void SetInlineBoxSpacing(float _spacing_left, float _spacing_right)
+	{
+		spacing_left = _spacing_left;
+		spacing_right = _spacing_right;
+	}
+
+	// Find and set the vertical offset relative to our parent box. Assumes the height is already set using 'SetHeightForLine'.
+	void SetVerticalAlignment(const InlineLevelBox* parent);
+
+	// Calls Element::OnLayout (proxy for private access to Element).
+	void SubmitElementOnLayout();
 
 private:
+	float DetermineVerticalOffsetFromParent(const InlineLevelBox* parent) const;
+
+	float height_above_baseline = 0.f;
+	float depth_below_baseline = 0.f;
+
+	Style::VerticalAlign vertical_align;
+	float vertical_offset_from_parent = 0.f;
+
+	// For inline boxes.
+	float spacing_left = 0.f;  // Left margin-border-padding for inline boxes.
+	float spacing_right = 0.f; // Right margin-border-padding for inline boxes.
+
 	Element* element;
 };
 
@@ -91,15 +123,16 @@ private:
  */
 class InlineLevelBox_Atomic final : public InlineLevelBox {
 public:
-	InlineLevelBox_Atomic(Element* element, const Box& box);
+	InlineLevelBox_Atomic(const InlineLevelBox* parent, Element* element, const Box& box);
 
 	FragmentResult CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool first_box,
 		LayoutOverflowHandle overflow_handle) override;
-	void Submit(FragmentBox fragment_box, String text) override;
+	void Submit(FragmentBox fragment_box) override;
 
 	String DebugDumpNameValue() const override { return "InlineLevelBox_Atomic"; }
 
 private:
+	float outer_width = 0;
 	Box box;
 };
 
@@ -112,41 +145,25 @@ enum class FragmentType {
 
 struct FragmentResult {
 	FragmentResult() = default;
-	FragmentResult(FragmentType type, bool principal_fragment, float outer_width, float above_baseline, float below_baseline, float spacing_left,
-		float spacing_right) :
-		type(type),
-		principal_fragment(principal_fragment), outer_width(outer_width), spacing_left(spacing_left), spacing_right(spacing_right),
-		total_height_above_baseline(above_baseline), total_depth_below_baseline(below_baseline)
-	{}
-	FragmentResult(FragmentType type, bool principal_fragment, float outer_width, float above_baseline, float below_baseline,
-		LayoutOverflowHandle overflow_handle, String text) :
-		type(type),
-		principal_fragment(principal_fragment), outer_width(outer_width), total_height_above_baseline(above_baseline),
-		total_depth_below_baseline(below_baseline), overflow_handle(overflow_handle), text(std::move(text))
+	FragmentResult(FragmentType type, float layout_width, LayoutFragmentHandle fragment_handle = {}, LayoutOverflowHandle overflow_handle = {}) :
+		type(type), layout_width(layout_width), fragment_handle(fragment_handle), overflow_handle(overflow_handle)
 	{}
 
 	FragmentType type = FragmentType::Invalid;
-	bool principal_fragment = false; // The element's main fragment, all other fragments are positioned relative to it.
 
-	float outer_width = 0.f;
+	float layout_width = 0.f;
 
-	float spacing_left = 0.f;  // Left margin-border-padding for inline boxes.
-	float spacing_right = 0.f; // Right margin-border-padding for inline boxes.
+	LayoutFragmentHandle fragment_handle = {}; // Handle to enable the inline-level box to reference any fragment-specific data.
 
-	float total_height_above_baseline = 0.f;
-	float total_depth_below_baseline = 0.f;
-
-	// Overflow handle is non-zero when there is another fragment to be layed out.
+	// Overflow handle is non-zero when there is another fragment to be layed out. TODO: Combine with fragment handle?
 	LayoutOverflowHandle overflow_handle = {};
-
-	String text;
 };
 
 struct FragmentBox {
 	Element* offset_parent;
+	LayoutFragmentHandle handle;
 	Vector2f position;
 	float layout_width;
-	bool principal_box;
 	bool split_left;
 	bool split_right;
 };

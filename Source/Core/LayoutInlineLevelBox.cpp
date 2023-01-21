@@ -29,24 +29,11 @@
 #include "LayoutInlineLevelBox.h"
 #include "../../Include/RmlUi/Core/ComputedValues.h"
 #include "../../Include/RmlUi/Core/Core.h"
-#include "../../Include/RmlUi/Core/ElementText.h"
-#include "../../Include/RmlUi/Core/ElementUtilities.h"
 #include "../../Include/RmlUi/Core/FontEngineInterface.h"
-#include "../../Include/RmlUi/Core/Property.h"
-#include "LayoutBlockBox.h"
 #include "LayoutDetails.h"
 #include "LayoutEngine.h"
 
-// TODO: Includes
-
 namespace Rml {
-
-static void ZeroBoxEdge(Box& box, Box::Edge edge)
-{
-	box.SetEdge(Box::PADDING, edge, 0.f);
-	box.SetEdge(Box::BORDER, edge, 0.f);
-	box.SetEdge(Box::MARGIN, edge, 0.f);
-}
 
 void* InlineLevelBox::operator new(size_t size)
 {
@@ -58,38 +45,54 @@ void InlineLevelBox::operator delete(void* chunk, size_t size)
 	LayoutEngine::DeallocateLayoutChunk(chunk, size);
 }
 
-void InlineLevelBox::SubmitBox(Box box, Vector2f content_size, const FragmentBox& fragment_box)
+InlineLevelBox::~InlineLevelBox() {}
+
+void InlineLevelBox::SubmitElementOnLayout()
 {
-	RMLUI_ASSERT(element && element != fragment_box.offset_parent);
-
-	box.SetContent(content_size);
-
-	if (fragment_box.split_left)
-		ZeroBoxEdge(box, Box::LEFT);
-	if (fragment_box.split_right)
-		ZeroBoxEdge(box, Box::RIGHT);
-
-	// Boxes are positioned based on their margin-box in inline layout, while element offsets are specified relative to
-	// their border-box. Thus, add the margin edge to the element offset here.
-	const Vector2f margin_edge = Vector2f{box.GetEdge(Box::MARGIN, Box::LEFT), box.GetEdge(Box::MARGIN, Box::TOP)};
-	const Vector2f offset = fragment_box.position + margin_edge;
-
-	if (fragment_box.principal_box)
-	{
-		element->SetOffset(offset, fragment_box.offset_parent);
-		element->SetBox(box);
-		OnLayout();
-	}
-	else
-	{
-		// TODO: Will be wrong in case of relative positioning. (we really just want to subtract the value submitted to SetOffset in Submit()
-		// above).
-		const Vector2f element_offset = element->GetRelativeOffset(Box::BORDER);
-		element->AddBox(box, offset - element_offset);
-	}
+	element->OnLayout();
 }
 
-InlineLevelBox::~InlineLevelBox() {}
+void InlineLevelBox::SetVerticalAlignment(const InlineLevelBox* parent)
+{
+	vertical_align = element->GetComputedValues().vertical_align();
+	vertical_offset_from_parent = DetermineVerticalOffsetFromParent(parent);
+}
+
+float InlineLevelBox::DetermineVerticalOffsetFromParent(const InlineLevelBox* parent) const
+{
+	using Style::VerticalAlign;
+
+	// Determine the offset from the parent baseline.
+	float parent_baseline_offset = 0.f; // The anchor on the parent, as an offset from its baseline.
+	float self_baseline_offset = 0.f;   // The offset from the parent anchor to our baseline.
+
+	switch (vertical_align.type)
+	{
+	case VerticalAlign::Baseline: parent_baseline_offset = 0.f; break;
+	case VerticalAlign::Length: parent_baseline_offset = -vertical_align.value; break;
+	case VerticalAlign::Sub: parent_baseline_offset = (1.f / 5.f) * (float)parent->GetFontMetrics().size; break;
+	case VerticalAlign::Super: parent_baseline_offset = (-1.f / 3.f) * (float)parent->GetFontMetrics().size; break;
+	case VerticalAlign::TextTop:
+		parent_baseline_offset = -parent->GetFontMetrics().ascent;
+		self_baseline_offset = height_above_baseline;
+		break;
+	case VerticalAlign::TextBottom:
+		parent_baseline_offset = parent->GetFontMetrics().descent;
+		self_baseline_offset = -depth_below_baseline;
+		break;
+	case VerticalAlign::Middle:
+		parent_baseline_offset = -0.5f * parent->GetFontMetrics().x_height;
+		self_baseline_offset = 0.5f * (height_above_baseline - depth_below_baseline);
+		break;
+	case VerticalAlign::Top:
+	case VerticalAlign::Bottom:
+		// These are relative to the line box and handled later.
+		break;
+	}
+
+	return parent_baseline_offset + self_baseline_offset;
+}
+
 
 const FontMetrics& InlineLevelBox::GetFontMetrics() const
 {
@@ -108,36 +111,38 @@ String InlineLevelBox::DebugDumpTree(int depth) const
 	return value;
 }
 
-InlineLevelBox_Atomic::InlineLevelBox_Atomic(Element* element, const Box& box) : InlineLevelBox(element), box(box)
+InlineLevelBox_Atomic::InlineLevelBox_Atomic(const InlineLevelBox* parent, Element* element, const Box& box) : InlineLevelBox(element), box(box)
 {
-	RMLUI_ASSERT(element);
+	RMLUI_ASSERT(parent && element);
 	RMLUI_ASSERT(box.GetSize().x >= 0.f && box.GetSize().y >= 0.f);
+
+	const Vector2f outer_size = box.GetSize(Box::MARGIN);
+	outer_width = outer_size.x;
+
+	const float descent = GetElement()->GetBaseline();
+	const float ascent = outer_size.y - descent;
+	SetHeightForLine(ascent, descent);
+
+	SetVerticalAlignment(parent);
 }
 
 FragmentResult InlineLevelBox_Atomic::CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool /*first_box*/,
 	LayoutOverflowHandle /*overflow_handle*/)
 {
-	const Vector2f outer_size = box.GetSize(Box::MARGIN);
-
-	const float descent = GetElement()->GetBaseline();
-	const float ascent = outer_size.y - descent;
-
-	if (mode != InlineLayoutMode::WrapAny || outer_size.x + right_spacing_width <= available_width)
-		return FragmentResult(FragmentType::SizedBox, true, outer_size.x, ascent, descent, 0.f, 0.f);
+	if (mode != InlineLayoutMode::WrapAny || outer_width + right_spacing_width <= available_width)
+		return FragmentResult(FragmentType::SizedBox, outer_width);
 
 	return {};
 }
 
-void InlineLevelBox_Atomic::Submit(FragmentBox fragment_box, String /*text*/)
+void InlineLevelBox_Atomic::Submit(FragmentBox fragment_box)
 {
-	const Vector2f outer_size = box.GetSize(Box::MARGIN);
+	const Vector2f margin_position = {fragment_box.position.x, fragment_box.position.y - GetHeightAboveBaseline()};
+	const Vector2f margin_edge = {box.GetEdge(Box::MARGIN, Box::LEFT), box.GetEdge(Box::MARGIN, Box::TOP)};
 
-	const float descent = GetElement()->GetBaseline();
-	const float ascent = outer_size.y - descent;
-
-	fragment_box.position.y -= ascent;
-
-	SubmitBox(box, box.GetSize(), fragment_box);
+	GetElement()->SetOffset(margin_position + margin_edge, fragment_box.offset_parent);
+	GetElement()->SetBox(box);
+	SubmitElementOnLayout();
 }
 
 } // namespace Rml

@@ -27,19 +27,11 @@
  */
 
 #include "LayoutInlineLevelBoxText.h"
-#include "../../Include/RmlUi/Core/ComputedValues.h"
-#include "../../Include/RmlUi/Core/Core.h"
 #include "../../Include/RmlUi/Core/ElementText.h"
-#include "../../Include/RmlUi/Core/ElementUtilities.h"
-#include "../../Include/RmlUi/Core/FontEngineInterface.h"
-#include "../../Include/RmlUi/Core/Log.h"
-#include "../../Include/RmlUi/Core/Profiling.h"
-#include "../../Include/RmlUi/Core/Property.h"
-#include "ComputeProperty.h"
-#include "LayoutEngine.h"
-#include "LayoutLineBox.h"
 
 namespace Rml {
+
+InlineLevelBox_Text::InlineLevelBox_Text(ElementText* element) : InlineLevelBox(element) {}
 
 FragmentResult InlineLevelBox_Text::CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool first_box,
 	LayoutOverflowHandle in_overflow_handle)
@@ -66,31 +58,34 @@ FragmentResult InlineLevelBox_Text::CreateFragment(InlineLayoutMode mode, float 
 	if (overflow)
 		out_overflow_handle = line_begin + line_length;
 
-	const bool principal_fragment = (line_begin == 0);
+	LayoutFragmentHandle fragment_handle = (LayoutFragmentHandle)fragments.size();
+	fragments.push_back(std::move(line_contents));
 
-	return FragmentResult(FragmentType::TextRun, principal_fragment, line_width, 0.f, 0.f, out_overflow_handle, std::move(line_contents));
+	return FragmentResult(FragmentType::TextRun, line_width, fragment_handle, out_overflow_handle);
 }
 
-void InlineLevelBox_Text::Submit(FragmentBox fragment_box, String text)
+void InlineLevelBox_Text::Submit(FragmentBox fragment_box)
 {
+	RMLUI_ASSERT((size_t)fragment_box.handle < fragments.size());
+
+	const int fragment_index = (int)fragment_box.handle;
+	const bool principal_box = (fragment_index == 0);
+
 	ElementText* text_element = GetTextElement();
 	Vector2f line_offset;
-	if (fragment_box.principal_box)
+
+	if (principal_box)
 	{
+		element_offset = fragment_box.position;
 		text_element->SetOffset(fragment_box.position, fragment_box.offset_parent);
 		text_element->ClearLines();
 	}
 	else
 	{
-		// TODO: Will be wrong in case of relative positioning. (we really just want to subtract the value submitted to SetOffset in Submit() above).
-		const Vector2f element_offset = text_element->GetRelativeOffset(Box::BORDER);
 		line_offset = fragment_box.position - element_offset;
 	}
 
-	text_element->AddLine(line_offset, std::move(text));
-
-	// TODO Use offset calculation from base function.
-	// TODO Maybe we want to size it?
+	text_element->AddLine(line_offset, std::move(fragments[fragment_index]));
 }
 
 String InlineLevelBox_Text::DebugDumpNameValue() const

@@ -33,6 +33,7 @@
 
 namespace Rml {
 
+class InlineBox;
 class InlineBoxRoot;
 
 class LayoutLineBox final {
@@ -78,39 +79,31 @@ private:
 	using FragmentIndex = int;
 
 	struct Fragment {
+		InlineLevelBox* box;
+		LayoutFragmentHandle fragment_handle = {};
 		FragmentType type = FragmentType::Invalid;
 
-		Style::VerticalAlign vertical_align;
-		InlineLevelBox* inline_level_box;
-
+		// Layout state.
 		Vector2f position;  // Position relative to start of the line, disregarding floats, (x: outer-left edge, y: baseline).
 		float layout_width; // Inner width for inline boxes, otherwise outer width.
 
-		String text; // @performance Replace by a pointer or index? Don't need it for most fragments.
-
-		float total_height_above_baseline = 0.f; // Fragment contribution to the line box height above this fragment's baseline.
-		float total_depth_below_baseline = 0.f;  // Fragment contribution to the line box height below this fragment's baseline.
-
-		bool principal_fragment = true;
-		bool split_left = false;
-		bool split_right = false;
-
-		// For inline boxes
-		bool has_content = false;
-		float spacing_left = 0.f;             // Left margin-border-padding for inline boxes.
-		float spacing_right = 0.f;            // Right margin-border-padding for inline boxes.
-		FragmentIndex children_end_index = 0; // One-past-last-child of this box, as index into fragment list.
-
-		// Vertical alignment temporary state.
+		// Vertical alignment state.
 		float baseline_offset = 0.f;             // Vertical offset from aligned subtree root baseline to our baseline.
-		FragmentIndex aligned_subtree_root = -1; // Index of the aligned subtree the fragment belongs to, 0 being the root.
+		FragmentIndex aligned_subtree_root = -1; // Index of the aligned subtree the fragment belongs to, -1 being the root inline box.
 		FragmentIndex parent_fragment = -1;
 
-		// For aligned subtree root
+		// For inline boxes.
+		bool split_left = false;
+		bool split_right = false;
+		bool has_content = false;
+		FragmentIndex children_end_index = 0; // One-past-last-child of this box, as index into fragment list.
+
+		// For aligned subtree root.
 		float max_ascent = 0.f;
 		float max_descent = 0.f;
 	};
 
+	// TODO: Do we need this at all?
 	struct AlignedSubtree {
 		const InlineLevelBox* root_box = nullptr;
 		FragmentIndex root_index = 0;
@@ -140,7 +133,8 @@ private:
 
 	static bool IsAlignedSubtreeRoot(const Fragment& fragment)
 	{
-		return (fragment.vertical_align.type == Style::VerticalAlign::Top || fragment.vertical_align.type == Style::VerticalAlign::Bottom);
+		const Style::VerticalAlign::Type vertical_align = fragment.box->GetVerticalAlign().type;
+		return (vertical_align == Style::VerticalAlign::Top || vertical_align == Style::VerticalAlign::Bottom);
 	}
 
 	FragmentIndex GetOpenAlignedSubtreeRoot() const
