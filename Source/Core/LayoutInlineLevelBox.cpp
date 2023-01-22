@@ -68,9 +68,10 @@ void InlineLevelBox::SetHeightAndVerticalAlignment(float _height_above_baseline,
 	RMLUI_ASSERT(parent);
 	using Style::VerticalAlign;
 
-	height_above_baseline = _height_above_baseline;
-	depth_below_baseline = _depth_below_baseline;
-	vertical_align = element->GetComputedValues().vertical_align();
+	SetHeight(_height_above_baseline, _depth_below_baseline);
+
+	const Style::VerticalAlign vertical_align = element->GetComputedValues().vertical_align();
+	vertical_align_type = vertical_align.type;
 
 	// Determine the offset from the parent baseline.
 	float parent_baseline_offset = 0.f; // The anchor on the parent, as an offset from its baseline.
@@ -101,6 +102,12 @@ void InlineLevelBox::SetHeightAndVerticalAlignment(float _height_above_baseline,
 	}
 
 	vertical_offset_from_parent = parent_baseline_offset + self_baseline_offset;
+}
+
+void InlineLevelBox::SetHeight(float _height_above_baseline, float _depth_below_baseline)
+{
+	height_above_baseline = _height_above_baseline;
+	depth_below_baseline = _depth_below_baseline;
 }
 
 void InlineLevelBox::SetInlineBoxSpacing(float _spacing_left, float _spacing_right)

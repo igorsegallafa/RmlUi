@@ -38,13 +38,13 @@ class InlineBoxBase : public InlineLevelBox {
 public:
 	InlineLevelBox* AddChild(UniquePtr<InlineLevelBox> child);
 
-	// Get the total height above and depth below the baseline based on this element's line-height and font.
-	void GetStrut(float& out_total_height_above, float& out_total_depth_below) const;
-
 	String DebugDumpTree(int depth) const override;
 
 protected:
 	InlineBoxBase(Element* element);
+
+	// Get the total height above and depth below the baseline based on this element's line-height and font.
+	void GetStrut(float& out_total_height_above, float& out_total_depth_below) const;
 
 private:
 	using InlineLevelBoxList = Vector<UniquePtr<InlineLevelBox>>;

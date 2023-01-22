@@ -67,7 +67,12 @@ String InlineBoxBase::DebugDumpTree(int depth) const
 
 InlineBoxBase::InlineBoxBase(Element* element) : InlineLevelBox(element) {}
 
-InlineBoxRoot::InlineBoxRoot(Element* element) : InlineBoxBase(element) {}
+InlineBoxRoot::InlineBoxRoot(Element* element) : InlineBoxBase(element)
+{
+	float height_above_baseline, depth_below_baseline;
+	GetStrut(height_above_baseline, depth_below_baseline);
+	SetHeight(height_above_baseline, depth_below_baseline);
+}
 
 FragmentResult InlineBoxRoot::CreateFragment(InlineLayoutMode /*mode*/, float /*available_width*/, float /*right_spacing_width*/, bool /*first_box*/,
 	LayoutOverflowHandle /*overflow_handle*/)

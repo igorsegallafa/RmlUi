@@ -47,7 +47,7 @@ public:
 	// Closes the line, submitting any fragments placed on this line.
 	// @param[out] out_height_of_line Height of line. Note: This can be different from the element's computed line-height property.
 	// @return The next line, containing any open fragments that had to be split or wrapped down.
-	UniquePtr<LayoutLineBox> Close(const InlineBoxRoot* root_box, Element* offset_parent, Vector2f line_position, Style::TextAlign text_align,
+	UniquePtr<LayoutLineBox> Close(const InlineBoxRoot* root_inline_box, Element* offset_parent, Vector2f line_position, Style::TextAlign text_align,
 		float& out_height_of_line);
 
 	/// Close the open inline box.
@@ -61,16 +61,18 @@ public:
 	bool IsClosed() const { return is_closed; }
 	bool HasContent() const { return fragments.size() > open_fragments.size(); }
 
-	String DebugDumpTree(int depth) const;
-
 	void SetLineBox(Vector2f line_position, float line_width);
 	Vector2f GetPosition() const { return line_position; }
 
-	// Returns the width of the contents of the line, relative to the line position. Includes spacing due to horizontal alignment.
+	// Returns the width of the contents of the line, relative to the left edge of the line box. Includes spacing due to horizontal alignment.
 	// @note Only available after line has been closed.
 	float GetExtentRight() const;
 
+	// Returns the baseline position, relative to the top of the line box.
+	// @note Only available after line has been closed.
 	float GetBaseline() const;
+
+	String DebugDumpTree(int depth) const;
 
 	void* operator new(size_t size);
 	void operator delete(void* chunk, size_t size);
@@ -80,8 +82,9 @@ private:
 
 	struct Fragment {
 		InlineLevelBox* box;
-		LayoutFragmentHandle fragment_handle = {};
 		FragmentType type = FragmentType::Invalid;
+		Style::VerticalAlign::Type vertical_align = {};
+		LayoutFragmentHandle fragment_handle = {};
 
 		// Layout state.
 		Vector2f position;  // Position relative to start of the line, disregarding floats, (x: outer-left edge, y: baseline).
@@ -103,18 +106,8 @@ private:
 		float max_descent = 0.f;
 	};
 
-	// TODO: Do we need this at all?
-	struct AlignedSubtree {
-		const InlineLevelBox* root_box = nullptr;
-		FragmentIndex root_index = 0;
-		FragmentIndex child_end_index = 0;
-		float max_ascent = 0.f;
-		float max_descent = 0.f;
-	};
-
 	using FragmentList = Vector<Fragment>;
 	using FragmentIndexList = Vector<FragmentIndex>;
-	using AlignedSubtreeList = Vector<AlignedSubtree>;
 
 	// Place an open fragment.
 	Fragment& CloseFragment(int open_fragment_index, float right_inner_edge_position);
@@ -122,7 +115,8 @@ private:
 	// Splits the line, returning a new line if there are any open fragments.
 	UniquePtr<LayoutLineBox> SplitLine();
 
-	void VerticallyAlignSubtree(AlignedSubtree& parameters, FragmentIndexList& aligned_subtree_indices);
+	// Vertically align all descendants of the subtree. Returns the ascent of the top-most box, and descent of the bottom-most box.
+	void VerticallyAlignSubtree(int subtree_root_index, int children_end_index, float& max_ascent, float& max_descent);
 
 	FragmentIndex GetOpenParent() const
 	{
@@ -133,19 +127,19 @@ private:
 
 	static bool IsAlignedSubtreeRoot(const Fragment& fragment)
 	{
-		const Style::VerticalAlign::Type vertical_align = fragment.box->GetVerticalAlign().type;
-		return (vertical_align == Style::VerticalAlign::Top || vertical_align == Style::VerticalAlign::Bottom);
+		return (fragment.vertical_align == Style::VerticalAlign::Top || fragment.vertical_align == Style::VerticalAlign::Bottom);
 	}
 
-	FragmentIndex GetOpenAlignedSubtreeRoot() const
+	FragmentIndex DetermineAlignedSubtreeRoot(FragmentIndex index) const
 	{
-		for (int i = (int)open_fragments.size() - 1; i >= 0; i--)
+		while (index != -1)
 		{
-			FragmentIndex open_index = open_fragments[i];
-			if (IsAlignedSubtreeRoot(fragments[open_index]))
-				return open_index;
+			const Fragment& fragment = fragments[index];
+			if (IsAlignedSubtreeRoot(fragment))
+				return index;
+			index = fragment.parent_fragment;
 		}
-		return FragmentIndex(-1);
+		return index;
 	}
 
 	// Position of the line, relative to our parent root.
@@ -164,8 +158,6 @@ private:
 	// List of fragments from inline boxes that have been opened but are yet to be closed, as indices into 'fragments'.
 	// @performance Store using parent pointers to avoid allocations.
 	FragmentIndexList open_fragments;
-
-	AlignedSubtreeList aligned_subtree_list; // TODO: Alternative to storing a list: Calculate on close iff inline-box.
 
 	bool is_closed = false;
 

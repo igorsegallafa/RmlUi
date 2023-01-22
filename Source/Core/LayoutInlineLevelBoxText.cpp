@@ -38,8 +38,6 @@ FragmentResult InlineLevelBox_Text::CreateFragment(InlineLayoutMode mode, float 
 {
 	ElementText* text_element = GetTextElement();
 
-	// TODO: Allow empty if we have floats too, then we can wrap down. (But never if we cannot wrap?). Force it if we are the first content box of
-	// this line. That is, purely opened inline boxes that we are contained within should not count as a first box (we are then still the first box).
 	const bool allow_empty = (mode == InlineLayoutMode::WrapAny);
 	const bool decode_escape_characters = true;
 

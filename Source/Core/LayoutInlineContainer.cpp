@@ -263,7 +263,7 @@ bool InlineContainer::GetBaselineOfLastLine(float& out_baseline) const
 {
 	if (!line_boxes.empty())
 	{
-		out_baseline = line_boxes.back()->GetBaseline();
+		out_baseline = line_boxes.back()->GetPosition().y + line_boxes.back()->GetBaseline();
 		return true;
 	}
 	return false;

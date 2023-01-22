@@ -65,8 +65,8 @@ public:
 
 	float GetHeightAboveBaseline() const { return height_above_baseline; }
 	float GetDepthBelowBaseline() const { return depth_below_baseline; }
+	Style::VerticalAlign::Type GetVerticalAlign() const { return vertical_align_type; }
 	float GetVerticalOffsetFromParent() const { return vertical_offset_from_parent; }
-	Style::VerticalAlign GetVerticalAlign() const { return vertical_align; }
 	float GetSpacingLeft() const { return spacing_left; }
 	float GetSpacingRight() const { return spacing_right; }
 
@@ -85,6 +85,9 @@ protected:
 	// Set the height used for inline layout, and the vertical offset relative to our parent box.
 	void SetHeightAndVerticalAlignment(float height_above_baseline, float depth_below_baseline, const InlineLevelBox* parent);
 
+	// Set the height used for inline layout.
+	void SetHeight(float height_above_baseline, float depth_below_baseline);
+
 	// Set the inner-to-outer spacing (margin + border + padding) for inline boxes.
 	void SetInlineBoxSpacing(float spacing_left, float spacing_right);
 
@@ -95,7 +98,7 @@ private:
 	float height_above_baseline = 0.f;
 	float depth_below_baseline = 0.f;
 
-	Style::VerticalAlign vertical_align;
+	Style::VerticalAlign::Type vertical_align_type = {};
 	float vertical_offset_from_parent = 0.f;
 
 	float spacing_left = 0.f;  // Left margin-border-padding for inline boxes.
@@ -124,7 +127,7 @@ private:
 	Box box;
 };
 
-enum class FragmentType {
+enum class FragmentType : byte {
 	Invalid,   // Could not be placed.
 	InlineBox, // An inline box.
 	SizedBox,  // Sized inline-level boxes that are not inline-boxes.
