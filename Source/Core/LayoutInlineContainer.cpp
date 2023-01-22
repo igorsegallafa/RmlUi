@@ -98,6 +98,7 @@ InlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
 		// this approximation alright? Perhaps experiment with a very tall inline-element.
 		// @performance: We could do this only once for each line, and instead update it if we get new inline floats.
 		Vector2f line_position = NextLineBoxPosition(available_width, minimum_dimensions, !wrap_content);
+		available_width = Math::Max(available_width, 0.f);
 		line_box->SetLineBox(line_position, available_width);
 
 		// TODO: Cleanup logic
@@ -113,7 +114,7 @@ InlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
 		minimum_width_next = (line_box->HasContent() ? 0.f : available_width + 1.f);
 
 		// Keep adding boxes on a new line, either because the box couldn't fit on the current line at all, or because it had to be split.
-		CloseOpenLineBox();
+		CloseOpenLineBox(false);
 	}
 
 	return inline_box;
@@ -135,7 +136,7 @@ void InlineContainer::AddBreak(float line_height)
 {
 	// Increment by the line height if no line is open, otherwise simply end the line.
 	if (LayoutLineBox* line_box = GetOpenLineBox())
-		CloseOpenLineBox();
+		CloseOpenLineBox(true);
 	else
 		box_cursor += line_height;
 }
@@ -150,7 +151,7 @@ void InlineContainer::AddChainedBox(UniquePtr<LayoutLineBox> open_line_box)
 InlineContainer::CloseResult InlineContainer::Close(UniquePtr<LayoutLineBox>* out_open_line_box)
 {
 	// The parent container may need the open line box to be split and resumed.
-	CloseOpenLineBox(out_open_line_box);
+	CloseOpenLineBox(true, out_open_line_box);
 
 	// It is possible that floats were queued between the last line close and this container close, if so place them now.
 	parent->PlaceQueuedFloats(box_cursor);
@@ -183,7 +184,7 @@ InlineContainer::CloseResult InlineContainer::Close(UniquePtr<LayoutLineBox>* ou
 	return CloseResult::OK;
 }
 
-void InlineContainer::CloseOpenLineBox(UniquePtr<LayoutLineBox>* out_split_line)
+void InlineContainer::CloseOpenLineBox(bool split_all_open_boxes, UniquePtr<LayoutLineBox>* out_split_line)
 {
 	// Find the position of the line box, relative to its parent's block box's offset parent.
 	if (LayoutLineBox* line_box = GetOpenLineBox())
@@ -199,11 +200,11 @@ void InlineContainer::CloseOpenLineBox(UniquePtr<LayoutLineBox>* out_split_line)
 		const Vector2f line_position_offset_parent = line_position - root_to_offset_parent_offset;
 
 		float height_of_line = 0.f;
-		UniquePtr<LayoutLineBox> split_line_box =
-			line_box->Close(&root_inline_box, offset_parent->GetElement(), line_position_offset_parent, text_align, height_of_line);
+		UniquePtr<LayoutLineBox> split_line_box = line_box->Close(&root_inline_box, offset_parent->GetElement(), line_position_offset_parent,
+			text_align, split_all_open_boxes, height_of_line);
 
-		// Move the cursor down, but only if our line has any width.
-		if (line_box->GetBoxCursor() != 0.f)
+		// Move the cursor down, unless we should collapse the line.
+		if (!line_box->CanCollapseLine())
 			box_cursor = (line_position.y - position.y) + height_of_line;
 
 		// If we have any pending floating elements for our parent, then this would be an ideal time to place them.

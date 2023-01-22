@@ -94,7 +94,7 @@ private:
 
 	/// Close any open line box.
 	/// @param[out] out_split_line Optionally return any resulting split line, otherwise it will be added as a new line box to this container.
-	void CloseOpenLineBox(UniquePtr<LayoutLineBox>* out_split_line = nullptr);
+	void CloseOpenLineBox(bool split_all_open_boxes, UniquePtr<LayoutLineBox>* out_split_line = nullptr);
 
 	/// Returns the offset from the top-left corner of this box for the next line.
 	/// @param[out] box_width The available width for the line box.

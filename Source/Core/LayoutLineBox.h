@@ -58,7 +58,7 @@ public:
 	// @param[out] out_height_of_line Resulting height of line. This can be different from the element's computed line-height property.
 	// @return The next line if any open fragments had to be split or wrapped down.
 	UniquePtr<LayoutLineBox> Close(const InlineBoxRoot* root_inline_box, Element* offset_parent, Vector2f line_position, Style::TextAlign text_align,
-		float& out_height_of_line);
+		bool split_all_open_boxes, float& out_height_of_line);
 
 	float GetBoxCursor() const { return box_cursor; }
 	Vector2f GetPosition() const { return line_position; }
@@ -67,6 +67,9 @@ public:
 
 	bool IsClosed() const { return is_closed; }
 	bool HasContent() const { return has_content; }
+
+	// Returns true if this line should be collapsed, such that it takes up no height in the inline container.
+	bool CanCollapseLine() const;
 
 	// Returns the width of the contents of the line, relative to the left edge of the line box. Includes spacing due to horizontal alignment.
 	// @note Only available after line has been closed.
@@ -125,7 +128,7 @@ private:
 	void CloseFragment(Fragment& open_fragment, float right_inner_edge_position);
 
 	// Splits the line, returning a new line if there are any open fragments.
-	UniquePtr<LayoutLineBox> SplitLine();
+	UniquePtr<LayoutLineBox> SplitLine(bool split_all_open_boxes);
 
 	// Vertically align all descendants of the subtree. Returns the ascent of the top-most box, and descent of the bottom-most box.
 	void VerticallyAlignSubtree(int subtree_root_index, int children_end_index, float& max_ascent, float& max_descent);
@@ -154,8 +157,8 @@ private:
 		while (index != RootFragmentIndex)
 		{
 			Fragment& fragment = fragments[index];
-			func(fragment);
 			index = fragment.parent;
+			func(fragment);
 		}
 	}
 

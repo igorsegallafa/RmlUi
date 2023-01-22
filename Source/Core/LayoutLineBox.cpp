@@ -129,8 +129,8 @@ void LayoutLineBox::CloseFragment(Fragment& open_fragment, float right_inner_edg
 	RMLUI_ASSERT(open_fragment.type == FragmentType::InlineBox);
 
 	open_fragment.children_end_index = (int)fragments.size();
-	open_fragment.layout_width =
-		Math::Max(right_inner_edge_position - open_fragment.position.x - (open_fragment.split_left ? 0.f : open_fragment.box->GetSpacingLeft()), 0.f);
+	const float spacing_left = (open_fragment.split_left ? 0.f : open_fragment.box->GetSpacingLeft());
+	open_fragment.layout_width = Math::Max(right_inner_edge_position - open_fragment.position.x - spacing_left, 0.f);
 }
 
 void LayoutLineBox::CloseInlineBox(InlineBox* inline_box)
@@ -151,12 +151,82 @@ void LayoutLineBox::CloseInlineBox(InlineBox* inline_box)
 	open_fragments_leaf = fragment.parent;
 }
 
+UniquePtr<LayoutLineBox> LayoutLineBox::SplitLine(bool split_all_open_boxes)
+{
+	if (open_fragments_leaf == RootFragmentIndex)
+		return nullptr;
+
+	int num_open_fragments = 0;
+	ForAllOpenFragments([&](const Fragment& /*fragment*/) { num_open_fragments += 1; });
+
+	// Move the box cursor to account for any newly opened inline boxes to be closed.
+	box_cursor += open_spacing_left;
+	open_spacing_left = 0.f;
+
+	// Make a new line with the open fragments.
+	auto new_line = MakeUnique<LayoutLineBox>();
+	new_line->fragments.resize(num_open_fragments);
+
+	// Copy all open fragments to the next line. Do it in reverse order of iteration, since we iterate from back to front.
+	FragmentIndex new_index = num_open_fragments;
+	ForAllOpenFragments([&](Fragment& old_fragment) {
+		new_index -= 1;
+		RMLUI_ASSERT((size_t)new_index < new_line->fragments.size() && old_fragment.children_end_index == 0);
+
+		// Copy the old fragment.
+		Fragment& new_fragment = new_line->fragments[new_index];
+		new_fragment = old_fragment;
+		new_fragment.position.x = 0.f;
+		new_fragment.parent = new_index - 1;
+		new_fragment.aligned_subtree_root = new_line->DetermineAlignedSubtreeRoot(new_index);
+
+		// Only fragments with content placed on the previous line is split, otherwise the fragment is moved down.
+		if (new_fragment.has_content || split_all_open_boxes)
+		{
+			new_fragment.split_left = true;
+			new_fragment.has_content = false;
+
+			CloseFragment(old_fragment, box_cursor);
+			old_fragment.split_right = true;
+		}
+		else
+		{
+			const float spacing_left = (new_fragment.split_left ? 0.f : new_fragment.box->GetSpacingLeft());
+			new_line->open_spacing_left += spacing_left;
+
+			// The old fragment is not closed here, which ensures that it will not be placed/submitted on the previous
+			// line. Backtrack the box cursor since this fragment is moved down to the next line.
+			box_cursor -= spacing_left;
+		}
+	});
+
+	new_line->open_fragments_leaf = (int)new_line->fragments.size() - 1;
+	open_fragments_leaf = RootFragmentIndex;
+
+#ifdef RMLUI_DEBUG
+	// Verify integrity of the fragment tree after split.
+	for (int i = 0; i < (int)new_line->fragments.size(); i++)
+	{
+		const Fragment& fragment = new_line->fragments[i];
+		RMLUI_ASSERT(fragment.type == FragmentType::InlineBox);
+		RMLUI_ASSERT(fragment.parent < i);
+		RMLUI_ASSERT(fragment.parent == i - 1);
+		RMLUI_ASSERT(fragment.parent == RootFragmentIndex || new_line->fragments[fragment.parent].type == FragmentType::InlineBox);
+		RMLUI_ASSERT(
+			fragment.aligned_subtree_root == RootFragmentIndex || new_line->IsAlignedSubtreeRoot(new_line->fragments[fragment.aligned_subtree_root]));
+		RMLUI_ASSERT(fragment.children_end_index == 0);
+	}
+#endif
+
+	return new_line;
+}
+
 UniquePtr<LayoutLineBox> LayoutLineBox::Close(const InlineBoxRoot* root_inline_box, Element* offset_parent, Vector2f line_position,
-	Style::TextAlign text_align, float& out_height_of_line)
+	Style::TextAlign text_align, bool split_all_open_boxes, float& out_height_of_line)
 {
 	RMLUI_ASSERT(!is_closed);
 
-	UniquePtr<LayoutLineBox> new_line_box = SplitLine();
+	UniquePtr<LayoutLineBox> new_line_box = SplitLine(split_all_open_boxes);
 
 	RMLUI_ASSERT(open_fragments_leaf == RootFragmentIndex); // Ensure all open fragments are either closed or split.
 
@@ -247,7 +317,7 @@ UniquePtr<LayoutLineBox> LayoutLineBox::Close(const InlineBoxRoot* root_inline_b
 	}
 
 	// Position and size all inline-level boxes, place geometry boxes.
-	for (const auto& fragment : fragments)
+	for (const Fragment& fragment : fragments)
 	{
 		// Skip inline boxes which have not been closed (moved down to next line).
 		if (fragment.type == FragmentType::InlineBox && fragment.children_end_index == 0)
@@ -269,70 +339,6 @@ UniquePtr<LayoutLineBox> LayoutLineBox::Close(const InlineBoxRoot* root_inline_b
 	is_closed = true;
 
 	return new_line_box;
-}
-
-UniquePtr<LayoutLineBox> LayoutLineBox::SplitLine()
-{
-	if (open_fragments_leaf == RootFragmentIndex)
-		return nullptr;
-
-	int num_open_fragments = 0;
-	ForAllOpenFragments([&](const Fragment& /*fragment*/) { num_open_fragments += 1; });
-
-	// Make a new line with the open fragments.
-	auto new_line = MakeUnique<LayoutLineBox>();
-	new_line->fragments.resize(num_open_fragments);
-
-	// Copy all open fragments to the next line. Do it in reverse order of iteration, since we iterate from back to front.
-	FragmentIndex new_index = num_open_fragments;
-	ForAllOpenFragments([&](Fragment& old_fragment) {
-		new_index -= 1;
-		RMLUI_ASSERT(new_index >= 0 && new_index < (int)new_line->fragments.size());
-
-		// Copy the old fragment.
-		Fragment& new_fragment = new_line->fragments[new_index];
-		new_fragment = old_fragment;
-		new_fragment.position.x = new_line->box_cursor;
-		new_fragment.parent = new_index - 1;
-		new_fragment.aligned_subtree_root = new_line->DetermineAlignedSubtreeRoot(new_index);
-
-		// Fragments with content placed on the previous line is split, otherwise the fragment is moved down.
-		if (new_fragment.has_content)
-		{
-			// Mark the new fragment as split.
-			new_fragment.split_left = true;
-			new_fragment.has_content = false;
-
-			// The old fragment is closed, and also marked as split.
-			CloseFragment(old_fragment, box_cursor);
-			old_fragment.split_right = true;
-		}
-		else
-		{
-			new_line->open_spacing_left += new_fragment.box->GetSpacingLeft();
-			// The old fragment is not closed, which ensures that it is not placed/submitted on the previous line.
-		}
-	});
-
-	new_line->open_fragments_leaf = (int)new_line->fragments.size() - 1;
-	open_fragments_leaf = RootFragmentIndex;
-
-#ifdef RMLUI_DEBUG
-	// Verify integrity of the fragment tree after split.
-	for (int i = 0; i < (int)new_line->fragments.size(); i++)
-	{
-		const Fragment& fragment = new_line->fragments[i];
-		RMLUI_ASSERT(fragment.type == FragmentType::InlineBox);
-		RMLUI_ASSERT(fragment.parent < i);
-		RMLUI_ASSERT(fragment.parent == i - 1);
-		RMLUI_ASSERT(fragment.parent == RootFragmentIndex || new_line->fragments[fragment.parent].type == FragmentType::InlineBox);
-		RMLUI_ASSERT(
-			fragment.aligned_subtree_root == RootFragmentIndex || new_line->IsAlignedSubtreeRoot(new_line->fragments[fragment.aligned_subtree_root]));
-		RMLUI_ASSERT(fragment.children_end_index == 0);
-	}
-#endif
-
-	return new_line;
 }
 
 void LayoutLineBox::VerticallyAlignSubtree(const int subtree_root_index, const int children_end_index, float& max_ascent, float& max_descent)
@@ -365,6 +371,26 @@ InlineBox* LayoutLineBox::GetOpenInlineBox()
 		return nullptr;
 
 	return static_cast<InlineBox*>(fragments[open_fragments_leaf].box);
+}
+
+bool LayoutLineBox::CanCollapseLine() const
+{
+	// Roughly, collapse lines with only empty text fragments or inline boxes not taking up any width or spacing.
+	for (const Fragment& fragment : fragments)
+	{
+		if (fragment.layout_width > 0.f)
+			return false;
+		else if (fragment.type == FragmentType::SizedBox)
+			return false;
+		else if (fragment.type == FragmentType::InlineBox && fragment.children_end_index > 0)
+		{
+			const bool any_spacing_left = (!fragment.split_left && fragment.box->GetSpacingLeft() != 0.f);
+			const bool any_spacing_right = (!fragment.split_right && fragment.box->GetSpacingRight() != 0.f);
+			if (any_spacing_left || any_spacing_right)
+				return false;
+		}
+	}
+	return true;
 }
 
 float LayoutLineBox::GetExtentRight() const
