@@ -60,11 +60,13 @@ public:
 	UniquePtr<LayoutLineBox> Close(const InlineBoxRoot* root_inline_box, Element* offset_parent, Vector2f line_position, Style::TextAlign text_align,
 		float& out_height_of_line);
 
-	InlineBox* GetOpenInlineBox();
 	float GetBoxCursor() const { return box_cursor; }
-	bool IsClosed() const { return is_closed; }
-	bool HasContent() const { return fragments.size() > open_fragments.size(); }
 	Vector2f GetPosition() const { return line_position; }
+
+	InlineBox* GetOpenInlineBox();
+
+	bool IsClosed() const { return is_closed; }
+	bool HasContent() const { return has_content; }
 
 	// Returns the width of the contents of the line, relative to the left edge of the line box. Includes spacing due to horizontal alignment.
 	// @note Only available after line has been closed.
@@ -83,6 +85,8 @@ private:
 	using FragmentIndex = int;
 	using VerticalAlignType = Style::VerticalAlign::Type;
 
+	static constexpr FragmentIndex RootFragmentIndex = -1;
+
 	struct Fragment {
 		Fragment() = default;
 		Fragment(InlineLevelBox* box, FragmentConstructor constructor, VerticalAlignType vertical_align, float position_x, FragmentIndex parent) :
@@ -100,9 +104,9 @@ private:
 		float layout_width = 0.f; // Inner width for inline boxes, otherwise outer width.
 
 		// Vertical alignment state.
-		FragmentIndex parent = -1;
-		FragmentIndex aligned_subtree_root = -1; // Index of the aligned subtree the fragment belongs to, -1 being the root inline box.
-		float baseline_offset = 0.f;             // Vertical offset from aligned subtree root baseline to our baseline.
+		FragmentIndex parent = RootFragmentIndex;
+		FragmentIndex aligned_subtree_root = RootFragmentIndex; // Index of the aligned subtree the fragment belongs to.
+		float baseline_offset = 0.f;                            // Vertical offset from aligned subtree root baseline to our baseline.
 
 		// For inline boxes.
 		bool split_left = false;
@@ -116,23 +120,15 @@ private:
 	};
 
 	using FragmentList = Vector<Fragment>;
-	using FragmentIndexList = Vector<FragmentIndex>;
 
 	// Place an open fragment.
-	Fragment& CloseFragment(FragmentIndex open_fragment_index, float right_inner_edge_position);
+	void CloseFragment(Fragment& open_fragment, float right_inner_edge_position);
 
 	// Splits the line, returning a new line if there are any open fragments.
 	UniquePtr<LayoutLineBox> SplitLine();
 
 	// Vertically align all descendants of the subtree. Returns the ascent of the top-most box, and descent of the bottom-most box.
 	void VerticallyAlignSubtree(int subtree_root_index, int children_end_index, float& max_ascent, float& max_descent);
-
-	FragmentIndex GetOpenParent() const
-	{
-		if (!open_fragments.empty())
-			return open_fragments.back();
-		return FragmentIndex(-1);
-	}
 
 	static bool IsAlignedSubtreeRoot(const Fragment& fragment)
 	{
@@ -151,6 +147,18 @@ private:
 		return index;
 	}
 
+	template <typename Func>
+	void ForAllOpenFragments(Func&& func)
+	{
+		FragmentIndex index = open_fragments_leaf;
+		while (index != RootFragmentIndex)
+		{
+			Fragment& fragment = fragments[index];
+			func(fragment);
+			index = fragment.parent;
+		}
+	}
+
 	// Position of the line, relative to our parent root.
 	Vector2f line_position;
 	// Available space for the line. Based on our parent box content width, possibly shrinked due to floating boxes.
@@ -161,13 +169,13 @@ private:
 	// The contribution of opened inline boxes to the placement of the next fragment, due to their left edges (margin-border-padding).
 	float open_spacing_left = 0.f;
 
-	// List of placed fragments in this line box.
+	// List of fragments in this line box.
 	FragmentList fragments;
 
-	// List of fragments from inline boxes that have been opened but are yet to be closed, as indices into 'fragments'.
-	// @performance Store using parent pointers to avoid allocations.
-	FragmentIndexList open_fragments;
+	// Index of the last open fragment. The list of open fragments is this leaf and all of its ancestors up to the root.
+	FragmentIndex open_fragments_leaf = RootFragmentIndex;
 
+	bool has_content = false;
 	bool is_closed = false;
 
 	// Content offset due to space distribution from 'text-align'. Available after close.
