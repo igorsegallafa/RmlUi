@@ -37,7 +37,7 @@
 #include "LayoutBlockBox.h"
 #include "LayoutBlockBoxSpace.h"
 #include "LayoutDetails.h"
-#include "LayoutInlineLevelBoxText.h"
+#include "LayoutInlineLevelBox.h"
 
 namespace Rml {
 

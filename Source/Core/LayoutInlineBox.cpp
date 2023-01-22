@@ -74,14 +74,14 @@ InlineBoxRoot::InlineBoxRoot(Element* element) : InlineBoxBase(element)
 	SetHeight(height_above_baseline, depth_below_baseline);
 }
 
-FragmentResult InlineBoxRoot::CreateFragment(InlineLayoutMode /*mode*/, float /*available_width*/, float /*right_spacing_width*/, bool /*first_box*/,
-	LayoutOverflowHandle /*overflow_handle*/)
+FragmentConstructor InlineBoxRoot::CreateFragment(InlineLayoutMode /*mode*/, float /*available_width*/, float /*right_spacing_width*/,
+	bool /*first_box*/, LayoutOverflowHandle /*overflow_handle*/)
 {
 	RMLUI_ERROR;
 	return {};
 }
 
-void InlineBoxRoot::Submit(FragmentBox /*box_display*/)
+void InlineBoxRoot::Submit(const PlacedFragment& /*placed_fragment*/)
 {
 	RMLUI_ERROR;
 }
@@ -110,40 +110,40 @@ InlineBox::InlineBox(const InlineLevelBox* parent, Element* element, const Box& 
 	baseline_to_border_height = font_metrics.ascent + half_leading + box.GetEdge(Box::BORDER, Box::TOP) + box.GetEdge(Box::PADDING, Box::TOP);
 }
 
-FragmentResult InlineBox::CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool /*first_box*/,
+FragmentConstructor InlineBox::CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool /*first_box*/,
 	LayoutOverflowHandle /*overflow_handle*/)
 {
 	if (mode != InlineLayoutMode::WrapAny || right_spacing_width <= available_width + GetSpacingLeft())
-		return FragmentResult(FragmentType::InlineBox, -1.f);
+		return FragmentConstructor{FragmentType::InlineBox, -1.f, {}, {}};
 
 	return {};
 }
 
-void InlineBox::Submit(FragmentBox fragment_box)
+void InlineBox::Submit(const PlacedFragment& placed_fragment)
 {
 	Element* element = GetElement();
-	RMLUI_ASSERT(element && element != fragment_box.offset_parent);
+	RMLUI_ASSERT(element && element != placed_fragment.offset_parent);
 
 	Box element_box = box;
-	element_box.SetContent({fragment_box.layout_width, element_box.GetSize().y});
+	element_box.SetContent({placed_fragment.layout_width, element_box.GetSize().y});
 
-	if (fragment_box.split_left)
+	if (placed_fragment.split_left)
 		ZeroBoxEdge(element_box, Box::LEFT);
-	if (fragment_box.split_right)
+	if (placed_fragment.split_right)
 		ZeroBoxEdge(element_box, Box::RIGHT);
 
 	// In inline layout, fragments are positioned in terms of (x: margin edge, y: baseline), while element offsets are
 	// specified relative to their border box. Thus, find the offset from the fragment position to the border edge.
-	const Vector2f border_position = fragment_box.position + Vector2f{element_box.GetEdge(Box::MARGIN, Box::LEFT), -baseline_to_border_height};
+	const Vector2f border_position = placed_fragment.position + Vector2f{element_box.GetEdge(Box::MARGIN, Box::LEFT), -baseline_to_border_height};
 
 	// We can determine the principal fragment based on its left split: Only the principal one has its left side intact,
 	// subsequent fragments have their left side split.
-	const bool principal_box = !fragment_box.split_left;
+	const bool principal_box = !placed_fragment.split_left;
 
 	if (principal_box)
 	{
 		element_offset = border_position;
-		element->SetOffset(border_position, fragment_box.offset_parent);
+		element->SetOffset(border_position, placed_fragment.offset_parent);
 		element->SetBox(element_box);
 		SubmitElementOnLayout();
 	}

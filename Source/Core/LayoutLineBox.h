@@ -29,39 +29,41 @@
 #ifndef RMLUI_CORE_LAYOUTLINEBOX_H
 #define RMLUI_CORE_LAYOUTLINEBOX_H
 
-#include "LayoutInlineLevelBox.h"
+#include "../../Include/RmlUi/Core/StyleTypes.h"
+#include "LayoutInlineTypes.h"
 
 namespace Rml {
 
 class InlineBox;
 class InlineBoxRoot;
+class InlineLevelBox;
 
 class LayoutLineBox final {
 public:
 	LayoutLineBox() = default;
 	~LayoutLineBox();
 
+	// Set the line box position and width.
+	void SetLineBox(Vector2f line_position, float line_width);
+
 	// Returns true if the box should be placed again on a new line.
 	bool AddBox(InlineLevelBox* box, InlineLayoutMode layout_mode, float line_width, LayoutOverflowHandle& inout_overflow_handle);
 
+	/// Close the open inline box.
+	/// @param[in] inline_box The inline box to be closed. Should match the currently open box, strictly used for verification.
+	/// @note Only inline boxes need to be closed. Other inline-level boxes do not contain child boxes considered in the current inline formatting
+	void CloseInlineBox(InlineBox* inline_box);
+
 	// Closes the line, submitting any fragments placed on this line.
-	// @param[out] out_height_of_line Height of line. Note: This can be different from the element's computed line-height property.
-	// @return The next line, containing any open fragments that had to be split or wrapped down.
+	// @param[out] out_height_of_line Resulting height of line. This can be different from the element's computed line-height property.
+	// @return The next line if any open fragments had to be split or wrapped down.
 	UniquePtr<LayoutLineBox> Close(const InlineBoxRoot* root_inline_box, Element* offset_parent, Vector2f line_position, Style::TextAlign text_align,
 		float& out_height_of_line);
 
-	/// Close the open inline box.
-	/// @param[in] inline_box The inline box to be closed. Should match the currently open box, strictly used for verification.
-	/// @note Only inline-boxes need to be closed. Other inline-level boxes do not contain child boxes considered in the current inline formatting
-	void CloseInlineBox(InlineBox* inline_box);
-
 	InlineBox* GetOpenInlineBox();
-
 	float GetBoxCursor() const { return box_cursor; }
 	bool IsClosed() const { return is_closed; }
 	bool HasContent() const { return fragments.size() > open_fragments.size(); }
-
-	void SetLineBox(Vector2f line_position, float line_width);
 	Vector2f GetPosition() const { return line_position; }
 
 	// Returns the width of the contents of the line, relative to the left edge of the line box. Includes spacing due to horizontal alignment.
@@ -79,21 +81,28 @@ public:
 
 private:
 	using FragmentIndex = int;
+	using VerticalAlignType = Style::VerticalAlign::Type;
 
 	struct Fragment {
-		InlineLevelBox* box;
+		Fragment() = default;
+		Fragment(InlineLevelBox* box, FragmentConstructor constructor, VerticalAlignType vertical_align, float position_x, FragmentIndex parent) :
+			box(box), type(constructor.type), fragment_handle(constructor.fragment_handle), vertical_align(vertical_align), position(position_x, 0.f),
+			layout_width(constructor.layout_width), parent(parent)
+		{}
+
+		InlineLevelBox* box = nullptr;
 		FragmentType type = FragmentType::Invalid;
-		Style::VerticalAlign::Type vertical_align = {};
 		LayoutFragmentHandle fragment_handle = {};
+		VerticalAlignType vertical_align = {};
 
 		// Layout state.
-		Vector2f position;  // Position relative to start of the line, disregarding floats, (x: outer-left edge, y: baseline).
-		float layout_width; // Inner width for inline boxes, otherwise outer width.
+		Vector2f position;        // Position relative to start of the line, disregarding floats, (x: outer-left edge, y: baseline).
+		float layout_width = 0.f; // Inner width for inline boxes, otherwise outer width.
 
 		// Vertical alignment state.
-		float baseline_offset = 0.f;             // Vertical offset from aligned subtree root baseline to our baseline.
+		FragmentIndex parent = -1;
 		FragmentIndex aligned_subtree_root = -1; // Index of the aligned subtree the fragment belongs to, -1 being the root inline box.
-		FragmentIndex parent_fragment = -1;
+		float baseline_offset = 0.f;             // Vertical offset from aligned subtree root baseline to our baseline.
 
 		// For inline boxes.
 		bool split_left = false;
@@ -110,7 +119,7 @@ private:
 	using FragmentIndexList = Vector<FragmentIndex>;
 
 	// Place an open fragment.
-	Fragment& CloseFragment(int open_fragment_index, float right_inner_edge_position);
+	Fragment& CloseFragment(FragmentIndex open_fragment_index, float right_inner_edge_position);
 
 	// Splits the line, returning a new line if there are any open fragments.
 	UniquePtr<LayoutLineBox> SplitLine();
@@ -127,7 +136,7 @@ private:
 
 	static bool IsAlignedSubtreeRoot(const Fragment& fragment)
 	{
-		return (fragment.vertical_align == Style::VerticalAlign::Top || fragment.vertical_align == Style::VerticalAlign::Bottom);
+		return (fragment.vertical_align == VerticalAlignType::Top || fragment.vertical_align == VerticalAlignType::Bottom);
 	}
 
 	FragmentIndex DetermineAlignedSubtreeRoot(FragmentIndex index) const
@@ -137,7 +146,7 @@ private:
 			const Fragment& fragment = fragments[index];
 			if (IsAlignedSubtreeRoot(fragment))
 				return index;
-			index = fragment.parent_fragment;
+			index = fragment.parent;
 		}
 		return index;
 	}

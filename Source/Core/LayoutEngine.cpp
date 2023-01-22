@@ -39,7 +39,6 @@
 #include "LayoutDetails.h"
 #include "LayoutFlex.h"
 #include "LayoutInlineContainer.h"
-#include "LayoutInlineLevelBoxText.h"
 #include "LayoutTable.h"
 #include "Pool.h"
 #include <algorithm>

@@ -29,6 +29,7 @@
 #include "LayoutInlineLevelBox.h"
 #include "../../Include/RmlUi/Core/ComputedValues.h"
 #include "../../Include/RmlUi/Core/Core.h"
+#include "../../Include/RmlUi/Core/ElementText.h"
 #include "../../Include/RmlUi/Core/FontEngineInterface.h"
 #include "LayoutDetails.h"
 #include "LayoutEngine.h"
@@ -127,31 +128,98 @@ InlineLevelBox_Atomic::InlineLevelBox_Atomic(const InlineLevelBox* parent, Eleme
 	RMLUI_ASSERT(parent && element);
 	RMLUI_ASSERT(box.GetSize().x >= 0.f && box.GetSize().y >= 0.f);
 
-	const Vector2f outer_size = box.GetSize(Box::MARGIN);
-	outer_width = outer_size.x;
+	const float outer_height = box.GetSizeAcross(Box::VERTICAL, Box::MARGIN);
 
 	const float descent = GetElement()->GetBaseline();
-	const float ascent = outer_size.y - descent;
+	const float ascent = outer_height - descent;
 	SetHeightAndVerticalAlignment(ascent, descent, parent);
 }
 
-FragmentResult InlineLevelBox_Atomic::CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool /*first_box*/,
+FragmentConstructor InlineLevelBox_Atomic::CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool /*first_box*/,
 	LayoutOverflowHandle /*overflow_handle*/)
 {
+	const float outer_width = box.GetSizeAcross(Box::HORIZONTAL, Box::MARGIN);
+
 	if (mode != InlineLayoutMode::WrapAny || outer_width + right_spacing_width <= available_width)
-		return FragmentResult(FragmentType::SizedBox, outer_width);
+		return FragmentConstructor{FragmentType::SizedBox, outer_width, {}, {}};
 
 	return {};
 }
 
-void InlineLevelBox_Atomic::Submit(FragmentBox fragment_box)
+void InlineLevelBox_Atomic::Submit(const PlacedFragment& placed_fragment)
 {
-	const Vector2f margin_position = {fragment_box.position.x, fragment_box.position.y - GetHeightAboveBaseline()};
+	const Vector2f margin_position = {placed_fragment.position.x, placed_fragment.position.y - GetHeightAboveBaseline()};
 	const Vector2f margin_edge = {box.GetEdge(Box::MARGIN, Box::LEFT), box.GetEdge(Box::MARGIN, Box::TOP)};
 
-	GetElement()->SetOffset(margin_position + margin_edge, fragment_box.offset_parent);
+	GetElement()->SetOffset(margin_position + margin_edge, placed_fragment.offset_parent);
 	GetElement()->SetBox(box);
 	SubmitElementOnLayout();
 }
 
+InlineLevelBox_Text::InlineLevelBox_Text(ElementText* element) : InlineLevelBox(element) {}
+
+FragmentConstructor InlineLevelBox_Text::CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool first_box,
+	LayoutOverflowHandle in_overflow_handle)
+{
+	ElementText* text_element = GetTextElement();
+
+	const bool allow_empty = (mode == InlineLayoutMode::WrapAny);
+	const bool decode_escape_characters = true;
+
+	String line_contents;
+	int line_begin = in_overflow_handle;
+	int line_length = 0;
+	float line_width = 0.f;
+	bool overflow = !text_element->GenerateLine(line_contents, line_length, line_width, line_begin, available_width, right_spacing_width, first_box,
+		decode_escape_characters, allow_empty);
+
+	if (overflow && line_contents.empty())
+		// We couldn't fit anything on this line.
+		return {};
+
+	LayoutOverflowHandle out_overflow_handle = {};
+	if (overflow)
+		out_overflow_handle = line_begin + line_length;
+
+	LayoutFragmentHandle fragment_handle = (LayoutFragmentHandle)fragments.size();
+	fragments.push_back(std::move(line_contents));
+
+	return FragmentConstructor{FragmentType::TextRun, line_width, fragment_handle, out_overflow_handle};
+}
+
+void InlineLevelBox_Text::Submit(const PlacedFragment& placed_fragment)
+{
+	RMLUI_ASSERT((size_t)placed_fragment.handle < fragments.size());
+
+	const int fragment_index = (int)placed_fragment.handle;
+	const bool principal_box = (fragment_index == 0);
+
+	ElementText* text_element = GetTextElement();
+	Vector2f line_offset;
+
+	if (principal_box)
+	{
+		element_offset = placed_fragment.position;
+		text_element->SetOffset(placed_fragment.position, placed_fragment.offset_parent);
+		text_element->ClearLines();
+	}
+	else
+	{
+		line_offset = placed_fragment.position - element_offset;
+	}
+
+	text_element->AddLine(line_offset, std::move(fragments[fragment_index]));
+}
+
+String InlineLevelBox_Text::DebugDumpNameValue() const
+{
+	return "InlineLevelBox_Text";
+}
+
+ElementText* InlineLevelBox_Text::GetTextElement()
+{
+	RMLUI_ASSERT(rmlui_dynamic_cast<ElementText*>(GetElement()));
+
+	return static_cast<ElementText*>(GetElement());
+}
 } // namespace Rml

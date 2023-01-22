@@ -57,7 +57,7 @@ private:
     Inline boxes are inline-level boxes whose contents (child boxes) participate in the same inline formatting context
     as the box itself.
 
-    An inline box initially creates an unsized open fragment, since its width depend on its children. The fragment is
+    An inline box initially creates an unsized open fragment, since its width depends on its children. The fragment is
     sized and placed later on, either when its line needs to be split or when its element is closed, which happens after
     all its children in the element tree have already been placed.
  */
@@ -65,9 +65,10 @@ class InlineBox final : public InlineBoxBase {
 public:
 	InlineBox(const InlineLevelBox* parent, Element* element, const Box& box);
 
-	FragmentResult CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool first_box,
+	FragmentConstructor CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool first_box,
 		LayoutOverflowHandle overflow_handle) override;
-	void Submit(FragmentBox fragment_box) override;
+
+	void Submit(const PlacedFragment& placed_fragment) override;
 
 	String DebugDumpNameValue() const override { return "InlineBox"; }
 
@@ -86,9 +87,10 @@ class InlineBoxRoot final : public InlineBoxBase {
 public:
 	InlineBoxRoot(Element* element);
 
-	FragmentResult CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool first_box,
+	FragmentConstructor CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool first_box,
 		LayoutOverflowHandle overflow_handle) override;
-	void Submit(FragmentBox fragment_box) override;
+
+	void Submit(const PlacedFragment& placed_fragment) override;
 
 	String DebugDumpNameValue() const override { return "InlineBoxRoot"; }
 };

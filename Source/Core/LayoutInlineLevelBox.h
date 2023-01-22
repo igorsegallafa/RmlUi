@@ -31,21 +31,12 @@
 
 #include "../../Include/RmlUi/Core/Box.h"
 #include "../../Include/RmlUi/Core/StyleTypes.h"
+#include "LayoutInlineTypes.h"
 
 namespace Rml {
 
-class Element;
-struct FragmentResult;
-struct FragmentBox;
+class ElementText;
 struct FontMetrics;
-
-enum class InlineLayoutMode {
-	WrapAny,          // Allow wrapping to avoid overflow, even if nothing is placed.
-	WrapAfterContent, // Allow wrapping to avoid overflow, but first place at least *some* content on this line.
-	Nowrap,           // Place all content on this line, regardless of overflow.
-};
-using LayoutOverflowHandle = int;
-using LayoutFragmentHandle = int;
 
 /**
     A box that takes part in inline layout.
@@ -57,11 +48,11 @@ public:
 	virtual ~InlineLevelBox();
 
 	// Create a fragment from this box, if it can fit within the available width.
-	virtual FragmentResult CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool first_box,
+	virtual FragmentConstructor CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool first_box,
 		LayoutOverflowHandle overflow_handle) = 0;
 
 	// Submit a fragment's position and size to be displayed on the underlying element.
-	virtual void Submit(FragmentBox fragment_box) = 0;
+	virtual void Submit(const PlacedFragment& placed_fragment) = 0;
 
 	float GetHeightAboveBaseline() const { return height_above_baseline; }
 	float GetDepthBelowBaseline() const { return depth_below_baseline; }
@@ -116,44 +107,38 @@ class InlineLevelBox_Atomic final : public InlineLevelBox {
 public:
 	InlineLevelBox_Atomic(const InlineLevelBox* parent, Element* element, const Box& box);
 
-	FragmentResult CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool first_box,
+	FragmentConstructor CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool first_box,
 		LayoutOverflowHandle overflow_handle) override;
-	void Submit(FragmentBox fragment_box) override;
+
+	void Submit(const PlacedFragment& placed_fragment) override;
 
 	String DebugDumpNameValue() const override { return "InlineLevelBox_Atomic"; }
 
 private:
-	float outer_width = 0;
 	Box box;
 };
 
-enum class FragmentType : byte {
-	Invalid,   // Could not be placed.
-	InlineBox, // An inline box.
-	SizedBox,  // Sized inline-level boxes that are not inline-boxes.
-	TextRun,   // Text runs.
-};
+/**
+    Inline-level text boxes represent text nodes.
 
-struct FragmentResult {
-	FragmentResult() = default;
-	FragmentResult(FragmentType type, float layout_width, LayoutFragmentHandle fragment_handle = {}, LayoutOverflowHandle overflow_handle = {}) :
-		type(type), layout_width(layout_width), fragment_handle(fragment_handle), overflow_handle(overflow_handle)
-	{}
+    Generates fragments to display its text, splitting it up as necessary to fit in the available space.
+ */
+class InlineLevelBox_Text final : public InlineLevelBox {
+public:
+	InlineLevelBox_Text(ElementText* element);
 
-	FragmentType type = FragmentType::Invalid;
-	float layout_width = 0.f;
+	FragmentConstructor CreateFragment(InlineLayoutMode mode, float available_width, float right_spacing_width, bool first_box,
+		LayoutOverflowHandle overflow_handle) override;
 
-	LayoutFragmentHandle fragment_handle = {}; // Handle to enable the inline-level box to reference any fragment-specific data.
-	LayoutOverflowHandle overflow_handle = {}; // Overflow handle is non-zero when there is another fragment to be layed out.
-};
+	void Submit(const PlacedFragment& placed_fragment) override;
 
-struct FragmentBox {
-	Element* offset_parent;
-	LayoutFragmentHandle handle;
-	Vector2f position;
-	float layout_width;
-	bool split_left;
-	bool split_right;
+	String DebugDumpNameValue() const override;
+
+private:
+	ElementText* GetTextElement();
+
+	Vector2f element_offset;
+	StringList fragments;
 };
 
 } // namespace Rml
