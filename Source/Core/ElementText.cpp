@@ -27,22 +27,42 @@
  */
 
 #include "../../Include/RmlUi/Core/ElementText.h"
-#include "ElementDefinition.h"
-#include "ElementStyle.h"
-#include "../../Include/RmlUi/Core/Core.h"
 #include "../../Include/RmlUi/Core/Context.h"
+#include "../../Include/RmlUi/Core/Core.h"
 #include "../../Include/RmlUi/Core/ElementDocument.h"
 #include "../../Include/RmlUi/Core/ElementUtilities.h"
 #include "../../Include/RmlUi/Core/Event.h"
 #include "../../Include/RmlUi/Core/FontEngineInterface.h"
 #include "../../Include/RmlUi/Core/GeometryUtilities.h"
-#include "../../Include/RmlUi/Core/Property.h"
 #include "../../Include/RmlUi/Core/Profiling.h"
+#include "../../Include/RmlUi/Core/Property.h"
+#include "ComputeProperty.h"
+#include "ElementDefinition.h"
+#include "ElementStyle.h"
 
 namespace Rml {
 
 static bool BuildToken(String& token, const char*& token_begin, const char* string_end, bool first_token, bool collapse_white_space, bool break_at_endline, Style::TextTransform text_transformation, bool decode_escape_characters);
 static bool LastToken(const char* token_begin, const char* string_end, bool collapse_white_space, bool break_at_endline);
+
+void LogMissingFontFace(Element* element)
+{
+	const String font_family_property = element->GetProperty<String>("font-family");
+	if (font_family_property.empty())
+	{
+		Log::Message(Log::LT_WARNING, "No font face defined. Missing 'font-family' property. On element %s", element->GetAddress().c_str());
+	}
+	else
+	{
+		const ComputedValues& computed = element->GetComputedValues();
+		const String font_face_description = GetFontFaceDescription(font_family_property, computed.font_style(), computed.font_weight());
+		Log::Message(Log::LT_WARNING,
+			"No font face defined. Ensure (1) that Context::Update is run after new elements are constructed, before Context::Render, "
+			"and (2) that the specified font face %s has been successfully loaded. "
+			"Please see previous log messages for all successfully loaded fonts. On element %s",
+			font_face_description.c_str(), element->GetAddress().c_str());
+	}
+}
 
 ElementText::ElementText(const String& tag) :
 	Element(tag), colour(255, 255, 255), opacity(1), font_handle_version(0), geometry_dirty(true), dirty_layout_on_change(true),
@@ -152,36 +172,6 @@ void ElementText::OnRender()
 		decoration->Render(translation);
 }
 
-// Generates a token of text from this element, returning only the width.
-bool ElementText::GenerateToken(float& token_width, int line_begin)
-{
-	RMLUI_ZoneScoped;
-
-	// Bail if we don't have a valid font face.
-	FontFaceHandle font_face_handle = GetFontFaceHandle();
-	if (font_face_handle == 0 || line_begin >= (int)text.size())
-		return false;
-
-	// Determine how we are processing white-space while formatting the text.
-	using namespace Style;
-	auto& computed = GetComputedValues();
-	WhiteSpace white_space_property = computed.white_space();
-	bool collapse_white_space = white_space_property == WhiteSpace::Normal ||
-								white_space_property == WhiteSpace::Nowrap ||
-								white_space_property == WhiteSpace::Preline;
-	bool break_at_endline = white_space_property == WhiteSpace::Pre ||
-							white_space_property == WhiteSpace::Prewrap ||
-							white_space_property == WhiteSpace::Preline;
-
-	const char* token_begin = text.c_str() + line_begin;
-	String token;
-
-	BuildToken(token, token_begin, text.c_str() + text.size(), true, collapse_white_space, break_at_endline, computed.text_transform(), true);
-	token_width = (float) GetFontEngineInterface()->GetStringWidth(font_face_handle, token);
-
-	return LastToken(token_begin, text.c_str() + text.size(), collapse_white_space, break_at_endline);
-}
-
 // Generates a line of text rendered from this element
 bool ElementText::GenerateLine(String& line, int& line_length, float& line_width, int line_begin, float maximum_line_width, float right_spacing_width,
 	bool trim_whitespace_prefix, bool decode_escape_characters, bool allow_empty)
@@ -198,7 +188,10 @@ bool ElementText::GenerateLine(String& line, int& line_length, float& line_width
 
 	// Bail if we don't have a valid font face.
 	if (font_face_handle == 0)
+	{
+		LogMissingFontFace(GetParentNode() ? GetParentNode() : this);
 		return true;
+	}
 
 	// Determine how we are processing white-space while formatting the text.
 	using namespace Style;

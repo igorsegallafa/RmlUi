@@ -52,11 +52,6 @@ public:
 	/// Returns the raw string this text element contains.
 	const String& GetText() const;
 
-	/// Generates a token of text from this element, returning only the width.
-	/// @param[out] token_width The window (in pixels) of the token.
-	/// @param[in] token_begin The first character to be included in the token.
-	/// @return True if the token is the end of the element's text, false if not.
-	bool GenerateToken(float& token_width, int token_begin);
 	/// Generates a line of text rendered from this element.
 	/// @param[out] line The characters making up the line, with white-space characters collapsed and endlines processed appropriately.
 	/// @param[out] line_length The number of characters from the source string consumed making up this string; this may very well be different from line.size()!

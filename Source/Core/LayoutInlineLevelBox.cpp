@@ -58,9 +58,16 @@ const FontMetrics& InlineLevelBox::GetFontMetrics() const
 	if (FontFaceHandle handle = element->GetFontFaceHandle())
 		return GetFontEngineInterface()->GetFontMetrics(handle);
 
+	// If there is no font face defined then we provide zero'd out font metrics. This situation can affect the layout,
+	// in particular in terms of inline box sizing and vertical alignment. Thus, this is potentially a situation where
+	// we might want to log a warning. However, in many cases it will produce the same layout with or without the font,
+	// so in that sense the warnings can produce false positives.
+	//
+	// For now, we wait until we try to actually place text before producing any warnings, since that is a clear
+	// erroneous situation producing no text. See 'LogMissingFontFace' in ElementText.cpp, which also lists some
+	// possible reasons for the missing font face.
+
 	static const FontMetrics font_metrics = {};
-	// TODO
-	Log::Message(Log::LT_WARNING, "%s", "Font face not set.");
 	return font_metrics;
 }
 

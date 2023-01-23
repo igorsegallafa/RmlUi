@@ -27,38 +27,20 @@
  */
 
 #include "FontProvider.h"
-#include "FontFace.h"
-#include "FontFamily.h"
-#include "FreeTypeInterface.h"
 #include "../../../Include/RmlUi/Core/Core.h"
 #include "../../../Include/RmlUi/Core/FileInterface.h"
 #include "../../../Include/RmlUi/Core/Log.h"
 #include "../../../Include/RmlUi/Core/Math.h"
 #include "../../../Include/RmlUi/Core/StringUtilities.h"
+#include "../ComputeProperty.h"
+#include "FontFace.h"
+#include "FontFamily.h"
+#include "FreeTypeInterface.h"
 #include <algorithm>
 
 namespace Rml {
 
 static FontProvider* g_font_provider = nullptr;
-
-static String FontFaceDescription(const String& font_family, Style::FontStyle style, Style::FontWeight weight)
-{
-	String font_attributes;
-
-	if (style == Style::FontStyle::Italic)
-		font_attributes += "italic, ";
-	if (weight == Style::FontWeight::Bold)
-		font_attributes += "bold, ";
-	else if (weight != Style::FontWeight::Auto && weight != Style::FontWeight::Normal)
-		font_attributes += "weight=" + ToString((int)weight) + ", ";
-
-	if (font_attributes.empty())
-		font_attributes = "regular";
-	else
-		font_attributes.resize(font_attributes.size() - 2);
-
-	return CreateString(font_attributes.size() + font_family.size() + 8, "'%s' [%s]", font_family.c_str(), font_attributes.c_str());
-}
 
 FontProvider::FontProvider()
 {
@@ -235,7 +217,7 @@ bool FontProvider::LoadFontFace(const byte* data, int data_size, bool fallback_f
 			FreeType::GetFaceStyle(ft_face, nullptr, nullptr, &weight);
 
 		const FontWeight variation_weight = (variation.weight == FontWeight::Auto ? weight : variation.weight);
-		const String font_face_description = FontFaceDescription(font_family, style, variation_weight);
+		const String font_face_description = GetFontFaceDescription(font_family, style, variation_weight);
 
 		if (!AddFace(ft_face, font_family, style, variation_weight, fallback_face, std::move(face_memory)))
 		{
