@@ -161,6 +161,7 @@ BlockContainer::CloseResult BlockContainer::Close()
 	//       https://www.w3.org/TR/css-overflow-3/#scrollable
 	//
 	Vector2f visible_overflow_size;
+	const bool is_scroll_container = (overflow_x_property != Overflow::Visible || overflow_y_property != Overflow::Visible);
 
 	// Set the computed box on the element.
 	if (element)
@@ -203,11 +204,9 @@ BlockContainer::CloseResult BlockContainer::Close()
 		if (!CatchVerticalOverflow(content_box.y))
 			return CloseResult::LayoutSelf;
 
-		const bool catches_overflow = (overflow_x_property != Overflow::Visible || overflow_y_property != Overflow::Visible);
-
 		const Vector2f scrollbar_size = {
-			catches_overflow ? element->GetElementScroll()->GetScrollbarSize(ElementScroll::VERTICAL) : 0.f,
-			catches_overflow ? element->GetElementScroll()->GetScrollbarSize(ElementScroll::HORIZONTAL) : 0.f,
+			is_scroll_container ? element->GetElementScroll()->GetScrollbarSize(ElementScroll::VERTICAL) : 0.f,
+			is_scroll_container ? element->GetElementScroll()->GetScrollbarSize(ElementScroll::HORIZONTAL) : 0.f,
 		};
 		const Vector2f scrollable_overflow_size = Math::Max(padding_size - scrollbar_size, padding_top_left + content_box);
 
@@ -217,23 +216,22 @@ BlockContainer::CloseResult BlockContainer::Close()
 		const Vector2f margin_size = padding_size + box.GetSizeAround(Box::MARGIN, Box::MARGIN);
 
 		// Set the visible overflow size so that ancestors can catch any overflow produced by us. That is, hiding it or
-		// providing a scrolling mechanism. If we catch our own overflow here, then just use the normal margin box as
-		// that will effectively remove the overflow from our ancestor's perspective.
-		if (catches_overflow)
+		// providing a scrolling mechanism. If this box is a scroll container, we catch our own overflow here; then,
+		// just use the normal margin box as that will effectively remove the overflow from our ancestor's perspective.
+		if (is_scroll_container)
 		{
-			visible_overflow_size.x = margin_size.x;
-			visible_overflow_size.y = margin_size.y;
+			visible_overflow_size = margin_size;
 
 			// Format any scrollbars which were enabled on this element.
 			element->GetElementScroll()->FormatScrollbars();
 		}
 		else
 		{
-			visible_overflow_size.x = Math::Max(margin_size.x,
-				content_box.x + box.GetEdge(Box::MARGIN, Box::LEFT) + box.GetEdge(Box::BORDER, Box::LEFT) + box.GetEdge(Box::PADDING, Box::LEFT));
-
-			visible_overflow_size.y = Math::Max(margin_size.y,
-				content_box.y + box.GetEdge(Box::MARGIN, Box::TOP) + box.GetEdge(Box::BORDER, Box::TOP) + box.GetEdge(Box::PADDING, Box::TOP));
+			const Vector2f top_left_edges = {
+				box.GetCumulativeEdge(Box::PADDING, Box::LEFT),
+				box.GetCumulativeEdge(Box::PADDING, Box::TOP),
+			};
+			visible_overflow_size = Math::Max(margin_size, content_box + top_left_edges);
 		}
 	}
 
@@ -269,20 +267,20 @@ BlockContainer::CloseResult BlockContainer::Close()
 
 			if (found_baseline)
 			{
-				if (baseline < 0 && (overflow_x_property != Overflow::Visible || overflow_y_property != Overflow::Visible))
-				{
-					baseline = 0;
-				}
-
 				// It is assumed here that we are the offset parent of our children. If this is not the case, we might need
 				// to take into account the offset between this box's position and our children's offset parent.
 				RMLUI_ASSERT(this == offset_parent);
 
 				// Set the element baseline which is the distance from the margin bottom of the element to its baseline.
-				const float element_baseline = box.GetSizeAcross(Box::VERTICAL, Box::BORDER) + box.GetEdge(Box::MARGIN, Box::BOTTOM) - baseline;
+				float element_baseline = 0;
+				if (!is_scroll_container)
+					element_baseline = box.GetSizeAcross(Box::VERTICAL, Box::BORDER) + box.GetEdge(Box::MARGIN, Box::BOTTOM) - baseline;
+
 				element->SetBaseline(element_baseline);
 			}
 		}
+		else
+			element->SetBaseline(0);
 	}
 
 	ResetInterruptedLineBox();
