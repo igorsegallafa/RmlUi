@@ -78,7 +78,6 @@ InlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
 		inline_level_box = parent_box->AddChild(std::move(inline_box_ptr));
 	}
 
-	// TODO: Move to InlineLevelBox?
 	const float minimum_line_height = Math::Max(element_line_height, (box.GetSize().y >= 0.f ? box.GetSizeAcross(Box::VERTICAL, Box::MARGIN) : 0.f));
 
 	LayoutOverflowHandle overflow_handle = {};
@@ -88,30 +87,21 @@ InlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
 	{
 		LayoutLineBox* line_box = EnsureOpenLineBox();
 
-		const Vector2f minimum_dimensions = {
-			Math::Max(line_box->GetBoxCursor(), minimum_width_next),
-			minimum_line_height,
-		};
+		UpdateLineBoxPlacement(line_box, minimum_width_next, minimum_line_height);
 
-		float available_width = 0.f;
-		// TODO: We don't know the exact line height yet. Do we need to check placement after closing the line, or is
-		// this approximation alright? Perhaps experiment with a very tall inline-element.
-		// @performance: We could do this only once for each line, and instead update it if we get new inline floats.
-		Vector2f line_position = NextLineBoxPosition(available_width, minimum_dimensions, !wrap_content);
-		available_width = Math::Max(available_width, 0.f);
-		line_box->SetLineBox(line_position, available_width);
+		InlineLayoutMode layout_mode = InlineLayoutMode::Nowrap;
+		if (wrap_content)
+		{
+			const bool line_shrinked_by_floats = (line_box->GetLineWidth() < box_size.x);
+			const bool can_wrap_any = (line_shrinked_by_floats || line_box->HasContent());
+			layout_mode = (can_wrap_any ? InlineLayoutMode::WrapAny : InlineLayoutMode::WrapAfterContent);
+		}
 
-		// TODO: Cleanup logic
-		const bool line_shrinked_by_floats = (available_width < box_size.x);
-		const bool can_wrap_any = (line_shrinked_by_floats || line_box->HasContent());
-		const InlineLayoutMode layout_mode =
-			(wrap_content ? (can_wrap_any ? InlineLayoutMode::WrapAny : InlineLayoutMode::WrapAfterContent) : InlineLayoutMode::Nowrap);
-
-		const bool add_to_new_line = line_box->AddBox(inline_level_box, layout_mode, available_width, overflow_handle);
-		if (!add_to_new_line)
+		const bool add_new_line = line_box->AddBox(inline_level_box, layout_mode, overflow_handle);
+		if (!add_new_line)
 			break;
 
-		minimum_width_next = (line_box->HasContent() ? 0.f : available_width + 1.f);
+		minimum_width_next = (line_box->HasContent() ? 0.f : line_box->GetLineWidth() + 1.f);
 
 		// Keep adding boxes on a new line, either because the box couldn't fit on the current line at all, or because it had to be split.
 		CloseOpenLineBox(false);
@@ -134,7 +124,7 @@ void InlineContainer::CloseInlineElement(InlineBox* inline_box)
 
 void InlineContainer::AddBreak(float line_height)
 {
-	// Increment by the line height if no line is open, otherwise simply end the line.
+	// Simply end the line if one is open, otherwise increment by the line height.
 	if (LayoutLineBox* line_box = GetOpenLineBox())
 		CloseOpenLineBox(true);
 	else
@@ -146,6 +136,33 @@ void InlineContainer::AddChainedBox(UniquePtr<LayoutLineBox> open_line_box)
 	RMLUI_ASSERT(line_boxes.empty());
 	RMLUI_ASSERT(open_line_box && !open_line_box->IsClosed());
 	line_boxes.push_back(std::move(open_line_box));
+}
+
+bool InlineContainer::PlaceFloatElement(Element* element, LayoutBlockBoxSpace* space)
+{
+	if (LayoutLineBox* line_box = GetOpenLineBox())
+	{
+		const Vector2f margin_size = element->GetBox().GetSize(Box::MARGIN);
+		const Style::Float float_property = element->GetComputedValues().float_();
+		const Style::Clear clear_property = element->GetComputedValues().clear();
+
+		const float line_box_top = position.y + box_cursor;
+		float available_width = 0.f;
+		const Vector2f float_position = space->NextFloatPosition(available_width, line_box_top, margin_size, float_property, clear_property);
+
+		const float line_box_bottom = line_box_top + element_line_height;
+		const float line_box_and_element_width = margin_size.x + line_box->GetBoxCursor();
+
+		// If the float can be positioned on this line, and it can fit next to the line's contents, place it now.
+		if (float_position.y < line_box_bottom && line_box_and_element_width <= available_width)
+		{
+			space->PlaceFloat(element, position.y + box_cursor);
+			UpdateLineBoxPlacement(line_box, 0.f, element_line_height);
+			return true;
+		}
+	}
+
+	return false;
 }
 
 InlineContainer::CloseResult InlineContainer::Close(UniquePtr<LayoutLineBox>* out_open_line_box)
@@ -186,26 +203,25 @@ InlineContainer::CloseResult InlineContainer::Close(UniquePtr<LayoutLineBox>* ou
 
 void InlineContainer::CloseOpenLineBox(bool split_all_open_boxes, UniquePtr<LayoutLineBox>* out_split_line)
 {
-	// Find the position of the line box, relative to its parent's block box's offset parent.
 	if (LayoutLineBox* line_box = GetOpenLineBox())
 	{
-		// TODO Cleanup: Move calls to parent into function arguments where possible.
-
-		// Find the position of the line box relative to its parent's block box's offset parent.
-		const BlockContainer* offset_parent = parent->GetOffsetParent();
-		const Vector2f line_position = line_box->GetPosition();
-
-		// Make position relative to our own offset parent.
-		const Vector2f root_to_offset_parent_offset = offset_parent->GetPosition() - parent->GetOffsetRoot()->GetPosition();
-		const Vector2f line_position_offset_parent = line_position - root_to_offset_parent_offset;
-
 		float height_of_line = 0.f;
-		UniquePtr<LayoutLineBox> split_line_box = line_box->Close(&root_inline_box, offset_parent->GetElement(), line_position_offset_parent,
-			text_align, split_all_open_boxes, height_of_line);
+		UniquePtr<LayoutLineBox> split_line_box = line_box->DetermineVerticalPositioning(&root_inline_box, split_all_open_boxes, height_of_line);
+
+		// If the final height of the line is larger than previously considered, we might need to push the line down to
+		// clear overlapping floats.
+		if (height_of_line > line_box->GetLineMinimumHeight())
+			UpdateLineBoxPlacement(line_box, 0.f, height_of_line);
+
+		// Find the position of the line box relative to its parent's block box's offset parent. Now that the line has
+		// been given a final position and size, close the line box to submit all the fragments.
+		const BlockContainer* offset_parent = parent->GetOffsetParent();
+		const Vector2f offset_root_position = parent->GetOffsetRoot()->GetPosition() - offset_parent->GetPosition();
+		line_box->Close(offset_parent->GetElement(), offset_root_position, text_align);
 
 		// Move the cursor down, unless we should collapse the line.
 		if (!line_box->CanCollapseLine())
-			box_cursor = (line_position.y - position.y) + height_of_line;
+			box_cursor = (line_box->GetPosition().y - position.y) + height_of_line;
 
 		// If we have any pending floating elements for our parent, then this would be an ideal time to place them.
 		parent->PlaceQueuedFloats(box_cursor);
@@ -220,11 +236,22 @@ void InlineContainer::CloseOpenLineBox(bool split_all_open_boxes, UniquePtr<Layo
 	}
 }
 
-Vector2f InlineContainer::NextLineBoxPosition(float& out_box_width, const Vector2f dimensions, const bool nowrap) const
+void InlineContainer::UpdateLineBoxPlacement(LayoutLineBox* line_box, float minimum_width, float minimum_height)
 {
+	RMLUI_ASSERT(line_box);
+
+	Vector2f minimum_dimensions = {
+		Math::Max(minimum_width, line_box->GetBoxCursor()),
+		Math::Max(minimum_height, line_box->GetLineMinimumHeight()),
+	};
+
+	// @performance: We might benefit from doing this search only when the minimum dimensions change, or if we get new inline floats.
 	const float ideal_position_y = position.y + box_cursor;
-	const Vector2f box_position = parent->GetBlockBoxSpace()->NextBoxPosition(out_box_width, ideal_position_y, dimensions, nowrap);
-	return box_position;
+	float available_width = 0.f;
+	const Vector2f line_position = parent->GetBlockBoxSpace()->NextBoxPosition(available_width, ideal_position_y, minimum_dimensions, !wrap_content);
+	available_width = Math::Max(available_width, 0.f);
+
+	line_box->SetLineBox(line_position, available_width, minimum_dimensions.y);
 }
 
 float InlineContainer::GetShrinkToFitWidth() const
@@ -273,7 +300,9 @@ bool InlineContainer::GetBaselineOfLastLine(float& out_baseline) const
 LayoutLineBox* InlineContainer::EnsureOpenLineBox()
 {
 	if (line_boxes.empty() || line_boxes.back()->IsClosed())
+	{
 		line_boxes.push_back(MakeUnique<LayoutLineBox>());
+	}
 	return line_boxes.back().get();
 }
 

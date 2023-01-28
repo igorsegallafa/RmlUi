@@ -43,25 +43,30 @@ public:
 	LayoutLineBox() = default;
 	~LayoutLineBox();
 
-	// Set the line box position and width.
-	void SetLineBox(Vector2f line_position, float line_width);
+	// Set the line box position and dimensions.
+	void SetLineBox(Vector2f line_position, float line_width, float line_minimum_height);
 
-	// Returns true if the box should be placed again on a new line.
-	bool AddBox(InlineLevelBox* box, InlineLayoutMode layout_mode, float line_width, LayoutOverflowHandle& inout_overflow_handle);
+	// Returns true if the box should be placed again on a new line, either because the box could not fit or there is more content to be placed.
+	bool AddBox(InlineLevelBox* box, InlineLayoutMode layout_mode, LayoutOverflowHandle& inout_overflow_handle);
 
 	/// Close the open inline box.
 	/// @param[in] inline_box The inline box to be closed. Should match the currently open box, strictly used for verification.
-	/// @note Only inline boxes need to be closed. Other inline-level boxes do not contain child boxes considered in the current inline formatting
+	/// @note Only inline boxes need to be closed, not other inline-level boxes since they do not contain child boxes.
 	void CloseInlineBox(InlineBox* inline_box);
 
-	// Closes the line, submitting any fragments placed on this line.
+	// Vertically positions each fragment and sizes the line, after splitting any open inline boxes to be placed on a new line.
 	// @param[out] out_height_of_line Resulting height of line. This can be different from the element's computed line-height property.
 	// @return The next line if any open fragments had to be split or wrapped down.
-	UniquePtr<LayoutLineBox> Close(const InlineBoxRoot* root_inline_box, Element* offset_parent, Vector2f line_position, Style::TextAlign text_align,
-		bool split_all_open_boxes, float& out_height_of_line);
+	UniquePtr<LayoutLineBox> DetermineVerticalPositioning(const InlineBoxRoot* root_inline_box, bool split_all_open_boxes, float& out_height_of_line);
+
+	// Closes the line and submits all fragments. Thereby positioning, sizing, and placing their corresponding boxes.
+	// @note The line must have been vertically positioned before closing.
+	void Close(Element* offset_parent, Vector2f offset_root_position, Style::TextAlign text_align);
 
 	float GetBoxCursor() const { return box_cursor; }
 	Vector2f GetPosition() const { return line_position; }
+	float GetLineWidth() const { return line_width; }
+	float GetLineMinimumHeight() const { return line_minimum_height; }
 
 	InlineBox* GetOpenInlineBox();
 
@@ -166,6 +171,8 @@ private:
 	Vector2f line_position;
 	// Available space for the line. Based on our parent box content width, possibly shrinked due to floating boxes.
 	float line_width = 0.f;
+	// Lower-bound estimate for the line box height.
+	float line_minimum_height = 0.f;
 
 	// The horizontal cursor. This is the outer-right position of the last placed fragment.
 	float box_cursor = 0.f;
@@ -179,6 +186,7 @@ private:
 	FragmentIndex open_fragments_leaf = RootFragmentIndex;
 
 	bool has_content = false;
+	bool is_vertically_positioned = false;
 	bool is_closed = false;
 
 	// Content offset due to space distribution from 'text-align'. Available after close.

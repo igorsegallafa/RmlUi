@@ -55,6 +55,26 @@ Vector2f LayoutBlockBoxSpace::NextBoxPosition(float& box_width, float cursor, co
 	return NextBoxPosition(box_width, cursor, dimensions, nowrap, Style::Float::None);
 }
 
+Vector2f LayoutBlockBoxSpace::NextFloatPosition(float& out_box_width, float cursor, Vector2f dimensions, Style::Float float_property,
+	Style::Clear clear_property) const
+{
+	// Shift the cursor down (if necessary) so it isn't placed any higher than a previously-floated box.
+	for (int i = 0; i < NUM_ANCHOR_EDGES; ++i)
+	{
+		if (!boxes[i].empty())
+			cursor = Math::Max(cursor, boxes[i].back().offset.y);
+	}
+
+	// Shift the cursor down past to clear boxes, if necessary.
+	cursor = DetermineClearPosition(cursor, clear_property);
+
+	// Find a place to put this box.
+	const bool nowrap = false;
+	const Vector2f margin_offset = NextBoxPosition(out_box_width, cursor, dimensions, nowrap, float_property);
+
+	return margin_offset;
+}
+
 float LayoutBlockBoxSpace::PlaceFloat(Element* element, float cursor)
 {
 	const Box& element_box = element->GetBox();
@@ -65,25 +85,14 @@ float LayoutBlockBoxSpace::PlaceFloat(Element* element, float cursor)
 	const Vector2f element_margin_size = element_border_size + element_margin_top_left + element_margin_bottom_right;
 
 	Style::Float float_property = element->GetComputedValues().float_();
+	Style::Clear clear_property = element->GetComputedValues().clear();
 
-	// Shift the cursor down (if necessary) so it isn't placed any higher than a previously-floated box.
-	for (int i = 0; i < NUM_ANCHOR_EDGES; ++i)
-	{
-		if (!boxes[i].empty())
-			cursor = Math::Max(cursor, boxes[i].back().offset.y);
-	}
-
-	// Shift the cursor down past to clear boxes, if necessary.
-	cursor = DetermineClearPosition(cursor, element->GetComputedValues().clear());
-
-	// Find a place to put this box.
-	const bool nowrap = false;
-	float unused_maximum_box_width = 0;
-	const Vector2f element_margin_offset = NextBoxPosition(unused_maximum_box_width, cursor, element_margin_size, nowrap, float_property);
+	float unused_box_width = 0.f;
+	const Vector2f element_margin_offset = NextFloatPosition(unused_box_width, cursor, element_margin_size, float_property, clear_property);
 	const Vector2f element_border_offset = element_margin_offset + element_margin_top_left;
 
 	// It's been placed, so we can now add it to our list of floating boxes.
-	boxes[float_property == Style::Float::Left ? LEFT : RIGHT].push_back(SpaceBox(element_margin_offset, element_margin_size));
+	boxes[float_property == Style::Float::Left ? LEFT : RIGHT].push_back(SpaceBox{element_margin_offset, element_margin_size});
 
 	// Determine offsets relative to our container.
 	const Vector2f parent_content_offset = parent->GetPosition() + parent->GetBox().GetPosition();
@@ -124,11 +133,11 @@ float LayoutBlockBoxSpace::DetermineClearPosition(float cursor, Style::Clear cle
 Vector2f LayoutBlockBoxSpace::NextBoxPosition(float& maximum_box_width, const float cursor, const Vector2f dimensions, const bool nowrap,
 	const Style::Float float_property) const
 {
-	float parent_scrollbar_width = parent->GetElement()->GetElementScroll()->GetScrollbarSize(ElementScroll::VERTICAL);
-	float parent_origin = parent->GetPosition().x + parent->GetBox().GetPosition(Box::CONTENT).x;
-	float parent_edge = parent->GetBox().GetSize().x + parent_origin - parent_scrollbar_width;
+	const float parent_scrollbar_width = parent->GetElement()->GetElementScroll()->GetScrollbarSize(ElementScroll::VERTICAL);
+	const float parent_origin = parent->GetPosition().x + parent->GetBox().GetPosition(Box::CONTENT).x;
+	const float parent_edge = parent->GetBox().GetSize().x + parent_origin - parent_scrollbar_width;
 
-	AnchorEdge box_edge = (float_property == Style::Float::Right ? RIGHT : LEFT);
+	const AnchorEdge box_edge = (float_property == Style::Float::Right ? RIGHT : LEFT);
 
 	Vector2f box_position = {parent_origin, cursor};
 
@@ -276,9 +285,5 @@ void LayoutBlockBoxSpace::operator delete(void* chunk, size_t size)
 {
 	LayoutEngine::DeallocateLayoutChunk(chunk, size);
 }
-
-LayoutBlockBoxSpace::SpaceBox::SpaceBox() : offset(0, 0), dimensions(0, 0) {}
-
-LayoutBlockBoxSpace::SpaceBox::SpaceBox(const Vector2f offset, const Vector2f dimensions) : offset(offset), dimensions(dimensions) {}
 
 } // namespace Rml

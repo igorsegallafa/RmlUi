@@ -63,6 +63,15 @@ public:
 	/// @return The generated position for the box.
 	Vector2f NextBoxPosition(float& box_width, float cursor, Vector2f dimensions, bool nowrap) const;
 
+	/// Determines the position of a floated element within our block box.
+	/// @param[out] box_width The available width for the box.
+	/// @param[in] cursor The ideal vertical position for the box.
+	/// @param[in] dimensions The floated element's margin size.
+	/// @param[in] float_property The element's computed float property.
+	/// @param[in] clear_property The element's computed clear property.
+	/// @return The next placement position for the float at its top-left margin position.
+	Vector2f NextFloatPosition(float& box_width, float cursor, Vector2f dimensions, Style::Float float_property, Style::Clear clear_property) const;
+
 	/// Generates and sets the position for a floating box of a given size within our block box. The element's box
 	/// is then added into our list of floating boxes.
 	/// @param[in] element The element to position.
@@ -92,9 +101,6 @@ private:
 	Vector2f NextBoxPosition(float& maximum_box_width, float cursor, Vector2f dimensions, bool nowrap, Style::Float float_property) const;
 
 	struct SpaceBox {
-		SpaceBox();
-		SpaceBox(Vector2f offset, Vector2f dimensions);
-
 		Vector2f offset;
 		Vector2f dimensions;
 	};

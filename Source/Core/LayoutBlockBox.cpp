@@ -380,12 +380,19 @@ void BlockContainer::AddBreak()
 
 bool BlockContainer::AddFloatElement(Element* element)
 {
-	// If we have an open inline block box, then we have to position the box a little differently, queue it for later.
 	if (InlineContainer* inline_container = GetOpenInlineContainer())
-		queued_float_elements.push_back(element);
-	// Nope ... just place it!
+	{
+		// Try to add the float to our inline container, placing it next to any open line if possible. Otherwise, queue it for later.
+		if (!queued_float_elements.empty() || !inline_container->PlaceFloatElement(element, space.get()))
+		{
+			queued_float_elements.push_back(element);
+		}
+	}
 	else
+	{
+		// Nope ... just place it!
 		PlaceFloat(element);
+	}
 
 	return true;
 }

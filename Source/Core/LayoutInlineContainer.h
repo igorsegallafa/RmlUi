@@ -57,6 +57,7 @@ public:
 	/// @return The inline box if one was generated for the elmeent, otherwise nullptr.
 	/// @note Any non-null return value must be closed with a call to CloseInlineElement().
 	InlineBox* AddInlineElement(Element* element, const Box& box);
+
 	/// Closes the previously added inline box.
 	/// @param[in] inline_box The box to close.
 	/// @note Calls to this function should be submitted in reverse order to AddInlineElement().
@@ -67,6 +68,11 @@ public:
 	/// Adds a line box for resuming one that was previously split.
 	/// @param[in] open_line_box The line box overflowing from a previous inline container.
 	void AddChainedBox(UniquePtr<LayoutLineBox> open_line_box);
+	/// Place a float element next to our open line box, if possible.
+	/// @param space The space for the float to be placed inside.
+	/// @param element The float element to be placed.
+	/// @return True if the element was placed, otherwise false.
+	bool PlaceFloatElement(Element* element, LayoutBlockBoxSpace* space);
 
 	/// Closes the box. This will determine the element's height (if it was unspecified).
 	/// @param[out] Optionally, output the open inline box.
@@ -93,16 +99,15 @@ private:
 	InlineBoxBase* GetOpenInlineBox();
 
 	/// Close any open line box.
+	/// @param[in] split_all_open_boxes Split all open inline boxes, even if they have no content.
 	/// @param[out] out_split_line Optionally return any resulting split line, otherwise it will be added as a new line box to this container.
 	void CloseOpenLineBox(bool split_all_open_boxes, UniquePtr<LayoutLineBox>* out_split_line = nullptr);
 
-	/// Returns the offset from the top-left corner of this box for the next line.
-	/// @param[out] box_width The available width for the line box.
-	/// @param[out] wrap_content Set to true if the line box should grow to fit inline boxes, false if it should wrap them.
-	/// @param[in] dimensions The minimum dimensions of the line.
-	/// @return The line box position.
-	/// TODO/note: Coordinates relative to our own offset parent.
-	Vector2f NextLineBoxPosition(float& out_box_width, Vector2f dimensions, bool nowrap) const;
+	/// Find and set the position and line width for the currently open line box.
+	/// @param[in] line_box The currently open line box.
+	/// @param[in] minimum_width The minimum line width to consider for this search.
+	/// @param[in] minimum_height The minimum line height to to be considered for this and future searches.
+	void UpdateLineBoxPlacement(LayoutLineBox* line_box, float minimum_width, float minimum_height);
 
 	BlockContainer* parent; // [not-null]
 
