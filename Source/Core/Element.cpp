@@ -413,17 +413,15 @@ Vector2f Element::GetAbsoluteOffset(Box::Area area)
 		else
 			absolute_offset = relative_offset_base + relative_offset_position;
 
-		// Add any parent scrolling onto our position as well. Could cache this if required.
 		if (!offset_fixed)
 		{
-			Element* scroll_parent = parent;
-			while (scroll_parent != nullptr)
+			// Add any parent scrolling and relative offset onto our position as well.
+			for (Element* scroll_parent = parent; scroll_parent; scroll_parent = scroll_parent->parent)
 			{
 				absolute_offset -= scroll_parent->scroll_offset;
 				if (scroll_parent == offset_parent)
 					break;
-				else
-					scroll_parent = scroll_parent->parent;
+				absolute_offset += scroll_parent->relative_offset_position;
 			}
 		}
 	}
