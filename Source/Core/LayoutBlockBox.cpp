@@ -341,6 +341,9 @@ BlockContainer::InlineBoxHandle BlockContainer::AddInlineElement(Element* elemen
 
 	InlineBox* inline_box = inline_container->AddInlineElement(element, box);
 
+	if (element->GetPosition() == Style::Position::Relative)
+		offset_parent->relative_elements.push_back(element);
+
 	return {inline_container, inline_box};
 }
 
@@ -393,6 +396,9 @@ bool BlockContainer::AddFloatElement(Element* element)
 		// Nope ... just place it!
 		PlaceFloat(element);
 	}
+
+	if (element->GetPosition() == Style::Position::Relative)
+		offset_parent->relative_elements.push_back(element);
 
 	return true;
 }
@@ -448,6 +454,16 @@ void BlockContainer::CloseAbsoluteElements()
 
 		absolute_elements.clear();
 	}
+}
+
+
+void BlockContainer::AddRelativeElements(ElementList&& elements)
+{
+	if (relative_elements.empty())
+		relative_elements = std::move(elements);
+	else
+		relative_elements.insert(relative_elements.end(), elements.begin(), elements.end());
+	elements.clear();
 }
 
 Vector2f BlockContainer::NextBoxPosition(float top_margin, Style::Clear clear_property) const

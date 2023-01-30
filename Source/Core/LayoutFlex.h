@@ -46,12 +46,14 @@ public:
 	/// @param[out] out_formatted_content_size The flex container element's used size.
 	/// @param[out] out_content_overflow_size  The content size of the flexbox's overflowing content.
 	/// @param[out] out_absolutely_positioned_elements List of absolutely positioned elements within the flexbox.
+	/// @param[out] out_relatively_positioned_elements List of relatively positioned elements within the flexbox.
 	static void Format(const Box& box, Vector2f min_size, Vector2f max_size, Vector2f containing_block, Element* element_flex,
-		Vector2f& out_formatted_content_size, Vector2f& out_content_overflow_size, ElementList& out_absolutely_positioned_elements);
+		Vector2f& out_formatted_content_size, Vector2f& out_content_overflow_size, ElementList& out_absolutely_positioned_elements,
+		ElementList& out_relatively_positioned_elements);
 
 private:
 	LayoutFlex(Element* element_flex, Vector2f flex_available_content_size, Vector2f flex_content_containing_block, Vector2f flex_content_offset,
-		Vector2f flex_min_size, Vector2f flex_max_size, ElementList& absolutely_positioned_elements);
+		Vector2f flex_min_size, Vector2f flex_max_size, ElementList& absolutely_positioned_elements, ElementList& relatively_positioned_elements);
 
 	// Format the flexbox.
 	void Format();
@@ -70,6 +72,7 @@ private:
 	Vector2f flex_content_overflow_size;
 
 	ElementList& absolutely_positioned_elements;
+	ElementList& relatively_positioned_elements;
 };
 
 } // namespace Rml

@@ -96,6 +96,8 @@ bool TableGrid::Build(Element* element_table)
 				rows[row_group_index].element_group = element;
 				rows[row_group_index].group_span = num_rows_added;
 			}
+			if (element->GetPosition() == Style::Position::Relative)
+				relatively_positioned_elements.push_back(element);
 		}
 		else if (rows.empty() && display == Display::TableColumn)
 		{
@@ -131,7 +133,7 @@ bool TableGrid::Build(Element* element_table)
 	{
 		Log::Message(Log::LT_WARNING,
 			"One or more cells span below the last row in table %s. They will not be formatted. Add additional rows, or adjust the rowspan "
-		    "attribute.",
+			"attribute.",
 			element_table->GetAddress().c_str());
 	}
 	open_cells.clear();
@@ -235,6 +237,9 @@ void TableGrid::PushRow(Element* element_row, ElementList cell_elements)
 				Log::Message(Log::LT_WARNING, "Only table cells are allowed as children of table rows. %s", element_cell->GetAddress().c_str());
 			}
 		}
+
+		if (element_row->GetPosition() == Style::Position::Relative)
+			relatively_positioned_elements.push_back(element_row);
 	}
 
 	rows.push_back(Row{element_row, nullptr, 0});
@@ -276,7 +281,7 @@ void TableGrid::PushRow(Element* element_row, ElementList cell_elements)
 		{
 			Log::Message(Log::LT_WARNING,
 				"Too many columns in table row %d while encountering cell: %s\nThe number of columns is %d, as determined by the table columns or "
-			    "the first table row.",
+				"the first table row.",
 				row_index + 1, element_cell->GetAddress().c_str(), (int)columns.size());
 			break;
 		}
@@ -290,6 +295,9 @@ void TableGrid::PushRow(Element* element_row, ElementList cell_elements)
 		cell.row_last = row_index + row_span - 1;
 		cell.column_begin = column;
 		cell.column_last = column_last;
+
+		if (element_cell->GetPosition() == Style::Position::Relative)
+			relatively_positioned_elements.push_back(element_cell);
 
 		column += col_span;
 	}

@@ -171,6 +171,9 @@ public:
 	/// Formats, sizes, and positions all absolute elements in this block.
 	void CloseAbsoluteElements();
 
+	/// Adds relatively positioned descendents which we act as a containing block for.
+	void AddRelativeElements(ElementList&& elements);
+
 	/// Returns the offset from the top-left corner of this box's offset element the next child box will be positioned at.
 	/// @param[in] top_margin The top margin of the box. This will be collapsed as appropriate against other block boxes.
 	/// @param[in] clear_property The value of the underlying element's clear property.

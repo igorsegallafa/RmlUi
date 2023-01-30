@@ -354,19 +354,21 @@ bool LayoutEngine::FormatElementFlex(BlockContainer* block_context_box, Element*
 		return false;
 
 	// Format the flexbox and all its children.
-	ElementList absolutely_positioned_elements;
+	ElementList absolutely_positioned_elements, relatively_positioned_elements;
 	Vector2f formatted_content_size, content_overflow_size;
 	LayoutFlex::Format(box, min_size, max_size, containing_block, element, formatted_content_size, content_overflow_size,
-		absolutely_positioned_elements);
+		absolutely_positioned_elements, relatively_positioned_elements);
 
 	// Set the box content size to match the one determined by the formatting procedure.
 	flex_block_context_box->GetBox().SetContent(formatted_content_size);
 	// Set the inner content size so that any overflow can be caught.
 	flex_block_context_box->ExtendInnerContentSize(content_overflow_size);
 
-	// Finally, add any absolutely positioned flex children.
+	// Finally, add any absolutely and relatively positioned flex items.
 	for (Element* abs_element : absolutely_positioned_elements)
 		flex_block_context_box->AddAbsoluteElement(abs_element);
+
+	flex_block_context_box->AddRelativeElements(std::move(relatively_positioned_elements));
 
 	// Close the block box, this may result in scrollbars being added to ourself or our parent.
 	const auto close_result = flex_block_context_box->Close();
@@ -379,9 +381,10 @@ bool LayoutEngine::FormatElementFlex(BlockContainer* block_context_box, Element*
 	{
 		// Scrollbars added to flex container, it needs to be formatted again to account for changed width or height.
 		absolutely_positioned_elements.clear();
+		relatively_positioned_elements.clear();
 
 		LayoutFlex::Format(box, min_size, max_size, containing_block, element, formatted_content_size, content_overflow_size,
-			absolutely_positioned_elements);
+			absolutely_positioned_elements, relatively_positioned_elements);
 
 		flex_block_context_box->GetBox().SetContent(formatted_content_size);
 		flex_block_context_box->ExtendInnerContentSize(content_overflow_size);
@@ -410,8 +413,10 @@ bool LayoutEngine::FormatElementTable(BlockContainer* block_context_box, Element
 	LayoutDetails::GetMinMaxHeight(min_size.y, max_size.y, computed_table, box, containing_block.y);
 	const Vector2f initial_content_size = box.GetSize();
 
+	ElementList relatively_positioned_elements;
+
 	// Format the table, this may adjust the box content size.
-	const Vector2f table_content_overflow_size = LayoutTable::FormatTable(box, min_size, max_size, element_table);
+	const Vector2f table_content_overflow_size = LayoutTable::FormatTable(box, min_size, max_size, element_table, relatively_positioned_elements);
 
 	const Vector2f final_content_size = box.GetSize();
 	RMLUI_ASSERT(final_content_size.y >= 0);
@@ -430,6 +435,9 @@ bool LayoutEngine::FormatElementTable(BlockContainer* block_context_box, Element
 
 	// Set the inner content size so that any overflow can be caught.
 	table_block_context_box->ExtendInnerContentSize(table_content_overflow_size);
+
+	// Add any relatively positioned elements so that their positions are correctly resolved against the table size, acting as their containing block.
+	table_block_context_box->AddRelativeElements(std::move(relatively_positioned_elements));
 
 	// If the close failed, it probably means that its parent produced scrollbars.
 	if (table_block_context_box->Close() != BlockContainer::CloseResult::OK)

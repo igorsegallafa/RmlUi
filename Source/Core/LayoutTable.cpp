@@ -38,7 +38,7 @@
 
 namespace Rml {
 
-Vector2f LayoutTable::FormatTable(Box& box, Vector2f min_size, Vector2f max_size, Element* element_table)
+Vector2f LayoutTable::FormatTable(Box& box, Vector2f min_size, Vector2f max_size, Element* element_table, ElementList& relatively_positioned_elements)
 {
 	const ComputedValues& computed_table = element_table->GetComputedValues();
 
@@ -69,7 +69,7 @@ Vector2f LayoutTable::FormatTable(Box& box, Vector2f min_size, Vector2f max_size
 	const Vector2f table_gap = Vector2f(ResolveValue(computed_table.column_gap(), table_initial_content_size.x),
 		ResolveValue(computed_table.row_gap(), table_initial_content_size.y));
 
-	TableGrid grid;
+	TableGrid grid(relatively_positioned_elements);
 	grid.Build(element_table);
 
 	// Construct the layout object and format the table.

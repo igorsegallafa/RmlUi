@@ -45,8 +45,9 @@ public:
 	/// @param[in] min_size Minimum width and height of the table.
 	/// @param[in] max_size Maximum width and height of the table.
 	/// @param[in] element_table The table element.
+	/// @param[out] relatively_positioned_elements A list of relatively positioned elements of the table.
 	/// @return The content size of the table's overflowing content.
-	static Vector2f FormatTable(Box& box, Vector2f min_size, Vector2f max_size, Element* element_table);
+	static Vector2f FormatTable(Box& box, Vector2f min_size, Vector2f max_size, Element* element_table, ElementList& relatively_positioned_elements);
 
 private:
 	LayoutTable(Element* element_table, const TableGrid& grid, Vector2f table_gap, Vector2f table_content_offset, Vector2f table_initial_content_size,

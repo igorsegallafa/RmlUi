@@ -43,6 +43,8 @@ struct ComputedAxisSize;
 */
 class TableGrid {
 public:
+	TableGrid(ElementList& relatively_positioned_elements) : relatively_positioned_elements(relatively_positioned_elements) {}
+
 	// Build a list of columns, rows, and cells in this table.
 	bool Build(Element* element_table);
 
@@ -85,6 +87,8 @@ private:
 	void PushRow(Element* element_row, ElementList cell_elements);
 
 	CellList open_cells;
+
+	ElementList& relatively_positioned_elements;
 };
 
 enum class TrackSizingMode { Auto, Fixed, Flexible };

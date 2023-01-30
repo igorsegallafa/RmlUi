@@ -40,7 +40,8 @@
 namespace Rml {
 
 void LayoutFlex::Format(const Box& box, const Vector2f min_size, const Vector2f max_size, const Vector2f flex_containing_block, Element* element_flex,
-	Vector2f& out_formatted_content_size, Vector2f& out_content_overflow_size, ElementList& out_absolutely_positioned_elements)
+	Vector2f& out_formatted_content_size, Vector2f& out_content_overflow_size, ElementList& out_absolutely_positioned_elements,
+	ElementList& out_relatively_positioned_elements)
 {
 	ElementScroll* element_scroll = element_flex->GetElementScroll();
 	const Vector2f scrollbar_size = {element_scroll->GetScrollbarSize(ElementScroll::VERTICAL),
@@ -64,7 +65,7 @@ void LayoutFlex::Format(const Box& box, const Vector2f min_size, const Vector2f 
 
 	// Construct the layout object and format the table.
 	LayoutFlex layout_flex(element_flex, flex_available_content_size, flex_content_containing_block, flex_content_offset, min_size, max_size,
-		out_absolutely_positioned_elements);
+		out_absolutely_positioned_elements, out_relatively_positioned_elements);
 
 	layout_flex.Format();
 
@@ -77,11 +78,12 @@ void LayoutFlex::Format(const Box& box, const Vector2f min_size, const Vector2f 
 }
 
 LayoutFlex::LayoutFlex(Element* element_flex, Vector2f flex_available_content_size, Vector2f flex_content_containing_block,
-	Vector2f flex_content_offset, Vector2f flex_min_size, Vector2f flex_max_size, ElementList& absolutely_positioned_elements) :
+	Vector2f flex_content_offset, Vector2f flex_min_size, Vector2f flex_max_size, ElementList& absolutely_positioned_elements,
+	ElementList& relatively_positioned_elements) :
 	element_flex(element_flex),
 	flex_available_content_size(flex_available_content_size), flex_content_containing_block(flex_content_containing_block),
 	flex_content_offset(flex_content_offset), flex_min_size(flex_min_size), flex_max_size(flex_max_size),
-	absolutely_positioned_elements(absolutely_positioned_elements)
+	absolutely_positioned_elements(absolutely_positioned_elements), relatively_positioned_elements(relatively_positioned_elements)
 {}
 
 struct FlexItem {
@@ -218,6 +220,10 @@ void LayoutFlex::Format()
 		{
 			absolutely_positioned_elements.push_back(element);
 			continue;
+		}
+		else if (computed.position() == Style::Position::Relative)
+		{
+			relatively_positioned_elements.push_back(element);
 		}
 
 		FlexItem item = {};
