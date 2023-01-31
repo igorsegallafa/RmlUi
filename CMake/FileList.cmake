@@ -65,6 +65,7 @@ set(Core_HDR_FILES
     ${PROJECT_SOURCE_DIR}/Source/Core/LayoutDetails.h
     ${PROJECT_SOURCE_DIR}/Source/Core/LayoutEngine.h
     ${PROJECT_SOURCE_DIR}/Source/Core/LayoutFlex.h
+    ${PROJECT_SOURCE_DIR}/Source/Core/LayoutFormattingContext.h
     ${PROJECT_SOURCE_DIR}/Source/Core/LayoutInlineBox.h
     ${PROJECT_SOURCE_DIR}/Source/Core/LayoutInlineContainer.h
     ${PROJECT_SOURCE_DIR}/Source/Core/LayoutInlineLevelBox.h
@@ -335,6 +336,7 @@ set(Core_SRC_FILES
     ${PROJECT_SOURCE_DIR}/Source/Core/LayoutDetails.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/LayoutEngine.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/LayoutFlex.cpp
+    ${PROJECT_SOURCE_DIR}/Source/Core/LayoutFormattingContext.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/LayoutInlineBox.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/LayoutInlineContainer.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/LayoutInlineLevelBox.cpp

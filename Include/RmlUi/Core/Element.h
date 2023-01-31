@@ -57,6 +57,7 @@ class ElementStyle;
 class LayoutEngine;
 class InlineBox;
 class InlineLevelBox;
+class FormattingContext;
 class BlockContainer;
 class PropertiesIteratorView;
 class PropertyDictionary;
@@ -799,6 +800,7 @@ private:
 	friend class Rml::BlockContainer;
 	friend class Rml::InlineBox;
 	friend class Rml::InlineLevelBox;
+	friend class Rml::FormattingContext;
 	friend class Rml::ElementScroll;
 	friend RMLUICORE_API void Rml::ReleaseFontResources();
 };

@@ -381,7 +381,7 @@ void BlockContainer::AddBreak()
 	box_cursor += line_height;
 }
 
-bool BlockContainer::AddFloatElement(Element* element)
+void BlockContainer::AddFloatElement(Element* element)
 {
 	if (InlineContainer* inline_container = GetOpenInlineContainer())
 	{
@@ -399,8 +399,6 @@ bool BlockContainer::AddFloatElement(Element* element)
 
 	if (element->GetPosition() == Style::Position::Relative)
 		offset_parent->relative_elements.push_back(element);
-
-	return true;
 }
 
 void BlockContainer::AddAbsoluteElement(Element* element)

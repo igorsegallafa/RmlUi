@@ -161,7 +161,7 @@ public:
 	void AddBreak();
 
 	/// Adds an element to this block box to be handled as a floating element.
-	bool AddFloatElement(Element* element);
+	void AddFloatElement(Element* element);
 
 	/// Adds an element to this block box to be handled as an absolutely-positioned element. This element will be
 	/// laid out, sized and positioned appropriately once this box is finished. This should only be called on boxes
@@ -215,9 +215,7 @@ public:
 	// The element we'll be computing our offset relative to during layout.
 	const BlockContainer* GetOffsetRoot() const;
 
-	/// Returns the block box's dimension box.
 	Box& GetBox();
-	/// Returns the block box's dimension box.
 	const Box& GetBox() const;
 
 private:

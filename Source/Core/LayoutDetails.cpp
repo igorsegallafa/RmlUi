@@ -230,30 +230,25 @@ float LayoutDetails::GetShrinkToFitWidth(Element* element, Vector2f containing_b
 	//       Use a non-definite placeholder for the box content width, and available width as a maximum constraint.
 	Box box;
 	float min_height, max_height;
+
+	// Currently we fix the element's width to its containing block so that any content is wrapped at this width.
+	// We can consider to instead set this to infinity and clamp it to the available width later after formatting,
+	// but right now the formatting procedure doesn't work well with such numbers.
 	LayoutDetails::BuildBox(box, containing_block, element, BoxContext::Block, containing_block.x);
 	LayoutDetails::GetDefiniteMinMaxHeight(min_height, max_height, element->GetComputedValues(), box, containing_block.y);
 
 	// First we need to format the element, then we get the shrink-to-fit width based on the largest line or box.
 	BlockContainer containing_block_box(nullptr, nullptr, Box(containing_block), 0.0f, FLT_MAX);
 
-	// Here we fix the element's width to its containing block so that any content is wrapped at this width.
-	// We can consider to instead set this to infinity and clamp it to the available width later after formatting,
-	// but right now the formatting procedure doesn't work well with such numbers.
-	BlockContainer* block_context_box = containing_block_box.AddBlockElement(element, box, min_height, max_height);
+	// TODO: Only considers block formatting contexts, however, we just as well might have flex or table formatting contexts.
+	auto formatting_context = MakeUnique<BlockFormattingContext>(nullptr, element);
 
-	// @performance. Some formatting can be simplified, eg. absolute elements do not contribute to the shrink-to-fit width.
-	// Also, children of elements with a fixed width and height don't need to be formatted further.
-	for (int i = 0; i < element->GetNumChildren(); i++)
-	{
-		if (!LayoutEngine::FormatElementFlow(block_context_box, element->GetChild(i)))
-			i = -1;
-	}
+	// @performance. Some formatting can be simplified, eg. absolute elements do not contribute to the shrink-to-fit
+	// width. Also, children of elements with a fixed width and height don't need to be formatted further. Further, we
+	// might get away with not closing the boxes during formatting.
+	formatting_context->Format(containing_block, FormatSettings{&box, nullptr});
 
-	// We only do layouting to get the fit-to-shrink width here, and for this purpose we may get
-	// away with not closing the boxes. This is avoided for performance reasons.
-	// block_context_box->Close();
-
-	return Math::Min(containing_block.x, block_context_box->GetShrinkToFitWidth());
+	return Math::Min(containing_block.x, formatting_context->GetShrinkToFitWidth());
 }
 
 ComputedAxisSize LayoutDetails::BuildComputedHorizontalSize(const ComputedValues& computed)
