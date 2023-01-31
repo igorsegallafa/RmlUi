@@ -263,42 +263,29 @@ bool BlockFormattingContext::FormatInlineBlock(BlockContainer* parent_block, Ele
 	return true;
 }
 
-// LayoutEngine::FormatElementFlex
-bool BlockFormattingContext::FormatFlex(BlockContainer* block_context_box, Element* element)
+// LayoutEngine::FormatElementFlex (Part 1/2)
+bool BlockFormattingContext::FormatFlex(BlockContainer* parent_block, Element* element)
 {
-	const ComputedValues& computed = element->GetComputedValues();
-	const Vector2f containing_block = LayoutDetails::GetContainingBlock(block_context_box);
+	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent_block);
 	RMLUI_ASSERT(containing_block.x >= 0.f);
 
-	// Build the initial box as specified by the flex's style, as if it was a normal block element.
-	Box box;
-	LayoutDetails::BuildBox(box, containing_block, element, BoxContext::Block);
+	Vector2f visible_overflow_size;
 
-	Vector2f min_size, max_size;
-	LayoutDetails::GetMinMaxWidth(min_size.x, max_size.x, computed, box, containing_block.x);
-	LayoutDetails::GetMinMaxHeight(min_size.y, max_size.y, computed, box, containing_block.y);
+	auto formatting_context = MakeUnique<FlexFormattingContext>(this, element);
+	formatting_context->Format(containing_block, FormatSettings{nullptr, &visible_overflow_size});
+
+	const Box& box = element->GetBox();
 
 	// Add the flex container element as if it was a normal block element.
-	BlockContainer* flex_block_context_box = block_context_box->AddBlockElement(element, box, min_size.y, max_size.y);
+	BlockContainer* flex_block_context_box = parent_block->AddBlockElement(element, box, box.GetSize().y, box.GetSize().y);
 	if (!flex_block_context_box)
 		return false;
 
-	// Format the flexbox and all its children.
-	ElementList absolutely_positioned_elements, relatively_positioned_elements;
-	Vector2f formatted_content_size, content_overflow_size;
-	LayoutFlex::Format(box, min_size, max_size, containing_block, element, formatted_content_size, content_overflow_size,
-		absolutely_positioned_elements, relatively_positioned_elements);
-
-	// Set the box content size to match the one determined by the formatting procedure.
-	flex_block_context_box->GetBox().SetContent(formatted_content_size);
 	// Set the inner content size so that any overflow can be caught.
-	flex_block_context_box->ExtendInnerContentSize(content_overflow_size);
+	flex_block_context_box->ExtendInnerContentSize(visible_overflow_size);
 
-	// Finally, add any absolutely and relatively positioned flex items.
-	for (Element* abs_element : absolutely_positioned_elements)
-		flex_block_context_box->AddAbsoluteElement(abs_element);
-
-	flex_block_context_box->AddRelativeElements(std::move(relatively_positioned_elements));
+	// TODO: Doesn't make any sense to redo formatting due to LayoutSelf here... It should be completely sized after
+	// flex formatting. Need to move some of the block container logic elsewhere.
 
 	// Close the block box, this may result in scrollbars being added to ourself or our parent.
 	const auto close_result = flex_block_context_box->Close();
@@ -310,14 +297,14 @@ bool BlockFormattingContext::FormatFlex(BlockContainer* block_context_box, Eleme
 	else if (close_result == BlockContainer::CloseResult::LayoutSelf)
 	{
 		// Scrollbars added to flex container, it needs to be formatted again to account for changed width or height.
-		absolutely_positioned_elements.clear();
-		relatively_positioned_elements.clear();
+		// TODO positioned elements
+		// absolutely_positioned_elements.clear();
+		// relatively_positioned_elements.clear();
 
-		LayoutFlex::Format(box, min_size, max_size, containing_block, element, formatted_content_size, content_overflow_size,
-			absolutely_positioned_elements, relatively_positioned_elements);
+		formatting_context->Format(containing_block, FormatSettings{nullptr, &visible_overflow_size});
 
-		flex_block_context_box->GetBox().SetContent(formatted_content_size);
-		flex_block_context_box->ExtendInnerContentSize(content_overflow_size);
+		flex_block_context_box->GetBox().SetContent(element->GetBox().GetSize());
+		flex_block_context_box->ExtendInnerContentSize(visible_overflow_size);
 
 		if (flex_block_context_box->Close() == BlockContainer::CloseResult::LayoutParent)
 			return false;
@@ -328,12 +315,108 @@ bool BlockFormattingContext::FormatFlex(BlockContainer* block_context_box, Eleme
 	return true;
 }
 
-// LayoutEngine::FormatElementTable
-bool BlockFormattingContext::FormatTable(BlockContainer* block_context_box, Element* element_table)
+// LayoutEngine::FormatElementFlex (Part 2/2)
+void FlexFormattingContext::Format(Vector2f containing_block, FormatSettings format_settings)
 {
-	const ComputedValues& computed_table = element_table->GetComputedValues();
+	Element* element = GetRootElement();
 
-	const Vector2f containing_block = LayoutDetails::GetContainingBlock(block_context_box);
+	const ComputedValues& computed = element->GetComputedValues();
+	RMLUI_ASSERT(containing_block.x >= 0.f);
+
+	// Build the initial box as specified by the flex's style, as if it was a normal block element.
+	Box box;
+	LayoutDetails::BuildBox(box, containing_block, element, BoxContext::Block);
+
+#if 0
+	{
+		// TODO: Direct copy from BlockContainer constructor. We need to duplicate the behavior of block container:
+		// Disable any auto scrollbars on first format, then enable them if we overflow, and format again. We probably
+		// want to extract this functionality out of the block container so we can use it here. Note: This does not
+		// apply to tables, since the table container cannot capture overflow.
+		
+		const auto& computed = element->GetComputedValues();
+		const Style::Overflow overflow_x_property = computed.overflow_x();
+		const Style::Overflow overflow_y_property = computed.overflow_y();
+
+		if (overflow_x_property == Style::Overflow::Scroll)
+			element->GetElementScroll()->EnableScrollbar(ElementScroll::HORIZONTAL, box.GetSize(Box::PADDING).x);
+		else
+			element->GetElementScroll()->DisableScrollbar(ElementScroll::HORIZONTAL);
+
+		if (overflow_y_property == Style::Overflow::Scroll)
+			element->GetElementScroll()->EnableScrollbar(ElementScroll::VERTICAL, box.GetSize(Box::PADDING).x);
+		else
+			element->GetElementScroll()->DisableScrollbar(ElementScroll::VERTICAL);
+	}
+#endif
+
+	Vector2f min_size, max_size;
+	LayoutDetails::GetMinMaxWidth(min_size.x, max_size.x, computed, box, containing_block.x);
+	LayoutDetails::GetMinMaxHeight(min_size.y, max_size.y, computed, box, containing_block.y);
+
+	// Format the flexbox and all its children.
+	ElementList absolutely_positioned_elements, relatively_positioned_elements;
+	Vector2f formatted_content_size, content_overflow_size;
+	LayoutFlex::Format(box, min_size, max_size, containing_block, element, formatted_content_size, content_overflow_size,
+		absolutely_positioned_elements, relatively_positioned_elements);
+
+	box.SetContent(formatted_content_size);
+
+	element->SetBox(box);
+
+	if (format_settings.out_visible_overflow_size)
+		*format_settings.out_visible_overflow_size = content_overflow_size;
+
+	// TODO: Handle overflow here? Need to reformat if scrollbars were added.
+
+	// TODO: Absolute and relative items.
+	//// Finally, add any absolutely and relatively positioned flex items.
+	// for (Element* abs_element : absolutely_positioned_elements)
+	//	flex_block_context_box->AddAbsoluteElement(abs_element);
+	//
+	// flex_block_context_box->AddRelativeElements(std::move(relatively_positioned_elements));
+
+	// TODO: It' hasn's only been sized, not positioned yet.
+	// SubmitElementLayout(element);
+}
+
+// LayoutEngine::FormatElementTable (Part 1/2)
+bool BlockFormattingContext::FormatTable(BlockContainer* parent_block, Element* element_table)
+{
+	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent_block);
+
+	Vector2f table_content_overflow_size;
+	auto formatting_context = MakeUnique<TableFormattingContext>(this, element_table);
+	formatting_context->Format(containing_block, FormatSettings{nullptr, &table_content_overflow_size});
+
+	const Box& box = element_table->GetBox();
+
+	// Now that the box is finalized, we can add table as a block element. If we did it earlier, eg. just before formatting the table,
+	// then the table element's offset would not be correct in cases where table size and auto-margins were adjusted.
+	BlockContainer* table_block_context_box = parent_block->AddBlockElement(element_table, box, box.GetSize().y, box.GetSize().y);
+	if (!table_block_context_box)
+		return false;
+
+	// Set the inner content size so that any overflow can be caught.
+	table_block_context_box->ExtendInnerContentSize(table_content_overflow_size);
+
+	// TODO: Positioned elements
+	//// Add any relatively positioned elements so that their positions are correctly resolved against the table size, acting as their containing
+	/// block.
+	// table_block_context_box->AddRelativeElements(std::move(relatively_positioned_elements));
+
+	// If the close failed, it probably means that its parent produced scrollbars.
+	if (table_block_context_box->Close() != BlockContainer::CloseResult::OK)
+		return false;
+
+	return true;
+}
+
+// LayoutEngine::FormatElementTable (Part 2/2)
+void TableFormattingContext::Format(Vector2f containing_block, FormatSettings format_settings)
+{
+	Element* element_table = GetRootElement();
+	const ComputedValues& computed_table = element_table->GetComputedValues();
 
 	// Build the initial box as specified by the table's style, as if it was a normal block element.
 	Box box;
@@ -358,29 +441,33 @@ bool BlockFormattingContext::FormatTable(BlockContainer* block_context_box, Elem
 		LayoutDetails::BuildBoxSizeAndMargins(box, min_size, max_size, containing_block, element_table, BoxContext::Block, true);
 	}
 
-	// Now that the box is finalized, we can add table as a block element. If we did it earlier, eg. just before formatting the table,
-	// then the table element's offset would not be correct in cases where table size and auto-margins were adjusted.
-	BlockContainer* table_block_context_box = block_context_box->AddBlockElement(element_table, box, final_content_size.y, final_content_size.y);
-	if (!table_block_context_box)
-		return false;
+	element_table->SetBox(box);
 
-	// Set the inner content size so that any overflow can be caught.
-	table_block_context_box->ExtendInnerContentSize(table_content_overflow_size);
-
-	// Add any relatively positioned elements so that their positions are correctly resolved against the table size, acting as their containing block.
-	table_block_context_box->AddRelativeElements(std::move(relatively_positioned_elements));
-
-	// If the close failed, it probably means that its parent produced scrollbars.
-	if (table_block_context_box->Close() != BlockContainer::CloseResult::OK)
-		return false;
-
-	return true;
+	if (format_settings.out_visible_overflow_size)
+		*format_settings.out_visible_overflow_size = table_content_overflow_size;
 }
 
 void FormatRoot(Element* element, Vector2f containing_block, FormatSettings format_settings)
 {
 	using namespace Style;
 	auto& computed = element->GetComputedValues();
+
+	const Display display = computed.display();
+
+	if (display == Display::Flex)
+	{
+		auto formatting_context = MakeUnique<FlexFormattingContext>(nullptr, element);
+		formatting_context->Format(containing_block, format_settings);
+		return;
+	}
+
+	if (display == Display::Table)
+	{
+		auto formatting_context = MakeUnique<TableFormattingContext>(nullptr, element);
+		formatting_context->Format(containing_block, format_settings);
+		return;
+	}
+
 	const bool establishes_bfc =
 		(computed.float_() != Float::None || computed.position() == Position::Absolute || computed.position() == Position::Fixed ||
 			computed.display() == Display::InlineBlock || computed.display() == Display::TableCell || computed.overflow_x() != Overflow::Visible ||
@@ -389,15 +476,12 @@ void FormatRoot(Element* element, Vector2f containing_block, FormatSettings form
 	if (establishes_bfc)
 	{
 		auto formatting_context = MakeUnique<BlockFormattingContext>(nullptr, element);
-
 		formatting_context->Format(containing_block, format_settings);
-
 		return;
 	}
 
-
+	// TODO: Handle gracefully?
 	RMLUI_ERROR;
-	// TODO: Other formatting contexts.
 }
 
 } // namespace Rml

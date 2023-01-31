@@ -36,7 +36,6 @@ namespace Rml {
 
 class Box;
 
-// TODO: Replace by e.g. virtual calls.
 struct FormatSettings {
 	const Box* override_initial_box = nullptr;
 	Vector2f* out_visible_overflow_size = nullptr;
@@ -50,7 +49,13 @@ public:
 		Table,
 		Flex,
 	};
+	enum class SizingMode {
+		StretchFit,
+		MinContent,
+		MaxContent,
+	};
 
+	// TODO: Instead of (output) format settings, use function calls (virtual if necessary) as needed.
 	virtual void Format(Vector2f containing_block, FormatSettings format_settings) = 0;
 
 protected:
@@ -85,6 +90,24 @@ private:
 
 	UniquePtr<BlockContainer> containing_block_box; // TODO?
 	BlockContainer* root_block_container = nullptr;
+};
+
+class FlexFormattingContext final : public FormattingContext {
+public:
+	FlexFormattingContext(FormattingContext* parent, Element* element) : FormattingContext(Type::Flex, parent, element) {}
+
+	void Format(Vector2f containing_block, FormatSettings format_settings) override;
+
+private:
+};
+
+class TableFormattingContext final : public FormattingContext {
+public:
+	TableFormattingContext(FormattingContext* parent, Element* element) : FormattingContext(Type::Table, parent, element) {}
+
+	void Format(Vector2f containing_block, FormatSettings format_settings) override;
+
+private:
 };
 
 // Formats the contents for a root-level element (usually a document or floating element).
