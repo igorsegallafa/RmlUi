@@ -230,6 +230,8 @@ private:
 
 	// Closes our last block box, if it is an open inline block box.
 	CloseResult CloseInlineBlockBox();
+	// Closes the inline container if there is one open.
+	bool CloseOpenInlineContainer();
 
 	void ResetInterruptedLineBox();
 

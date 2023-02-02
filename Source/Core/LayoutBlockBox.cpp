@@ -70,61 +70,18 @@ BlockContainer::BlockContainer(BlockContainer* _parent, Element* _element, const
 	else
 		offset_root = this;
 
-	// Determine the offset parent for this element.
-	BlockContainer* self_offset_parent;
-	if (parent && parent->offset_parent->GetElement())
-		self_offset_parent = parent->offset_parent;
-	else
-		self_offset_parent = this;
-
 	// Determine the offset parent for our children.
 	if (parent && parent->offset_parent->GetElement() && (!element || element->GetPosition() == Style::Position::Static))
 		offset_parent = parent->offset_parent;
 	else
 		offset_parent = this;
 
-	// Build the box for our element, and position it if we can.
-	if (parent)
-	{
-		space->ImportSpace(*parent->space);
-
-		// Position ourselves within our containing block (if we have a valid offset parent).
-		if (parent->GetElement())
-		{
-			if (self_offset_parent != this)
-			{
-				// Get the next position within our offset parent's containing block.
-				position = parent->NextBlockBoxPosition(box, element->GetComputedValues().clear());
-				element->SetOffset(position - (self_offset_parent->GetPosition() - offset_root->GetPosition()), self_offset_parent->GetElement());
-			}
-			else
-				element->SetOffset(position, nullptr);
-		}
-	}
-
 	if (element)
 	{
 		const auto& computed = element->GetComputedValues();
 		wrap_content = computed.white_space() != Style::WhiteSpace::Nowrap;
-
-		// Determine if this element should have scrollbars or not, and create them if so.
 		overflow_x_property = computed.overflow_x();
 		overflow_y_property = computed.overflow_y();
-
-		if (overflow_x_property == Style::Overflow::Scroll)
-			element->GetElementScroll()->EnableScrollbar(ElementScroll::HORIZONTAL, box.GetSize(Box::PADDING).x);
-		else
-			element->GetElementScroll()->DisableScrollbar(ElementScroll::HORIZONTAL);
-
-		if (overflow_y_property == Style::Overflow::Scroll)
-			element->GetElementScroll()->EnableScrollbar(ElementScroll::VERTICAL, box.GetSize(Box::PADDING).x);
-		else
-			element->GetElementScroll()->DisableScrollbar(ElementScroll::VERTICAL);
-
-		// Store relatively positioned elements with their containing block so that their offset can be updated after their containing block has been
-		// sized.
-		if (self_offset_parent != this && computed.position() == Style::Position::Relative)
-			self_offset_parent->relative_elements.push_back(element);
 	}
 	else
 	{
@@ -300,36 +257,57 @@ bool BlockContainer::CloseChildBox(BlockLevelBox* child, float child_position_to
 	return CatchVerticalOverflow();
 }
 
-BlockContainer* BlockContainer::AddBlockElement(Element* element, const Box& box, float min_height, float max_height)
+BlockContainer* BlockContainer::AddBlockElement(Element* child_element, const Box& box, float min_height, float max_height)
 {
 	RMLUI_ZoneScoped;
 
-	// Close the inline container if there is one open.
-	if (InlineContainer* inline_container = GetOpenInlineContainer())
+	if (!CloseOpenInlineContainer())
+		return nullptr;
+
+	auto child_container_ptr = MakeUnique<BlockContainer>(this, child_element, box, min_height, max_height);
+	BlockContainer* child_container = child_container_ptr.get();
+
+	// Determine the offset parent for the child element.
+	BlockContainer* child_offset_parent = (offset_parent->GetElement() ? offset_parent : child_container);
+
+	child_container->space->ImportSpace(*space);
+
+	// Position ourselves within our containing block (if we have a valid offset parent).
+	if (element)
 	{
-		UniquePtr<LayoutLineBox> open_line_box;
-
-		if (inline_container->Close(&open_line_box) != CloseResult::OK)
-			return nullptr;
-
-		if (open_line_box)
+		if (child_offset_parent != child_container)
 		{
-			// TODO: Is comment still valid?
-			// There's an open inline box chain, which means this block element is parented to it. The chain needs to
-			// be positioned (if it hasn't already), closed and duplicated after this block box closes. Also, this
-			// block needs to be aware of its parentage, so it can correctly compute its relative position. First of
-			// all, we need to close the inline box; this will position the last line if necessary, but it will also
-			// create a new line in the inline block box; we want this line to be in an inline box after our block
-			// element.
-
-			ResetInterruptedLineBox();
-
-			interrupted_line_box = std::move(open_line_box);
+			// Get the next position within our offset parent's containing block.
+			child_container->position = NextBlockBoxPosition(box, child_element->GetComputedValues().clear());
+			child_element->SetOffset(child_container->position - (child_offset_parent->GetPosition() - child_container->offset_root->GetPosition()),
+				child_offset_parent->GetElement());
 		}
+		else
+			child_element->SetOffset(child_container->position, nullptr);
 	}
 
-	block_boxes.push_back(MakeUnique<BlockContainer>(this, element, box, min_height, max_height));
-	return static_cast<BlockContainer*>(block_boxes.back().get());
+	if (child_element)
+	{
+		// Determine if this element should have scrollbars or not, and create them if so.
+		if (child_container->overflow_x_property == Style::Overflow::Scroll)
+			child_element->GetElementScroll()->EnableScrollbar(ElementScroll::HORIZONTAL, box.GetSize(Box::PADDING).x);
+		else
+			child_element->GetElementScroll()->DisableScrollbar(ElementScroll::HORIZONTAL);
+
+		if (child_container->overflow_y_property == Style::Overflow::Scroll)
+			child_element->GetElementScroll()->EnableScrollbar(ElementScroll::VERTICAL, box.GetSize(Box::PADDING).x);
+		else
+			child_element->GetElementScroll()->DisableScrollbar(ElementScroll::VERTICAL);
+
+		// Store relatively positioned elements with their containing block so that their offset can be updated after
+		// their containing block has been sized.
+		if (child_offset_parent != child_container && child_element->GetPosition() == Style::Position::Relative)
+			child_offset_parent->relative_elements.push_back(child_element);
+	}
+
+	block_boxes.push_back(std::move(child_container_ptr));
+
+	return child_container;
 }
 
 BlockContainer::InlineBoxHandle BlockContainer::AddInlineElement(Element* element, const Box& box)
@@ -453,7 +431,6 @@ void BlockContainer::CloseAbsoluteElements()
 		absolute_elements.clear();
 	}
 }
-
 
 void BlockContainer::AddRelativeElements(ElementList&& elements)
 {
@@ -679,6 +656,36 @@ BlockContainer::CloseResult BlockContainer::CloseInlineBlockBox()
 	}
 
 	return CloseResult::OK;
+}
+
+bool BlockContainer::CloseOpenInlineContainer()
+{
+	RMLUI_ZoneScoped;
+
+	if (InlineContainer* inline_container = GetOpenInlineContainer())
+	{
+		UniquePtr<LayoutLineBox> open_line_box;
+
+		if (inline_container->Close(&open_line_box) != CloseResult::OK)
+			return false;
+
+		if (open_line_box)
+		{
+			// TODO: Is comment still valid?
+			// There's an open inline box chain, which means this block element is parented to it. The chain needs to
+			// be positioned (if it hasn't already), closed and duplicated after this block box closes. Also, this
+			// block needs to be aware of its parentage, so it can correctly compute its relative position. First of
+			// all, we need to close the inline box; this will position the last line if necessary, but it will also
+			// create a new line in the inline block box; we want this line to be in an inline box after our block
+			// element.
+
+			ResetInterruptedLineBox();
+
+			interrupted_line_box = std::move(open_line_box);
+		}
+	}
+
+	return true;
 }
 
 void BlockContainer::ResetInterruptedLineBox()
