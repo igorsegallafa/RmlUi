@@ -62,7 +62,6 @@ BlockContainer::BlockContainer(BlockContainer* _parent, Element* _element, const
 	element = _element;
 
 	box_cursor = 0;
-	vertical_overflow = false;
 
 	// Get our offset root from our parent, if it has one; otherwise, our element is the offset parent.
 	if (parent && parent->offset_root->GetElement())
@@ -103,7 +102,7 @@ BlockContainer::CloseResult BlockContainer::Close()
 		return CloseResult::LayoutSelf;
 
 	// Set this box's height, if necessary.
-	if (box.GetSize(Box::CONTENT).y < 0)
+	if (box.GetSize().y < 0)
 	{
 		Vector2f content_area = box.GetSize();
 		content_area.y = Math::Clamp(box_cursor, min_height, max_height);
@@ -131,34 +130,20 @@ BlockContainer::CloseResult BlockContainer::Close()
 		// padding box should be caught here. Otherwise, our overflow should be included in the overflow calculations of
 		// our nearest scroll container ancestor.
 
-		// Start with the inner content size, as set by the child blocks boxes or external formatting contexts.
-		Vector2f content_box = inner_content_size;
-
 		// Check how big our floated area is.
 		const Vector2f space_box = space->GetDimensions(LayoutFloatBoxEdge::Border);
-		content_box.x = Math::Max(content_box.x, space_box.x);
+
+		// Start with the inner content size, as set by the child blocks boxes or external formatting contexts.
+		Vector2f content_box = Math::Max(inner_content_size, space_box);
+		content_box.y = Math::Max(content_box.y, box_cursor);
 
 		const Vector2f padding_top_left = {box.GetEdge(Box::PADDING, Box::LEFT), box.GetEdge(Box::PADDING, Box::TOP)};
 		const Vector2f padding_bottom_right = {box.GetEdge(Box::PADDING, Box::RIGHT), box.GetEdge(Box::PADDING, Box::BOTTOM)};
 		const Vector2f padding_size = box.GetSize() + padding_top_left + padding_bottom_right;
 
-		// If our content is larger than our window, we can enable the horizontal scrollbar if we're set to
-		// auto-scrollbars. If we're set to always use scrollbars, then the horiontal scrollbar will already have been
-		// enabled in the constructor.
-		if (content_box.x > box.GetSize().x + padding_bottom_right.x + 0.5f)
-		{
-			if (overflow_x_property == Overflow::Auto)
-			{
-				element->GetElementScroll()->EnableScrollbar(ElementScroll::HORIZONTAL, padding_size.x);
-
-				if (!CatchVerticalOverflow())
-					return CloseResult::LayoutSelf;
-			}
-		}
-
-		content_box.y = Math::Max(content_box.y, box_cursor);
-		content_box.y = Math::Max(content_box.y, space_box.y);
-		if (!CatchVerticalOverflow(content_box.y))
+		// If our content is larger than our padding box, we can add scrollbars if we're set to auto-scrollbars. If
+		// we're set to always use scrollbars, then the scrollbars have already been enabled.
+		if (!CatchOverflow(content_box))
 			return CloseResult::LayoutSelf;
 
 		const Vector2f scrollbar_size = {
@@ -170,25 +155,23 @@ BlockContainer::CloseResult BlockContainer::Close()
 		element->SetBox(box);
 		element->SetScrollableOverflowRectangle(scrollable_overflow_size);
 
-		const Vector2f margin_size = padding_size + box.GetSizeAround(Box::MARGIN, Box::MARGIN);
+		// TODO: Should we use the border size instead for visible overflow size?
+		const Vector2f border_size = padding_size + box.GetSizeAround(Box::BORDER, Box::BORDER);
 
 		// Set the visible overflow size so that ancestors can catch any overflow produced by us. That is, hiding it or
 		// providing a scrolling mechanism. If this box is a scroll container, we catch our own overflow here; then,
 		// just use the normal margin box as that will effectively remove the overflow from our ancestor's perspective.
 		if (is_scroll_container)
 		{
-			visible_overflow_size = margin_size;
+			visible_overflow_size = border_size;
 
 			// Format any scrollbars which were enabled on this element.
 			element->GetElementScroll()->FormatScrollbars();
 		}
 		else
 		{
-			const Vector2f top_left_edges = {
-				box.GetCumulativeEdge(Box::PADDING, Box::LEFT),
-				box.GetCumulativeEdge(Box::PADDING, Box::TOP),
-			};
-			visible_overflow_size = Math::Max(margin_size, content_box + top_left_edges);
+			const Vector2f border_top_left = {box.GetEdge(Box::BORDER, Box::LEFT), box.GetEdge(Box::BORDER, Box::TOP)};
+			visible_overflow_size = Math::Max(border_size, content_box + border_top_left + padding_top_left);
 		}
 	}
 
@@ -198,8 +181,9 @@ BlockContainer::CloseResult BlockContainer::Close()
 	if (parent)
 	{
 		// If this close fails, it means this block box has caused our parent block box to generate an automatic vertical scrollbar.
-		const float self_position_top = position.y - box.GetEdge(Box::MARGIN, Box::TOP);
-		if (!parent->CloseChildBox(this, self_position_top, box.GetSize(Box::MARGIN).y))
+		const Vector2f margin_corner = Vector2f{box.GetEdge(Box::MARGIN, Box::LEFT), box.GetEdge(Box::MARGIN, Box::TOP)};
+		const Vector2f margin_position = position - margin_corner;
+		if (!parent->CloseChildBox(this, margin_position, margin_corner, box.GetSize(Box::MARGIN)))
 			return CloseResult::LayoutParent;
 	}
 
@@ -245,22 +229,22 @@ BlockContainer::CloseResult BlockContainer::Close()
 	return CloseResult::OK;
 }
 
-bool BlockContainer::CloseChildBox(BlockLevelBox* child, float child_position_top, float child_size_y)
+bool BlockContainer::CloseChildBox(BlockLevelBox* child, Vector2f child_position, Vector2f child_margin_corner, Vector2f child_size)
 {
-	const float child_position_y = child_position_top - (box.GetPosition().y + position.y);
-	box_cursor = child_position_y + child_size_y;
+	child_position -= (box.GetPosition() + position);
+	box_cursor = child_position.y + child_size.y;
 
 	// Extend the inner content size. The vertical size can be larger than the box_cursor due to overflow.
-	inner_content_size.x = Math::Max(inner_content_size.x, child->GetVisibleOverflowSize().x);
-	inner_content_size.y = Math::Max(inner_content_size.y, child_position_y + child->GetVisibleOverflowSize().y);
+	// TODO: Consider position of child box in addition to its overflow size, when determining our own overflow area.
+	inner_content_size = Math::Max(inner_content_size, child_position + child_margin_corner + child->GetVisibleOverflowSize());
 
-	return CatchVerticalOverflow();
+	const Vector2f content_size = Math::Max(Vector2f{box.GetSize().x, box_cursor}, inner_content_size);
+
+	return CatchOverflow(content_size);
 }
 
-BlockContainer* BlockContainer::AddBlockElement(Element* child_element, const Box& box, float min_height, float max_height)
+BlockContainer* BlockContainer::AddBlockBox(Element* child_element, const Box& box, float min_height, float max_height)
 {
-	RMLUI_ZoneScoped;
-
 	if (!CloseOpenInlineContainer())
 		return nullptr;
 
@@ -288,16 +272,7 @@ BlockContainer* BlockContainer::AddBlockElement(Element* child_element, const Bo
 
 	if (child_element)
 	{
-		// Determine if this element should have scrollbars or not, and create them if so.
-		if (child_container->overflow_x_property == Style::Overflow::Scroll)
-			child_element->GetElementScroll()->EnableScrollbar(ElementScroll::HORIZONTAL, box.GetSize(Box::PADDING).x);
-		else
-			child_element->GetElementScroll()->DisableScrollbar(ElementScroll::HORIZONTAL);
-
-		if (child_container->overflow_y_property == Style::Overflow::Scroll)
-			child_element->GetElementScroll()->EnableScrollbar(ElementScroll::VERTICAL, box.GetSize(Box::PADDING).x);
-		else
-			child_element->GetElementScroll()->DisableScrollbar(ElementScroll::VERTICAL);
+		ResetScrollbars(child_element, box);
 
 		// Store relatively positioned elements with their containing block so that their offset can be updated after
 		// their containing block has been sized.
@@ -308,6 +283,48 @@ BlockContainer* BlockContainer::AddBlockElement(Element* child_element, const Bo
 	block_boxes.push_back(std::move(child_container_ptr));
 
 	return child_container;
+}
+
+BlockLevelBox* BlockContainer::AddBlockLevelBox(UniquePtr<BlockLevelBox> block_level_box_ptr, Element* child_element, const Box& box)
+{
+	RMLUI_ASSERT(box.GetSize().y >= 0.f); // Assumes child element already formatted and sized.
+
+	if (!CloseOpenInlineContainer())
+		return nullptr;
+
+	Vector2f child_position = NextBlockBoxPosition(box, child_element->GetComputedValues().clear());
+
+	BlockContainer* child_offset_parent = (offset_parent->GetElement() ? offset_parent : this); // TODO: Verify
+
+	// Position ourselves within our containing block (if we have a valid offset parent).
+	// TODO: Essentially the same as above in 'AddBlockBox'.
+	if (element)
+	{
+		// Get the next position within our offset parent's containing block.
+		Vector2f root_position = (offset_root->GetElement() ? offset_root->GetPosition() : Vector2f(0));
+		child_element->SetOffset(child_position - (child_offset_parent->GetPosition() - root_position), child_offset_parent->GetElement());
+	}
+
+	// TODO Basically, almost copy/paste from above.
+	if (child_element)
+	{
+		ResetScrollbars(child_element, box);
+
+		// Store relatively positioned elements with their containing block so that their offset can be updated after
+		// their containing block has been sized.
+		if (child_element->GetPosition() == Style::Position::Relative)
+			child_offset_parent->relative_elements.push_back(element);
+	}
+
+	block_boxes.push_back(std::move(block_level_box_ptr));
+	BlockLevelBox* block_level_box = block_boxes.back().get();
+
+	const Vector2f margin_corner = Vector2f{box.GetEdge(Box::MARGIN, Box::LEFT), box.GetEdge(Box::MARGIN, Box::TOP)};
+	const Vector2f margin_position = child_position - margin_corner;
+	if (!CloseChildBox(block_level_box, margin_position, margin_corner, box.GetSize(Box::MARGIN)))
+		return nullptr;
+
+	return block_level_box;
 }
 
 BlockContainer::InlineBoxHandle BlockContainer::AddInlineElement(Element* element, const Box& box)
@@ -703,35 +720,32 @@ void BlockContainer::PlaceFloat(Element* element, float offset)
 	space->PlaceFloat(element, box_position.y + offset);
 }
 
-bool BlockContainer::CatchVerticalOverflow(float cursor)
+bool BlockContainer::CatchOverflow(Vector2f content_size)
 {
-	if (cursor == -1)
-		cursor = Math::Max(box_cursor, inner_content_size.y);
+	Vector2f available_size = box.GetSize();
+	if (available_size.y < 0.f)
+		available_size.y = max_height;
+	if (available_size.y < 0.f)
+		available_size.y = INFINITY;
 
-	float box_height = box.GetSize().y;
-	if (box_height < 0)
-		box_height = max_height;
+	// Allow overflow onto the padding area.
+	available_size += Vector2f{box.GetEdge(Box::PADDING, Box::RIGHT), box.GetEdge(Box::PADDING, Box::BOTTOM)};
 
 	// If we're auto-scrolling and our height is fixed, we have to check if this box has exceeded our client height.
-	if (!vertical_overflow && box_height >= 0 && overflow_y_property == Style::Overflow::Auto)
+	// TODO: Better name, inconsistent bool return values.
+	if (BlockLevelBox::CatchOverflow(element, content_size, available_size, box.GetSize(Box::PADDING), overflow_x_property, overflow_y_property))
 	{
-		if (cursor > box_height - element->GetElementScroll()->GetScrollbarSize(ElementScroll::HORIZONTAL) + 0.5f)
-		{
-			RMLUI_ZoneScopedC(0xDD3322);
-			vertical_overflow = true;
-			element->GetElementScroll()->EnableScrollbar(ElementScroll::VERTICAL, box.GetSize(Box::PADDING).x);
+		RMLUI_ZoneScopedC(0xDD3322);
 
-			block_boxes.clear();
+		block_boxes.clear();
+		space = MakeUnique<LayoutBlockBoxSpace>(this);
 
-			space = MakeUnique<LayoutBlockBoxSpace>(this);
+		box_cursor = 0;
+		interrupted_line_box.reset();
 
-			box_cursor = 0;
-			interrupted_line_box.reset();
+		inner_content_size = Vector2f(0);
 
-			inner_content_size = Vector2f(0);
-
-			return false;
-		}
+		return false;
 	}
 
 	return true;

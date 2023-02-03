@@ -41,6 +41,11 @@ struct FormatSettings {
 	Vector2f* out_visible_overflow_size = nullptr;
 };
 
+struct ContainingBlock {
+	BlockContainer* block; // TODO: For static boxes, this could also be flex and table container boxes. In principle also inline boxes.
+	Vector2f size;
+};
+
 class FormattingContext {
 public:
 	enum class Type {
@@ -59,21 +64,35 @@ public:
 	virtual void Format(Vector2f containing_block, FormatSettings format_settings) = 0;
 
 protected:
-	FormattingContext(Type type, FormattingContext* parent, Element* root_element) : type(type), parent(parent), root_element(root_element) {}
+	FormattingContext(Type type, FormattingContext* parent_context, LayoutBox* parent_box, Element* root_element) :
+		type(type), parent_context(parent_context), parent_box(parent_box), root_element(root_element)
+	{}
 
 	Element* GetRootElement() { return root_element; }
+
+	ContainingBlock GetContainingBlockForAbsolute() const
+	{
+		// TODO
+	}
+	ContainingBlock GetContainingBlockForStatic() const
+	{
+		// TODO
+	}
 
 	static void SubmitElementLayout(Element* element) { element->OnLayout(); }
 
 private:
 	Type type;
-	FormattingContext* parent;
+	FormattingContext* parent_context;
+	LayoutBox* parent_box;
 	Element* root_element;
 };
 
 class BlockFormattingContext final : public FormattingContext {
 public:
-	BlockFormattingContext(FormattingContext* parent, Element* element) : FormattingContext(Type::Block, parent, element) {}
+	BlockFormattingContext(FormattingContext* parent_context, LayoutBox* parent_box, Element* element) :
+		FormattingContext(Type::Block, parent_context, parent_box, element)
+	{}
 
 	void Format(Vector2f containing_block, FormatSettings format_settings) override;
 
@@ -88,22 +107,30 @@ private:
 	bool FormatFlex(BlockContainer* block_context_box, Element* element);
 	bool FormatTable(BlockContainer* block_context_box, Element* element_table);
 
-	UniquePtr<BlockContainer> containing_block_box; // TODO?
+	UniquePtr<BlockContainer> containing_block_box; // TODO? Replace with root block container?
 	BlockContainer* root_block_container = nullptr;
 };
 
 class FlexFormattingContext final : public FormattingContext {
 public:
-	FlexFormattingContext(FormattingContext* parent, Element* element) : FormattingContext(Type::Flex, parent, element) {}
+	FlexFormattingContext(FormattingContext* parent_context, LayoutBox* parent_box, Element* element) :
+		FormattingContext(Type::Flex, parent_context, parent_box, element)
+	{}
 
 	void Format(Vector2f containing_block, FormatSettings format_settings) override;
 
+	FlexContainerBox* GetContainer() { return flex_container_box.get(); }
+	UniquePtr<FlexContainerBox> ExtractContainer() { return std::move(flex_container_box); }
+
 private:
+	UniquePtr<FlexContainerBox> flex_container_box;
 };
 
 class TableFormattingContext final : public FormattingContext {
 public:
-	TableFormattingContext(FormattingContext* parent, Element* element) : FormattingContext(Type::Table, parent, element) {}
+	TableFormattingContext(FormattingContext* parent_context, LayoutBox* parent_box, Element* element) :
+		FormattingContext(Type::Table, parent_context, parent_box, element)
+	{}
 
 	void Format(Vector2f containing_block, FormatSettings format_settings) override;
 

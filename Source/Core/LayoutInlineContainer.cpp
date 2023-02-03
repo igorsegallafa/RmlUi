@@ -195,7 +195,7 @@ InlineContainer::CloseResult InlineContainer::Close(UniquePtr<LayoutLineBox>* ou
 
 	// Increment the parent's cursor.
 	// If this close fails, it means this block box has caused our parent block box to generate an automatic vertical scrollbar.
-	if (!parent->CloseChildBox(this, position.y, box_size.y))
+	if (!parent->CloseChildBox(this, position, Vector2f(0), box_size))
 		return CloseResult::LayoutParent;
 
 	return CloseResult::OK;

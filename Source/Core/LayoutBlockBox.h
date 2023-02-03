@@ -69,20 +69,83 @@ private:
 
 class BlockLevelBox : public LayoutBox {
 public:
-	// Returns the outer size of this box including overflowing content. Similar to scroll width, but shrinked if
-	// overflow is caught here. This can be wider than the box if we are overflowing.
+	// Returns the border size of this box including overflowing content. Similar to the scrollable overflow rectangle,
+	// but shrinked if overflow is caught here. This can be wider than the box if we are overflowing.
 	// @note Only available after the box has been closed.
 	Vector2f GetVisibleOverflowSize() const { return visible_overflow_size; }
 
+	void SetVisibleOverflowSize(Vector2f size) { visible_overflow_size = size; }
+
 	virtual bool GetBaselineOfLastLine(float& /*out_baseline*/) const { return false; }
+
+	// TODO: Where to put this?
+	static void ResetScrollbars(Element* element, const Box& box)
+	{
+		const auto& child_computed = element->GetComputedValues();
+
+		// Determine if this element should have scrollbars or not, and create them if so.
+		if (child_computed.overflow_x() == Style::Overflow::Scroll)
+			element->GetElementScroll()->EnableScrollbar(ElementScroll::HORIZONTAL, box.GetSize(Box::PADDING).x);
+		else
+			element->GetElementScroll()->DisableScrollbar(ElementScroll::HORIZONTAL);
+
+		if (child_computed.overflow_y() == Style::Overflow::Scroll)
+			element->GetElementScroll()->EnableScrollbar(ElementScroll::VERTICAL, box.GetSize(Box::PADDING).x);
+		else
+			element->GetElementScroll()->DisableScrollbar(ElementScroll::VERTICAL);
+	}
 
 protected:
 	BlockLevelBox(Type type) : LayoutBox(OuterType::BlockLevel, type) {}
 
-	void SetVisibleOverflowSize(Vector2f size) { visible_overflow_size = size; }
+	bool CatchOverflow(Element* element, const Vector2f content_size, Vector2f available_space, const Vector2f padding_size,
+		Style::Overflow overflow_x_property, Style::Overflow overflow_y_property) const
+	{
+		RMLUI_ASSERT(available_space.x >= 0.f && available_space.y >= 0.f); // Infinite available space should here have the value FLT_MAX.
+
+		if (overflow_x_property != Style::Overflow::Auto && overflow_y_property != Style::Overflow::Auto)
+			return false;
+
+		ElementScroll* element_scroll = element->GetElementScroll();
+		bool scrollbar_size_changed = false;
+
+		if (overflow_x_property == Style::Overflow::Auto && content_size.x > available_space.x + 0.5f)
+		{
+			if (element_scroll->GetScrollbarSize(ElementScroll::HORIZONTAL) == 0.f)
+			{
+				element_scroll->EnableScrollbar(ElementScroll::HORIZONTAL, padding_size.x);
+				const float new_size = element_scroll->GetScrollbarSize(ElementScroll::HORIZONTAL);
+				scrollbar_size_changed = (new_size != 0.f);
+				available_space.y -= new_size;
+			}
+		}
+
+		// If we're auto-scrolling and our height is fixed, we have to check if this box has exceeded our client height.
+		if (overflow_y_property == Style::Overflow::Auto && content_size.y > available_space.y + 0.5f)
+		{
+			if (element_scroll->GetScrollbarSize(ElementScroll::VERTICAL) == 0.f)
+			{
+				element_scroll->EnableScrollbar(ElementScroll::VERTICAL, padding_size.x);
+				const float new_size = element_scroll->GetScrollbarSize(ElementScroll::VERTICAL);
+				scrollbar_size_changed |= (new_size != 0.f);
+			}
+		}
+
+		return scrollbar_size_changed;
+	}
 
 private:
 	Vector2f visible_overflow_size;
+};
+
+class FlexContainerBox final : public BlockLevelBox {
+public:
+	FlexContainerBox() : BlockLevelBox(Type::FlexContainer) {}
+	String DebugDumpTree(int depth) const override { return String(depth * 2, ' ') + "BlockFlexContainer"; /* TODO */ }
+
+	void Close() {
+
+	}
 };
 
 // class InlineLevelBox : public LayoutBox {
@@ -113,6 +176,7 @@ private:
 /**
     @author Peter Curry
  */
+// TODO: More correctly called BlockBox (block-level box which is also a block container). We might need another for inline-level block container.
 class BlockContainer final : public BlockLevelBox {
 public:
 	/// Creates a new block box for rendering a block element.
@@ -131,18 +195,21 @@ public:
 
 	/// Called by a closing block box child. Increments the cursor.
 	/// @param[in] child The closing child block-level box.
-	/// @param[in] child_position_top The position of the child, relative to this container.
-	/// @param[in] child_size_y The vertical margin size of the child.
+	/// @param[in] child_position The top-left position of the child, relative to this container.
+	/// @param[in] child_size The margin size of the child.
 	/// @return False if the block box caused an automatic vertical scrollbar to appear, forcing an entire reformat of the block box.
-	bool CloseChildBox(BlockLevelBox* child, float child_position_top, float child_size_y);
+	/// TODO: Can we simplify this?
+	bool CloseChildBox(BlockLevelBox* child, Vector2f child_position, Vector2f child_margin_corner, Vector2f child_size);
 
-	/// Adds a new block element to this block-context box.
+	/// Creates a new block box and adds it as a child of this one.
 	/// @param element[in] The new block element.
 	/// @param box[in] The box used for the new block box.
 	/// @param min_height[in] The minimum height of the content box.
 	/// @param max_height[in] The maximum height of the content box.
 	/// @return The block box representing the element. Once the element's children have been positioned, Close() must be called on it.
-	BlockContainer* AddBlockElement(Element* element, const Box& box, float min_height, float max_height);
+	BlockContainer* AddBlockBox(Element* element, const Box& box, float min_height, float max_height);
+
+	BlockLevelBox* AddBlockLevelBox(UniquePtr<BlockLevelBox> block_level_box, Element* element, const Box& box);
 
 	struct InlineBoxHandle {
 		InlineContainer* inline_container;
@@ -238,10 +305,11 @@ private:
 	// Positions a floating element within this block box.
 	void PlaceFloat(Element* element, float offset = 0);
 
-	// Checks if we have a new vertical overflow on an auto-scrolling element. If so, our vertical scrollbar will
-	// be enabled and our block boxes will be destroyed. All content will need to re-formatted. Returns true if no
-	// overflow occured, false if it did.
-	bool CatchVerticalOverflow(float cursor = -1);
+
+	// Checks if we have a new overflow on an auto-scrolling element. If so, our vertical scrollbar will be enabled and
+	// our block boxes will be destroyed. All content will need to re-formatted.
+	// @returns Returns true if no overflow occured, false if it did.
+	bool CatchOverflow(Vector2f content_size);
 
 	// Return the baseline of the last line box of this or any descendant inline-level boxes.
 	bool GetBaselineOfLastLine(float& out_baseline) const override;
@@ -299,8 +367,7 @@ private:
 	// This is extended as child block boxes are closed, or from external formatting contexts.
 	Vector2f inner_content_size;
 
-	// Used by block contexts only; if true, we've enabled our vertical scrollbar.
-	bool vertical_overflow;
+	bool vertical_overflow = false;
 };
 
 } // namespace Rml

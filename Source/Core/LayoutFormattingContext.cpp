@@ -126,13 +126,15 @@ bool BlockFormattingContext::FormatBlockBox(BlockContainer* parent_block_contain
 	float min_height, max_height;
 	LayoutDetails::GetDefiniteMinMaxHeight(min_height, max_height, element->GetComputedValues(), box, containing_block.y);
 
-	BlockContainer* new_block = parent_block_container->AddBlockElement(element, box, min_height, max_height);
+	BlockContainer* new_block = parent_block_container->AddBlockBox(element, box, min_height, max_height);
 	if (!new_block)
 		return false;
 
 	if (!root_block_container)
 		root_block_container = new_block; // TODO hacky
 
+	// TODO: In principle, it is possible that we need three iterations: Once to enable horizontal scroll bar, then to
+	// enable vertical scroll bar, then finally format with both enabled.
 	for (int layout_iteration = 0; layout_iteration < 2; layout_iteration++)
 	{
 		// Format the element's children.
@@ -254,7 +256,7 @@ bool BlockFormattingContext::FormatInlineBlock(BlockContainer* parent_block, Ele
 	// Format the element separately as a block element, then position it inside our own layout as an inline element.
 	Vector2f containing_block_size = LayoutDetails::GetContainingBlock(parent_block);
 
-	auto formatting_contex = MakeUnique<BlockFormattingContext>(this, element);
+	auto formatting_contex = MakeUnique<BlockFormattingContext>(this, parent_block, element);
 	formatting_contex->Format(containing_block_size, {});
 
 	auto inline_box_handle = parent_block->AddInlineElement(element, element->GetBox());
@@ -269,46 +271,15 @@ bool BlockFormattingContext::FormatFlex(BlockContainer* parent_block, Element* e
 	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent_block);
 	RMLUI_ASSERT(containing_block.x >= 0.f);
 
-	Vector2f visible_overflow_size;
-
-	auto formatting_context = MakeUnique<FlexFormattingContext>(this, element);
-	formatting_context->Format(containing_block, FormatSettings{nullptr, &visible_overflow_size});
+	auto formatting_context = MakeUnique<FlexFormattingContext>(this, parent_block, element);
+	formatting_context->Format(containing_block, FormatSettings{});
 
 	const Box& box = element->GetBox();
 
 	// Add the flex container element as if it was a normal block element.
-	BlockContainer* flex_block_context_box = parent_block->AddBlockElement(element, box, box.GetSize().y, box.GetSize().y);
-	if (!flex_block_context_box)
+	BlockLevelBox* flex_container = parent_block->AddBlockLevelBox(formatting_context->ExtractContainer(), element, box);
+	if (!flex_container)
 		return false;
-
-	// Set the inner content size so that any overflow can be caught.
-	flex_block_context_box->ExtendInnerContentSize(visible_overflow_size);
-
-	// TODO: Doesn't make any sense to redo formatting due to LayoutSelf here... It should be completely sized after
-	// flex formatting. Need to move some of the block container logic elsewhere.
-
-	// Close the block box, this may result in scrollbars being added to ourself or our parent.
-	const auto close_result = flex_block_context_box->Close();
-	if (close_result == BlockContainer::CloseResult::LayoutParent)
-	{
-		// Scollbars added to parent, bail out to reformat all its children.
-		return false;
-	}
-	else if (close_result == BlockContainer::CloseResult::LayoutSelf)
-	{
-		// Scrollbars added to flex container, it needs to be formatted again to account for changed width or height.
-		// TODO positioned elements
-		// absolutely_positioned_elements.clear();
-		// relatively_positioned_elements.clear();
-
-		formatting_context->Format(containing_block, FormatSettings{nullptr, &visible_overflow_size});
-
-		flex_block_context_box->GetBox().SetContent(element->GetBox().GetSize());
-		flex_block_context_box->ExtendInnerContentSize(visible_overflow_size);
-
-		if (flex_block_context_box->Close() == BlockContainer::CloseResult::LayoutParent)
-			return false;
-	}
 
 	SubmitElementLayout(element);
 
@@ -318,8 +289,10 @@ bool BlockFormattingContext::FormatFlex(BlockContainer* parent_block, Element* e
 // LayoutEngine::FormatElementFlex (Part 2/2)
 void FlexFormattingContext::Format(Vector2f containing_block, FormatSettings format_settings)
 {
-	Element* element = GetRootElement();
+	RMLUI_ASSERT(!flex_container_box);
+	flex_container_box = MakeUnique<FlexContainerBox>();
 
+	Element* element = GetRootElement();
 	const ComputedValues& computed = element->GetComputedValues();
 	RMLUI_ASSERT(containing_block.x >= 0.f);
 
@@ -327,28 +300,7 @@ void FlexFormattingContext::Format(Vector2f containing_block, FormatSettings for
 	Box box;
 	LayoutDetails::BuildBox(box, containing_block, element, BoxContext::Block);
 
-#if 0
-	{
-		// TODO: Direct copy from BlockContainer constructor. We need to duplicate the behavior of block container:
-		// Disable any auto scrollbars on first format, then enable them if we overflow, and format again. We probably
-		// want to extract this functionality out of the block container so we can use it here. Note: This does not
-		// apply to tables, since the table container cannot capture overflow.
-		
-		const auto& computed = element->GetComputedValues();
-		const Style::Overflow overflow_x_property = computed.overflow_x();
-		const Style::Overflow overflow_y_property = computed.overflow_y();
-
-		if (overflow_x_property == Style::Overflow::Scroll)
-			element->GetElementScroll()->EnableScrollbar(ElementScroll::HORIZONTAL, box.GetSize(Box::PADDING).x);
-		else
-			element->GetElementScroll()->DisableScrollbar(ElementScroll::HORIZONTAL);
-
-		if (overflow_y_property == Style::Overflow::Scroll)
-			element->GetElementScroll()->EnableScrollbar(ElementScroll::VERTICAL, box.GetSize(Box::PADDING).x);
-		else
-			element->GetElementScroll()->DisableScrollbar(ElementScroll::VERTICAL);
-	}
-#endif
+	flex_container_box->ResetScrollbars(element, box);
 
 	Vector2f min_size, max_size;
 	LayoutDetails::GetMinMaxWidth(min_size.x, max_size.x, computed, box, containing_block.x);
@@ -361,6 +313,10 @@ void FlexFormattingContext::Format(Vector2f containing_block, FormatSettings for
 		absolutely_positioned_elements, relatively_positioned_elements);
 
 	box.SetContent(formatted_content_size);
+
+	// Set the inner content size so that any overflow can be caught.
+	// TODO: Inner content size replaced by visible overflow size... Is this correct?
+	flex_container_box->SetVisibleOverflowSize(content_overflow_size);
 
 	element->SetBox(box);
 
@@ -386,14 +342,15 @@ bool BlockFormattingContext::FormatTable(BlockContainer* parent_block, Element* 
 	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent_block);
 
 	Vector2f table_content_overflow_size;
-	auto formatting_context = MakeUnique<TableFormattingContext>(this, element_table);
+	auto formatting_context = MakeUnique<TableFormattingContext>(this, parent_block, element_table);
 	formatting_context->Format(containing_block, FormatSettings{nullptr, &table_content_overflow_size});
 
 	const Box& box = element_table->GetBox();
 
 	// Now that the box is finalized, we can add table as a block element. If we did it earlier, eg. just before formatting the table,
 	// then the table element's offset would not be correct in cases where table size and auto-margins were adjusted.
-	BlockContainer* table_block_context_box = parent_block->AddBlockElement(element_table, box, box.GetSize().y, box.GetSize().y);
+	// TODO: Add as block-level element.
+	BlockContainer* table_block_context_box = parent_block->AddBlockBox(element_table, box, box.GetSize().y, box.GetSize().y);
 	if (!table_block_context_box)
 		return false;
 
@@ -456,14 +413,14 @@ void FormatRoot(Element* element, Vector2f containing_block, FormatSettings form
 
 	if (display == Display::Flex)
 	{
-		auto formatting_context = MakeUnique<FlexFormattingContext>(nullptr, element);
+		auto formatting_context = MakeUnique<FlexFormattingContext>(nullptr, nullptr, element);
 		formatting_context->Format(containing_block, format_settings);
 		return;
 	}
 
 	if (display == Display::Table)
 	{
-		auto formatting_context = MakeUnique<TableFormattingContext>(nullptr, element);
+		auto formatting_context = MakeUnique<TableFormattingContext>(nullptr, nullptr, element);
 		formatting_context->Format(containing_block, format_settings);
 		return;
 	}
@@ -475,7 +432,7 @@ void FormatRoot(Element* element, Vector2f containing_block, FormatSettings form
 
 	if (establishes_bfc)
 	{
-		auto formatting_context = MakeUnique<BlockFormattingContext>(nullptr, element);
+		auto formatting_context = MakeUnique<BlockFormattingContext>(nullptr, nullptr, element);
 		formatting_context->Format(containing_block, format_settings);
 		return;
 	}

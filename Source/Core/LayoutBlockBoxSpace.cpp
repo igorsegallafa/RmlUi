@@ -48,6 +48,8 @@ void LayoutBlockBoxSpace::ImportSpace(const LayoutBlockBoxSpace& space)
 		for (size_t j = 0; j < space.boxes[i].size(); ++j)
 			boxes[i].push_back(space.boxes[i][j]);
 	}
+
+	// TODO: Copy extents from the other space too?
 }
 
 Vector2f LayoutBlockBoxSpace::NextBoxPosition(float& box_width, float cursor, const Vector2f dimensions, bool nowrap) const
