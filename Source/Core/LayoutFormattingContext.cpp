@@ -132,9 +132,9 @@ bool BlockFormattingContext::FormatBlockBox(BlockContainer* parent_block_contain
 	if (!root_block_container)
 		root_block_container = new_block; // TODO hacky
 
-	// TODO: In principle, it is possible that we need three iterations: Once to enable horizontal scroll bar, then to
-	// enable vertical scroll bar, then finally format with both enabled.
-	for (int layout_iteration = 0; layout_iteration < 2; layout_iteration++)
+	// In rare cases, it is possible that we need three iterations: Once to enable the horizontal scroll bar, then to
+	// enable the vertical scroll bar, and then finally to format it with both scroll bars enabled.
+	for (int layout_iteration = 0; layout_iteration < 3; layout_iteration++)
 	{
 		// Format the element's children.
 		for (int i = 0; i < element->GetNumChildren(); i++)
@@ -191,7 +191,8 @@ bool BlockFormattingContext::FormatBlockContainerChild(BlockContainer* parent_bl
 	if (computed.position() == Style::Position::Absolute || computed.position() == Style::Position::Fixed)
 	{
 		// Display the element as a block element.
-		parent_block->AddAbsoluteElement(element);
+		const Vector2f static_position = parent_block->GetOpenStaticPosition(display);
+		parent_block->GetAbsolutePositioningContainingBlock()->AddAbsoluteElement(element, static_position);
 		return true;
 	}
 

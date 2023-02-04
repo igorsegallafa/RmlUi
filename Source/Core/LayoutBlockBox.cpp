@@ -177,7 +177,6 @@ bool ContainerBox::SubmitBox(const Vector2f content_box, const Box& box, const f
 	//       https://www.w3.org/TR/css-overflow-3/#scrollable
 	//
 	Vector2f visible_overflow_size;
-	const bool is_scroll_container = IsScrollContainer();
 
 	// Set the computed box on the element.
 	if (element)
@@ -199,6 +198,7 @@ bool ContainerBox::SubmitBox(const Vector2f content_box, const Box& box, const f
 		const Vector2f padding_bottom_right = {box.GetEdge(Box::PADDING, Box::RIGHT), box.GetEdge(Box::PADDING, Box::BOTTOM)};
 		const Vector2f padding_size = box.GetSize() + padding_top_left + padding_bottom_right;
 
+		const bool is_scroll_container = IsScrollContainer();
 		const Vector2f scrollbar_size = {
 			is_scroll_container ? element->GetElementScroll()->GetScrollbarSize(ElementScroll::VERTICAL) : 0.f,
 			is_scroll_container ? element->GetElementScroll()->GetScrollbarSize(ElementScroll::HORIZONTAL) : 0.f,
@@ -506,26 +506,27 @@ void BlockContainer::AddFloatElement(Element* element)
 		offset_parent->AddRelativeElement(element);
 }
 
-void BlockContainer::AddAbsoluteElement(Element* absolute_element)
+Vector2f BlockContainer::GetOpenStaticPosition(Style::Display display) const
 {
+	// Estimate the next box as if it had static position (10.6.4). If the element is inline-level, position it on the
+	// open line if we have one. Otherwise, block-level elements are positioned on a hypothetical next line.
 	Vector2f static_position = NextBoxPosition();
 
-	// Position the box as if it had static position (10.6.4). If the element is inline-level, position it on the open
-	// line if we have one. Otherwise, block-level elements are positioned on a hypothetical next line.
-	if (InlineContainer* inline_container = GetOpenInlineContainer())
+	if (const InlineContainer* inline_container = GetOpenInlineContainer())
 	{
-		const Style::Display display = absolute_element->GetDisplay();
 		const bool inline_level_element = (display == Style::Display::Inline || display == Style::Display::InlineBlock);
 		static_position += inline_container->GetStaticPositionEstimate(inline_level_element);
 	}
 
-	// Find the positioned parent for this element.
+	return static_position;
+}
+
+BlockContainer* BlockContainer::GetAbsolutePositioningContainingBlock()
+{
 	BlockContainer* absolute_parent = this;
 	while (absolute_parent != absolute_parent->offset_parent)
 		absolute_parent = absolute_parent->parent;
-
-	// TODO: Get rid of static_cast
-	static_cast<ContainerBox*>(absolute_parent)->AddAbsoluteElement(absolute_element, static_position);
+	return absolute_parent;
 }
 
 Vector2f BlockContainer::NextBoxPosition(float top_margin, Style::Clear clear_property) const
@@ -714,6 +715,11 @@ String BlockContainer::DebugDumpTree(int depth) const
 }
 
 InlineContainer* BlockContainer::GetOpenInlineContainer()
+{
+	return const_cast<InlineContainer*>(static_cast<const BlockContainer&>(*this).GetOpenInlineContainer());
+}
+
+const InlineContainer* BlockContainer::GetOpenInlineContainer() const
 {
 	if (!block_boxes.empty() && block_boxes.back()->GetType() == Type::InlineContainer)
 		return static_cast<InlineContainer*>(block_boxes.back().get());

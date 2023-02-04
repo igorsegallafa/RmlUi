@@ -95,7 +95,7 @@ public:
 
 	/// Formats, sizes, and positions all absolute elements in this block.
 	void ClosePositionedElements(const Box& box, Vector2f root_relative_position);
-	// Clears the list of absolutely and relatively positioned elements.
+	// Clears the list of absolutely and relatively positioned elements, without formatting them.
 	void ClearPositionedElements();
 
 protected:
@@ -177,35 +177,9 @@ public:
 	const Box* GetBoxPtr() const override { return &element->GetBox(); }
 };
 
-// class InlineLevelBox : public LayoutBox {
-// public:
-// protected:
-//	InlineLevelBox(Type type) : LayoutBox(OuterType::InlineLevel, type) {}
-// };
-//
-// class FormattingContext {
-// public:
-// private:
-//	// Contains absolute elements.
-// };
-//
-// class BlockFlexContainer : public BlockLevelBox {
-// public:
-//	BlockFlexContainer() : BlockLevelBox(Type::FlexContainer) {}
-//
-// private:
-// };
-// class InlineFlexContainer : public InlineLevelBox {
-// public:
-//	InlineFlexContainer() : InlineLevelBox(Type::FlexContainer) {}
-//
-// private:
-// };
-
 /**
     @author Peter Curry
  */
-// TODO: More correctly called BlockBox (block-level box which is also a block container). We might need another for inline-level block container.
 class BlockContainer final : public ContainerBox {
 public:
 	/// Creates a new block box for rendering a block element.
@@ -260,7 +234,11 @@ public:
 	/// Adds an element to this block box to be handled as a floating element.
 	void AddFloatElement(Element* element);
 
-	void AddAbsoluteElement(Element* element);
+	// Estimate the static position of a hypothetical next element to be placed.
+	Vector2f GetOpenStaticPosition(Style::Display display) const;
+
+	// TODO: Generalize to all formatting contexts, and transcend them.
+	BlockContainer* GetAbsolutePositioningContainingBlock();
 
 	/// Returns the offset from the top-left corner of this box's offset element the next child box will be positioned at.
 	/// @param[in] top_margin The top margin of the box. This will be collapsed as appropriate against other block boxes.
@@ -311,8 +289,10 @@ public:
 private:
 	void ResetContents();
 
-	InlineContainer* GetOpenInlineContainer();
 	InlineContainer* EnsureOpenInlineContainer();
+	InlineContainer* GetOpenInlineContainer();
+	const InlineContainer* GetOpenInlineContainer() const;
+
 	const BlockContainer* GetOpenBlockContainer() const;
 	const LayoutBox* GetOpenLayoutBox() const;
 
