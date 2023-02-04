@@ -48,6 +48,11 @@ public:
 
 	Type GetType() const { return type; }
 
+	// TODO: Do we really want virtual for these?
+	virtual Vector2f GetVisibleOverflowSize() const { return Vector2f(0.f); }
+	virtual const Box* GetBoxPtr() const { return nullptr; }
+	virtual bool GetBaselineOfLastLine(float& /*out_baseline*/) const { return false; }
+
 	// Debug dump layout tree.
 	String DumpLayoutTree(int depth = 0) const { return DebugDumpTree(depth); }
 
@@ -67,85 +72,103 @@ private:
 	Type type;
 };
 
-class BlockLevelBox : public LayoutBox {
+class ContainerBox : public LayoutBox {
 public:
 	// Returns the border size of this box including overflowing content. Similar to the scrollable overflow rectangle,
 	// but shrinked if overflow is caught here. This can be wider than the box if we are overflowing.
 	// @note Only available after the box has been closed.
-	Vector2f GetVisibleOverflowSize() const { return visible_overflow_size; }
+	Vector2f GetVisibleOverflowSize() const override { return visible_overflow_size; }
 
 	void SetVisibleOverflowSize(Vector2f size) { visible_overflow_size = size; }
 
-	virtual bool GetBaselineOfLastLine(float& /*out_baseline*/) const { return false; }
-
+	// Determine if this element should have scrollbars or not, and create them if so.
 	// TODO: Where to put this?
-	static void ResetScrollbars(Element* element, const Box& box)
+	void ResetScrollbars(const Box& box)
 	{
-		const auto& child_computed = element->GetComputedValues();
-
-		// Determine if this element should have scrollbars or not, and create them if so.
-		if (child_computed.overflow_x() == Style::Overflow::Scroll)
-			element->GetElementScroll()->EnableScrollbar(ElementScroll::HORIZONTAL, box.GetSize(Box::PADDING).x);
+		RMLUI_ASSERT(element);
+		if (overflow_x == Style::Overflow::Scroll)
+			element->GetElementScroll()->EnableScrollbar(ElementScroll::HORIZONTAL, box.GetSizeAcross(Box::HORIZONTAL, Box::PADDING));
 		else
 			element->GetElementScroll()->DisableScrollbar(ElementScroll::HORIZONTAL);
 
-		if (child_computed.overflow_y() == Style::Overflow::Scroll)
-			element->GetElementScroll()->EnableScrollbar(ElementScroll::VERTICAL, box.GetSize(Box::PADDING).x);
+		if (overflow_y == Style::Overflow::Scroll)
+			element->GetElementScroll()->EnableScrollbar(ElementScroll::VERTICAL, box.GetSizeAcross(Box::HORIZONTAL, Box::PADDING));
 		else
 			element->GetElementScroll()->DisableScrollbar(ElementScroll::VERTICAL);
 	}
 
+	/// Adds an element to this block box to be handled as an absolutely-positioned element. This element will be
+	/// laid out, sized and positioned appropriately once this box is finished. This should only be called on boxes
+	/// rendering in a block-context.
+	/// @param element[in] The element to be positioned absolutely within this block box.
+	void AddAbsoluteElement(Element* element, Vector2f static_position);
+	/// Adds a relatively positioned descendent which we act as a containing block for.
+	void AddRelativeElement(Element* element);
+	/// Adds relatively positioned descendents which we act as a containing block for.
+	void AddRelativeElements(ElementList&& elements);
+
+	/// Formats, sizes, and positions all absolute elements in this block.
+	void ClosePositionedElements(const Box& box, Vector2f root_relative_position);
+
 protected:
-	BlockLevelBox(Type type) : LayoutBox(OuterType::BlockLevel, type) {}
-
-	bool CatchOverflow(Element* element, const Vector2f content_size, Vector2f available_space, const Vector2f padding_size,
-		Style::Overflow overflow_x_property, Style::Overflow overflow_y_property) const
+	ContainerBox(OuterType outer_type, Type type, Element* element) : LayoutBox(outer_type, type), element(element)
 	{
-		RMLUI_ASSERT(available_space.x >= 0.f && available_space.y >= 0.f); // Infinite available space should here have the value FLT_MAX.
-
-		if (overflow_x_property != Style::Overflow::Auto && overflow_y_property != Style::Overflow::Auto)
-			return false;
-
-		ElementScroll* element_scroll = element->GetElementScroll();
-		bool scrollbar_size_changed = false;
-
-		if (overflow_x_property == Style::Overflow::Auto && content_size.x > available_space.x + 0.5f)
+		if (element)
 		{
-			if (element_scroll->GetScrollbarSize(ElementScroll::HORIZONTAL) == 0.f)
-			{
-				element_scroll->EnableScrollbar(ElementScroll::HORIZONTAL, padding_size.x);
-				const float new_size = element_scroll->GetScrollbarSize(ElementScroll::HORIZONTAL);
-				scrollbar_size_changed = (new_size != 0.f);
-				available_space.y -= new_size;
-			}
+			const auto& computed = element->GetComputedValues();
+			overflow_x = computed.overflow_x();
+			overflow_y = computed.overflow_y();
 		}
-
-		// If we're auto-scrolling and our height is fixed, we have to check if this box has exceeded our client height.
-		if (overflow_y_property == Style::Overflow::Auto && content_size.y > available_space.y + 0.5f)
-		{
-			if (element_scroll->GetScrollbarSize(ElementScroll::VERTICAL) == 0.f)
-			{
-				element_scroll->EnableScrollbar(ElementScroll::VERTICAL, padding_size.x);
-				const float new_size = element_scroll->GetScrollbarSize(ElementScroll::VERTICAL);
-				scrollbar_size_changed |= (new_size != 0.f);
-			}
-		}
-
-		return scrollbar_size_changed;
 	}
+
+	// Checks if we have a new overflow on an auto-scrolling element. If so, our vertical scrollbar will be enabled and
+	// our block boxes will be destroyed. All content will need to re-formatted.
+	// @returns Returns true if no overflow occured, false if it did.
+	bool CatchOverflow(const Vector2f content_size, const Box& box, const float max_height) const;
+
+	// TODO: content_box -> content_overflow_size ?
+	bool SubmitBox(const Vector2f content_box, const Box& box, const float max_height);
+
+	bool IsScrollContainer() const { return overflow_x != Style::Overflow::Visible || overflow_y != Style::Overflow::Visible; }
+
+	Element* const element;
 
 private:
 	Vector2f visible_overflow_size;
+
+	struct AbsoluteElement {
+		Element* element;
+		Vector2f position;
+	};
+
+	using AbsoluteElementList = Vector<AbsoluteElement>;
+
+	// Used by block contexts only; stores any elements that are to be absolutely positioned within this block box.
+	AbsoluteElementList absolute_elements;
+	// Used by block contexts only; stores any elements that are relatively positioned and whose containing block is this.
+	ElementList relative_elements;
+
+	Style::Overflow overflow_x = Style::Overflow::Visible;
+	Style::Overflow overflow_y = Style::Overflow::Visible;
 };
 
-class FlexContainerBox final : public BlockLevelBox {
+class FlexContainer final : public ContainerBox {
 public:
-	FlexContainerBox() : BlockLevelBox(Type::FlexContainer) {}
-	String DebugDumpTree(int depth) const override { return String(depth * 2, ' ') + "BlockFlexContainer"; /* TODO */ }
+	FlexContainer(OuterType outer_type, Element* element) : ContainerBox(outer_type, Type::FlexContainer, element) { RMLUI_ASSERT(element); }
 
-	void Close() {
+	String DebugDumpTree(int depth) const override { return String(depth * 2, ' ') + "FlexContainer"; /* TODO */ }
 
+	CloseResult Close(const Vector2f content_overflow_size, const Box& box)
+	{
+		if (!SubmitBox(content_overflow_size, box, -1.f))
+			return CloseResult::LayoutSelf;
+
+		ClosePositionedElements(box, Vector2f{});
+
+		return CloseResult::OK;
 	}
+
+	const Box* GetBoxPtr() const override { return &element->GetBox(); }
 };
 
 // class InlineLevelBox : public LayoutBox {
@@ -177,7 +200,7 @@ public:
     @author Peter Curry
  */
 // TODO: More correctly called BlockBox (block-level box which is also a block container). We might need another for inline-level block container.
-class BlockContainer final : public BlockLevelBox {
+class BlockContainer final : public ContainerBox {
 public:
 	/// Creates a new block box for rendering a block element.
 	/// @param parent[in] The parent of this block box. This will be nullptr for the root element.
@@ -185,7 +208,7 @@ public:
 	/// @param box[in] The box used for this block box.
 	/// @param min_height[in] The minimum height of the content box.
 	/// @param max_height[in] The maximum height of the content box.
-	BlockContainer(BlockContainer* parent, Element* element, const Box& box, float min_height, float max_height);
+	BlockContainer(OuterType outer_type, BlockContainer* parent, Element* element, const Box& box, float min_height, float max_height);
 	/// Releases the block box.
 	~BlockContainer();
 
@@ -196,10 +219,11 @@ public:
 	/// Called by a closing block box child. Increments the cursor.
 	/// @param[in] child The closing child block-level box.
 	/// @param[in] child_position The top-left position of the child, relative to this container.
+	/// @param[in] child_margin_corner The top-left margin of the child.
 	/// @param[in] child_size The margin size of the child.
 	/// @return False if the block box caused an automatic vertical scrollbar to appear, forcing an entire reformat of the block box.
-	/// TODO: Can we simplify this?
-	bool CloseChildBox(BlockLevelBox* child, Vector2f child_position, Vector2f child_margin_corner, Vector2f child_size);
+	/// TODO: Can we simplify this? Rename? This is more like increment box cursor and enlarge content size, and only needed for block-level boxes.
+	bool CloseChildBox(LayoutBox* child, Vector2f child_position, Vector2f child_margin_corner, Vector2f child_size);
 
 	/// Creates a new block box and adds it as a child of this one.
 	/// @param element[in] The new block element.
@@ -209,7 +233,7 @@ public:
 	/// @return The block box representing the element. Once the element's children have been positioned, Close() must be called on it.
 	BlockContainer* AddBlockBox(Element* element, const Box& box, float min_height, float max_height);
 
-	BlockLevelBox* AddBlockLevelBox(UniquePtr<BlockLevelBox> block_level_box, Element* element, const Box& box);
+	LayoutBox* AddBlockLevelBox(UniquePtr<LayoutBox> block_level_box, Element* element, const Box& box);
 
 	struct InlineBoxHandle {
 		InlineContainer* inline_container;
@@ -230,16 +254,7 @@ public:
 	/// Adds an element to this block box to be handled as a floating element.
 	void AddFloatElement(Element* element);
 
-	/// Adds an element to this block box to be handled as an absolutely-positioned element. This element will be
-	/// laid out, sized and positioned appropriately once this box is finished. This should only be called on boxes
-	/// rendering in a block-context.
-	/// @param element[in] The element to be positioned absolutely within this block box.
 	void AddAbsoluteElement(Element* element);
-	/// Formats, sizes, and positions all absolute elements in this block.
-	void CloseAbsoluteElements();
-
-	/// Adds relatively positioned descendents which we act as a containing block for.
-	void AddRelativeElements(ElementList&& elements);
 
 	/// Returns the offset from the top-left corner of this box's offset element the next child box will be positioned at.
 	/// @param[in] top_margin The top margin of the box. This will be collapsed as appropriate against other block boxes.
@@ -285,15 +300,15 @@ public:
 	Box& GetBox();
 	const Box& GetBox() const;
 
+	const Box* GetBoxPtr() const override { return &GetBox(); }
+
 private:
-	struct AbsoluteElement {
-		Element* element;
-		Vector2f position;
-	};
+	void ResetContents();
 
 	InlineContainer* GetOpenInlineContainer();
 	InlineContainer* EnsureOpenInlineContainer();
 	const BlockContainer* GetOpenBlockContainer() const;
+	const LayoutBox* GetOpenLayoutBox() const;
 
 	// Closes our last block box, if it is an open inline block box.
 	CloseResult CloseInlineBlockBox();
@@ -305,53 +320,39 @@ private:
 	// Positions a floating element within this block box.
 	void PlaceFloat(Element* element, float offset = 0);
 
-
-	// Checks if we have a new overflow on an auto-scrolling element. If so, our vertical scrollbar will be enabled and
-	// our block boxes will be destroyed. All content will need to re-formatted.
-	// @returns Returns true if no overflow occured, false if it did.
-	bool CatchOverflow(Vector2f content_size);
-
 	// Return the baseline of the last line box of this or any descendant inline-level boxes.
 	bool GetBaselineOfLastLine(float& out_baseline) const override;
 
 	// Debug dump layout tree.
 	String DebugDumpTree(int depth) const override;
 
-	using AbsoluteElementList = Vector<AbsoluteElement>;
-	using BlockBoxList = Vector<UniquePtr<BlockLevelBox>>;
-
-	// The element this box represents. This will be nullptr for boxes rendering in an inline context.
-	Element* element;
+	using BlockBoxList = Vector<UniquePtr<LayoutBox>>;
 
 	// The element we'll be computing our offset relative to during layout.
-	const BlockContainer* offset_root;
+	const BlockContainer* offset_root = nullptr;
 	// The element this block box's children are to be offset from.
-	BlockContainer* offset_parent;
+	BlockContainer* offset_parent = nullptr;
 
 	// The box's block parent. This will be nullptr for the root of the box tree.
-	BlockContainer* parent;
+	BlockContainer* parent = nullptr;
 
 	// The block box's position.
 	Vector2f position;
 	// The block box's size.
 	Box box;
-	float min_height;
-	float max_height;
+	float min_height = 0.f;
+	float max_height = -1.f;
 
 	// Used by inline contexts only; set to true if the block box's line boxes should stretch to fit their inline content instead of wrapping.
-	bool wrap_content;
+	bool wrap_content = true;
 
 	// The vertical position of the next block box to be added to this box, relative to the top of our content box.
-	float box_cursor;
+	float box_cursor = 0.f;
 
 	// TODO: All comments in the following.
 
 	// Used by block contexts only; stores the list of block boxes under this box.
 	BlockBoxList block_boxes;
-	// Used by block contexts only; stores any elements that are to be absolutely positioned within this block box.
-	AbsoluteElementList absolute_elements;
-	// Used by block contexts only; stores any elements that are relatively positioned and whose containing block is this.
-	ElementList relative_elements;
 	// Used by block contexts only; stores the block box space managing our space, as occupied by floating elements of this box and our ancestors.
 	UniquePtr<LayoutBlockBoxSpace> space;
 	// Stores any floating elements that are waiting for a line break to be positioned.
@@ -359,9 +360,6 @@ private:
 	// Used by block contexts only; stores an inline element hierarchy that was interrupted by a child block box.
 	// The hierarchy will be resumed in an inline-context box once the intervening block box is completed.
 	UniquePtr<LayoutLineBox> interrupted_line_box;
-	// Used by block contexts only; stores the value of the overflow property for the element.
-	Style::Overflow overflow_x_property;
-	Style::Overflow overflow_y_property;
 
 	// The inner content size (excluding any padding/border/margins).
 	// This is extended as child block boxes are closed, or from external formatting contexts.

@@ -119,11 +119,11 @@ public:
 
 	void Format(Vector2f containing_block, FormatSettings format_settings) override;
 
-	FlexContainerBox* GetContainer() { return flex_container_box.get(); }
-	UniquePtr<FlexContainerBox> ExtractContainer() { return std::move(flex_container_box); }
+	FlexContainer* GetContainer() { return flex_container_box.get(); }
+	UniquePtr<FlexContainer> ExtractContainer() { return std::move(flex_container_box); }
 
 private:
-	UniquePtr<FlexContainerBox> flex_container_box;
+	UniquePtr<FlexContainer> flex_container_box;
 };
 
 class TableFormattingContext final : public FormattingContext {

@@ -238,14 +238,12 @@ float LayoutDetails::GetShrinkToFitWidth(Element* element, Vector2f containing_b
 	LayoutDetails::GetDefiniteMinMaxHeight(min_height, max_height, element->GetComputedValues(), box, containing_block.y);
 
 	// First we need to format the element, then we get the shrink-to-fit width based on the largest line or box.
-	BlockContainer containing_block_box(nullptr, nullptr, Box(containing_block), 0.0f, FLT_MAX);
-
-	// TODO: Only considers block formatting contexts, however, we just as well might have flex or table formatting contexts.
-	auto formatting_context = MakeUnique<BlockFormattingContext>(nullptr, nullptr, element);
-
 	// @performance. Some formatting can be simplified, eg. absolute elements do not contribute to the shrink-to-fit
 	// width. Also, children of elements with a fixed width and height don't need to be formatted further. Further, we
 	// might get away with not closing the boxes during formatting.
+	// TODO: Only considers block formatting contexts, however, we just as well might have flex or table formatting contexts.
+	auto formatting_context = MakeUnique<BlockFormattingContext>(nullptr, nullptr, element);
+
 	formatting_context->Format(containing_block, FormatSettings{&box, nullptr});
 
 	return Math::Min(containing_block.x, formatting_context->GetShrinkToFitWidth());

@@ -92,7 +92,7 @@ void BlockFormattingContext::Format(Vector2f containing_block, FormatSettings fo
 #endif
 
 	// TODO: Make a lighter data structure for the containing block, or, just a pointer to the given box's containing block box.
-	containing_block_box = MakeUnique<BlockContainer>(nullptr, nullptr, Box(containing_block), 0.0f, FLT_MAX);
+	containing_block_box = MakeUnique<BlockContainer>(LayoutBox::OuterType::BlockLevel, nullptr, nullptr, Box(containing_block), 0.0f, FLT_MAX);
 	DebugDumpLayoutTree debug_dump_tree(element, containing_block_box.get());
 
 	for (int layout_iteration = 0; layout_iteration < 2; layout_iteration++)
@@ -277,7 +277,7 @@ bool BlockFormattingContext::FormatFlex(BlockContainer* parent_block, Element* e
 	const Box& box = element->GetBox();
 
 	// Add the flex container element as if it was a normal block element.
-	BlockLevelBox* flex_container = parent_block->AddBlockLevelBox(formatting_context->ExtractContainer(), element, box);
+	LayoutBox* flex_container = parent_block->AddBlockLevelBox(formatting_context->ExtractContainer(), element, box);
 	if (!flex_container)
 		return false;
 
@@ -289,51 +289,58 @@ bool BlockFormattingContext::FormatFlex(BlockContainer* parent_block, Element* e
 // LayoutEngine::FormatElementFlex (Part 2/2)
 void FlexFormattingContext::Format(Vector2f containing_block, FormatSettings format_settings)
 {
+	RMLUI_ASSERT(containing_block.x >= 0.f);
 	RMLUI_ASSERT(!flex_container_box);
-	flex_container_box = MakeUnique<FlexContainerBox>();
 
 	Element* element = GetRootElement();
+	flex_container_box = MakeUnique<FlexContainer>(LayoutBox::OuterType::BlockLevel, element);
+
 	const ComputedValues& computed = element->GetComputedValues();
-	RMLUI_ASSERT(containing_block.x >= 0.f);
 
 	// Build the initial box as specified by the flex's style, as if it was a normal block element.
 	Box box;
 	LayoutDetails::BuildBox(box, containing_block, element, BoxContext::Block);
 
-	flex_container_box->ResetScrollbars(element, box);
+	flex_container_box->ResetScrollbars(box);
 
 	Vector2f min_size, max_size;
 	LayoutDetails::GetMinMaxWidth(min_size.x, max_size.x, computed, box, containing_block.x);
 	LayoutDetails::GetMinMaxHeight(min_size.y, max_size.y, computed, box, containing_block.y);
 
-	// Format the flexbox and all its children.
-	ElementList absolutely_positioned_elements, relatively_positioned_elements;
-	Vector2f formatted_content_size, content_overflow_size;
-	LayoutFlex::Format(box, min_size, max_size, containing_block, element, formatted_content_size, content_overflow_size,
-		absolutely_positioned_elements, relatively_positioned_elements);
+	for (int layout_iteration = 0; layout_iteration < 3; layout_iteration++)
+	{
+		// Format the flexbox and all its children.
+		ElementList absolutely_positioned_elements, relatively_positioned_elements;
+		Vector2f formatted_content_size, content_overflow_size;
+		LayoutFlex::Format(box, min_size, max_size, containing_block, element, formatted_content_size, content_overflow_size,
+			absolutely_positioned_elements, relatively_positioned_elements);
 
-	box.SetContent(formatted_content_size);
+		if (layout_iteration == 0)
+		{
+			// TODO: Move absolute and relative items into LayoutFlex -- merge that class with this?
+			for (Element* abs_element : absolutely_positioned_elements)
+				flex_container_box->AddAbsoluteElement(abs_element, Vector2f{});
 
-	// Set the inner content size so that any overflow can be caught.
-	// TODO: Inner content size replaced by visible overflow size... Is this correct?
-	flex_container_box->SetVisibleOverflowSize(content_overflow_size);
+			flex_container_box->AddRelativeElements(std::move(relatively_positioned_elements));
+		}
 
-	element->SetBox(box);
+		Box formatted_box = box;
+		formatted_box.SetContent(formatted_content_size);
+		if (flex_container_box->Close(content_overflow_size, formatted_box) == LayoutBox::CloseResult::OK)
+		{
+			// box.SetContent(formatted_content_size);
 
-	if (format_settings.out_visible_overflow_size)
-		*format_settings.out_visible_overflow_size = content_overflow_size;
+			// Set the inner content size so that any overflow can be caught.
+			// TODO: Inner content size replaced by visible overflow size... Is this correct?
+			// TODO: This is now done by Close() above.
+			// flex_container_box->SetVisibleOverflowSize(content_overflow_size);
+			// element->SetBox(box);
+			if (format_settings.out_visible_overflow_size)
+				*format_settings.out_visible_overflow_size = content_overflow_size;
 
-	// TODO: Handle overflow here? Need to reformat if scrollbars were added.
-
-	// TODO: Absolute and relative items.
-	//// Finally, add any absolutely and relatively positioned flex items.
-	// for (Element* abs_element : absolutely_positioned_elements)
-	//	flex_block_context_box->AddAbsoluteElement(abs_element);
-	//
-	// flex_block_context_box->AddRelativeElements(std::move(relatively_positioned_elements));
-
-	// TODO: It' hasn's only been sized, not positioned yet.
-	// SubmitElementLayout(element);
+			break;
+		}
+	}
 }
 
 // LayoutEngine::FormatElementTable (Part 1/2)
@@ -356,11 +363,6 @@ bool BlockFormattingContext::FormatTable(BlockContainer* parent_block, Element* 
 
 	// Set the inner content size so that any overflow can be caught.
 	table_block_context_box->ExtendInnerContentSize(table_content_overflow_size);
-
-	// TODO: Positioned elements
-	//// Add any relatively positioned elements so that their positions are correctly resolved against the table size, acting as their containing
-	/// block.
-	// table_block_context_box->AddRelativeElements(std::move(relatively_positioned_elements));
 
 	// If the close failed, it probably means that its parent produced scrollbars.
 	if (table_block_context_box->Close() != BlockContainer::CloseResult::OK)
@@ -399,6 +401,11 @@ void TableFormattingContext::Format(Vector2f containing_block, FormatSettings fo
 	}
 
 	element_table->SetBox(box);
+
+	// TODO: Positioned elements
+	//// Add any relatively positioned elements so that their positions are correctly resolved against the table size, acting as their containing
+	/// block.
+	// table_block_context_box->AddRelativeElements(std::move(relatively_positioned_elements));
 
 	if (format_settings.out_visible_overflow_size)
 		*format_settings.out_visible_overflow_size = table_content_overflow_size;

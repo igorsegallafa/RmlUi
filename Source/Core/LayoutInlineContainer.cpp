@@ -42,8 +42,8 @@
 namespace Rml {
 
 InlineContainer::InlineContainer(BlockContainer* _parent, float _element_line_height, bool _wrap_content) :
-	BlockLevelBox(Type::InlineContainer), parent(_parent), element_line_height(_element_line_height), wrap_content(_wrap_content),
-	root_inline_box(_parent->GetElement())
+	ContainerBox(OuterType::BlockLevel, Type::InlineContainer, nullptr), parent(_parent), element_line_height(_element_line_height),
+	wrap_content(_wrap_content), root_inline_box(_parent->GetElement())
 {
 	RMLUI_ASSERT(_parent);
 

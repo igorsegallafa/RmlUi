@@ -59,6 +59,7 @@ class InlineBox;
 class InlineLevelBox;
 class FormattingContext;
 class BlockContainer;
+class ContainerBox;
 class PropertiesIteratorView;
 class PropertyDictionary;
 class RenderInterface;
@@ -798,6 +799,7 @@ private:
 	friend class Rml::ElementStyle;
 	friend class Rml::LayoutEngine;
 	friend class Rml::BlockContainer;
+	friend class Rml::ContainerBox;
 	friend class Rml::InlineBox;
 	friend class Rml::InlineLevelBox;
 	friend class Rml::FormattingContext;

@@ -45,7 +45,7 @@ namespace Rml {
 
     @author Michael R. P. Ragazzon
  */
-class InlineContainer final : public BlockLevelBox {
+class InlineContainer final : public ContainerBox {
 public:
 	/// Creates a new block box in an inline context.
 	InlineContainer(BlockContainer* parent, float element_line_height, bool wrap_content);

@@ -72,7 +72,7 @@ void LayoutFlex::Format(const Box& box, const Vector2f min_size, const Vector2f 
 	// Output the size of the formatted flexbox. The width is determined as a normal block box so we don't need to change that.
 	out_formatted_content_size = box_content_size;
 	if (auto_height)
-		out_formatted_content_size = Vector2f(box_content_size.x, layout_flex.flex_resulting_content_size.y + scrollbar_size.y);
+		out_formatted_content_size.y = layout_flex.flex_resulting_content_size.y + scrollbar_size.y;
 
 	out_content_overflow_size = layout_flex.flex_content_overflow_size;
 }
@@ -136,7 +136,7 @@ struct FlexLine {
 	float cross_offset = 0;
 };
 
-struct FlexContainer {
+struct FlexLineContainer {
 	Vector<FlexLine> lines;
 };
 
@@ -301,7 +301,7 @@ void LayoutFlex::Format()
 	}
 
 	// -- Collect the items into lines --
-	FlexContainer container;
+	FlexLineContainer container;
 
 	if (flex_single_line)
 	{
@@ -829,8 +829,7 @@ void LayoutFlex::Format()
 			item.element->SetOffset(flex_content_offset + item_offset, element_flex);
 
 			// The cell contents may overflow, propagate this to the flex container.
-			const Vector2f overflow_size = item_offset + cell_visible_overflow_size -
-				Vector2f(item.box.GetEdge(Box::MARGIN, Box::LEFT), item.box.GetEdge(Box::MARGIN, Box::TOP));
+			const Vector2f overflow_size = item_offset + cell_visible_overflow_size;
 
 			flex_content_overflow_size.x = Math::Max(flex_content_overflow_size.x, overflow_size.x);
 			flex_content_overflow_size.y = Math::Max(flex_content_overflow_size.y, overflow_size.y);
