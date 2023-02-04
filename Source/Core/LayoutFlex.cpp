@@ -39,52 +39,81 @@
 
 namespace Rml {
 
-void LayoutFlex::Format(const Box& box, const Vector2f min_size, const Vector2f max_size, const Vector2f flex_containing_block, Element* element_flex,
-	Vector2f& out_formatted_content_size, Vector2f& out_content_overflow_size, ElementList& out_absolutely_positioned_elements,
-	ElementList& out_relatively_positioned_elements)
+void FlexFormattingContext::Format(Vector2f containing_block, FormatSettings format_settings)
 {
-	ElementScroll* element_scroll = element_flex->GetElementScroll();
-	const Vector2f scrollbar_size = {element_scroll->GetScrollbarSize(ElementScroll::VERTICAL),
-		element_scroll->GetScrollbarSize(ElementScroll::HORIZONTAL)};
+	RMLUI_ASSERT(containing_block.x >= 0.f);
+	RMLUI_ASSERT(!flex_container_box);
 
-	Vector2f flex_content_offset = box.GetPosition();
+	Element* element = GetRootElement();
+	ElementScroll* element_scroll = element->GetElementScroll();
+	const ComputedValues& computed = element->GetComputedValues();
+
+	flex_container_box = MakeUnique<FlexContainer>(LayoutBox::OuterType::BlockLevel, element);
+
+	// Build the initial box as specified by the flex's style, as if it was a normal block element.
+	Box box;
+	LayoutDetails::BuildBox(box, containing_block, element, BoxContext::Block);
+
+	// Start with any auto-scrollbars off.
+	flex_container_box->ResetScrollbars(box);
+
+	LayoutDetails::GetMinMaxWidth(flex_min_size.x, flex_max_size.x, computed, box, containing_block.x);
+	LayoutDetails::GetMinMaxHeight(flex_min_size.y, flex_max_size.y, computed, box, containing_block.y);
 
 	const Vector2f box_content_size = box.GetSize();
 	const bool auto_height = (box_content_size.y < 0.0f);
 
-	Vector2f flex_available_content_size = Math::Max(box_content_size - scrollbar_size, Vector2f(0.f));
-	Vector2f flex_content_containing_block = flex_available_content_size;
+	flex_content_offset = box.GetPosition();
 
-	if (auto_height)
+	for (int layout_iteration = 0; layout_iteration < 3; layout_iteration++)
 	{
-		flex_available_content_size.y = -1.f; // Negative means infinite space
-		flex_content_containing_block.y = flex_containing_block.y;
+		// The scrollbars may be toggled on between iterations.
+		const Vector2f scrollbar_size = {
+			element_scroll->GetScrollbarSize(ElementScroll::VERTICAL),
+			element_scroll->GetScrollbarSize(ElementScroll::HORIZONTAL),
+		};
+
+		flex_available_content_size = Math::Max(box_content_size - scrollbar_size, Vector2f(0.f));
+		flex_content_containing_block = flex_available_content_size;
+
+		if (auto_height)
+		{
+			flex_available_content_size.y = -1.f; // Negative means infinite space
+			flex_content_containing_block.y = containing_block.y;
+		}
+
+		Math::SnapToPixelGrid(flex_content_offset, flex_available_content_size);
+
+		// Format the flexbox and all its children.
+		Vector2f flex_resulting_content_size, content_overflow_size;
+		Format(flex_resulting_content_size, content_overflow_size);
+
+		// Output the size of the formatted flexbox. The width is determined as a normal block box so we don't need to change that.
+		Vector2f formatted_content_size = box_content_size;
+		if (auto_height)
+			formatted_content_size.y = flex_resulting_content_size.y + scrollbar_size.y;
+
+		Box sized_box = box;
+		sized_box.SetContent(formatted_content_size);
+		if (flex_container_box->Close(content_overflow_size, sized_box) == LayoutBox::CloseResult::OK)
+		{
+			// box.SetContent(formatted_content_size);
+
+			// Set the inner content size so that any overflow can be caught.
+			// TODO: Inner content size replaced by visible overflow size... Is this correct?
+			// TODO: This is now done by Close() above.
+			// flex_container_box->SetVisibleOverflowSize(content_overflow_size);
+			// element->SetBox(box);
+			if (format_settings.out_visible_overflow_size)
+				*format_settings.out_visible_overflow_size = content_overflow_size;
+
+			break;
+		}
+
+		// TODO: Maybe do this as part of Close?
+		flex_container_box->ClearPositionedElements();
 	}
-
-	Math::SnapToPixelGrid(flex_content_offset, flex_available_content_size);
-
-	// Construct the layout object and format the table.
-	LayoutFlex layout_flex(element_flex, flex_available_content_size, flex_content_containing_block, flex_content_offset, min_size, max_size,
-		out_absolutely_positioned_elements, out_relatively_positioned_elements);
-
-	layout_flex.Format();
-
-	// Output the size of the formatted flexbox. The width is determined as a normal block box so we don't need to change that.
-	out_formatted_content_size = box_content_size;
-	if (auto_height)
-		out_formatted_content_size.y = layout_flex.flex_resulting_content_size.y + scrollbar_size.y;
-
-	out_content_overflow_size = layout_flex.flex_content_overflow_size;
 }
-
-LayoutFlex::LayoutFlex(Element* element_flex, Vector2f flex_available_content_size, Vector2f flex_content_containing_block,
-	Vector2f flex_content_offset, Vector2f flex_min_size, Vector2f flex_max_size, ElementList& absolutely_positioned_elements,
-	ElementList& relatively_positioned_elements) :
-	element_flex(element_flex),
-	flex_available_content_size(flex_available_content_size), flex_content_containing_block(flex_content_containing_block),
-	flex_content_offset(flex_content_offset), flex_min_size(flex_min_size), flex_max_size(flex_max_size),
-	absolutely_positioned_elements(absolutely_positioned_elements), relatively_positioned_elements(relatively_positioned_elements)
-{}
 
 struct FlexItem {
 	// In the following, suffix '_a' means flex start edge while '_b' means flex end edge.
@@ -175,11 +204,12 @@ static void GetItemSizing(FlexItem::Size& destination, const ComputedAxisSize& c
 	}
 }
 
-void LayoutFlex::Format()
+void FlexFormattingContext::Format(Vector2f& flex_resulting_content_size, Vector2f& flex_content_overflow_size) const
 {
-	// The following procedure is generally based on the CSS flexible box layout algorithm.
+	// The following procedure is based on the CSS flexible box layout algorithm.
 	// For details, see https://drafts.csswg.org/css-flexbox/#layout-algorithm
 
+	Element* const element_flex = GetRootElement();
 	const ComputedValues& computed_flex = element_flex->GetComputedValues();
 	const Style::FlexDirection direction = computed_flex.flex_direction();
 
@@ -218,12 +248,12 @@ void LayoutFlex::Format()
 		}
 		else if (computed.position() == Style::Position::Absolute || computed.position() == Style::Position::Fixed)
 		{
-			absolutely_positioned_elements.push_back(element);
+			flex_container_box->AddAbsoluteElement(element, {});
 			continue;
 		}
 		else if (computed.position() == Style::Position::Relative)
 		{
-			relatively_positioned_elements.push_back(element);
+			flex_container_box->AddRelativeElement(element);
 		}
 
 		FlexItem item = {};

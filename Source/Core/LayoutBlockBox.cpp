@@ -51,6 +51,20 @@ void LayoutBox::operator delete(void* chunk, size_t size)
 	LayoutEngine::DeallocateLayoutChunk(chunk, size);
 }
 
+void ContainerBox::ResetScrollbars(const Box& box)
+{
+	RMLUI_ASSERT(element);
+	if (overflow_x == Style::Overflow::Scroll)
+		element->GetElementScroll()->EnableScrollbar(ElementScroll::HORIZONTAL, box.GetSizeAcross(Box::HORIZONTAL, Box::PADDING));
+	else
+		element->GetElementScroll()->DisableScrollbar(ElementScroll::HORIZONTAL);
+
+	if (overflow_y == Style::Overflow::Scroll)
+		element->GetElementScroll()->EnableScrollbar(ElementScroll::VERTICAL, box.GetSizeAcross(Box::HORIZONTAL, Box::PADDING));
+	else
+		element->GetElementScroll()->DisableScrollbar(ElementScroll::VERTICAL);
+}
+
 void ContainerBox::AddAbsoluteElement(Element* element, Vector2f static_position)
 {
 	absolute_elements.push_back(AbsoluteElement{element, static_position});
@@ -59,15 +73,6 @@ void ContainerBox::AddAbsoluteElement(Element* element, Vector2f static_position
 void ContainerBox::AddRelativeElement(Element* element)
 {
 	relative_elements.push_back(element);
-}
-
-void ContainerBox::AddRelativeElements(ElementList&& elements)
-{
-	if (relative_elements.empty())
-		relative_elements = std::move(elements);
-	else
-		relative_elements.insert(relative_elements.end(), elements.begin(), elements.end());
-	elements.clear();
 }
 
 void ContainerBox::ClosePositionedElements(const Box& box, Vector2f root_relative_position)
@@ -104,6 +109,12 @@ void ContainerBox::ClosePositionedElements(const Box& box, Vector2f root_relativ
 	for (Element* child : relative_elements)
 		child->UpdateOffset();
 
+	relative_elements.clear();
+}
+
+void ContainerBox::ClearPositionedElements()
+{
+	absolute_elements.clear();
 	relative_elements.clear();
 }
 
@@ -158,7 +169,7 @@ bool ContainerBox::SubmitBox(const Vector2f content_box, const Box& box, const f
 {
 	if (!element)
 	{
-		SetVisibleOverflowSize(Vector2f{});
+		SetVisibleOverflowSize({});
 		return true;
 	}
 
@@ -248,8 +259,6 @@ BlockContainer::~BlockContainer() {}
 
 BlockContainer::CloseResult BlockContainer::Close()
 {
-	using Style::Overflow;
-
 	// If the last child of this block box is an inline box, then we haven't closed it; close it now!
 	CloseResult result = CloseInlineBlockBox();
 	if (result != CloseResult::OK)
@@ -284,7 +293,7 @@ BlockContainer::CloseResult BlockContainer::Close()
 	if (parent)
 	{
 		// If this close fails, it means this block box has caused our parent block box to generate an automatic vertical scrollbar.
-		const Vector2f margin_corner = Vector2f{box.GetEdge(Box::MARGIN, Box::LEFT), box.GetEdge(Box::MARGIN, Box::TOP)};
+		const Vector2f margin_corner = {box.GetEdge(Box::MARGIN, Box::LEFT), box.GetEdge(Box::MARGIN, Box::TOP)};
 		const Vector2f margin_position = position - margin_corner;
 		if (!parent->CloseChildBox(this, margin_position, margin_corner, box.GetSize(Box::MARGIN)))
 			return CloseResult::LayoutParent;
@@ -420,7 +429,7 @@ LayoutBox* BlockContainer::AddBlockLevelBox(UniquePtr<LayoutBox> block_level_box
 	block_boxes.push_back(std::move(block_level_box_ptr));
 	LayoutBox* block_level_box = block_boxes.back().get();
 
-	const Vector2f margin_corner = Vector2f{box.GetEdge(Box::MARGIN, Box::LEFT), box.GetEdge(Box::MARGIN, Box::TOP)};
+	const Vector2f margin_corner = {box.GetEdge(Box::MARGIN, Box::LEFT), box.GetEdge(Box::MARGIN, Box::TOP)};
 	const Vector2f margin_position = child_position - margin_corner;
 	if (!CloseChildBox(block_level_box, margin_position, margin_corner, box.GetSize(Box::MARGIN)))
 		return nullptr;
@@ -594,6 +603,12 @@ float BlockContainer::GetShrinkToFitWidth() const
 			{
 				InlineContainer* block_child = static_cast<InlineContainer*>(block_boxes[i].get());
 				content_width = Math::Max(content_width, block_child->GetShrinkToFitWidth());
+			}
+			else if (const Box* box = block_boxes[i]->GetBoxPtr())
+			{
+				// TODO: For unknown types (e.g. tables, flexboxes), we add spacing for the edges at least, but can be improved.
+				const float edge_size = box->GetSizeAcross(Box::HORIZONTAL, Box::MARGIN, Box::PADDING);
+				content_width = Math::Max(content_width, edge_size);
 			}
 		}
 	};

@@ -78,24 +78,12 @@ public:
 	// but shrinked if overflow is caught here. This can be wider than the box if we are overflowing.
 	// @note Only available after the box has been closed.
 	Vector2f GetVisibleOverflowSize() const override { return visible_overflow_size; }
-
 	void SetVisibleOverflowSize(Vector2f size) { visible_overflow_size = size; }
 
-	// Determine if this element should have scrollbars or not, and create them if so.
-	// TODO: Where to put this?
-	void ResetScrollbars(const Box& box)
-	{
-		RMLUI_ASSERT(element);
-		if (overflow_x == Style::Overflow::Scroll)
-			element->GetElementScroll()->EnableScrollbar(ElementScroll::HORIZONTAL, box.GetSizeAcross(Box::HORIZONTAL, Box::PADDING));
-		else
-			element->GetElementScroll()->DisableScrollbar(ElementScroll::HORIZONTAL);
+	bool IsScrollContainer() const { return overflow_x != Style::Overflow::Visible || overflow_y != Style::Overflow::Visible; }
 
-		if (overflow_y == Style::Overflow::Scroll)
-			element->GetElementScroll()->EnableScrollbar(ElementScroll::VERTICAL, box.GetSizeAcross(Box::HORIZONTAL, Box::PADDING));
-		else
-			element->GetElementScroll()->DisableScrollbar(ElementScroll::VERTICAL);
-	}
+	// Determine if this element should have scrollbars or not, and create them if so.
+	void ResetScrollbars(const Box& box);
 
 	/// Adds an element to this block box to be handled as an absolutely-positioned element. This element will be
 	/// laid out, sized and positioned appropriately once this box is finished. This should only be called on boxes
@@ -104,11 +92,11 @@ public:
 	void AddAbsoluteElement(Element* element, Vector2f static_position);
 	/// Adds a relatively positioned descendent which we act as a containing block for.
 	void AddRelativeElement(Element* element);
-	/// Adds relatively positioned descendents which we act as a containing block for.
-	void AddRelativeElements(ElementList&& elements);
 
 	/// Formats, sizes, and positions all absolute elements in this block.
 	void ClosePositionedElements(const Box& box, Vector2f root_relative_position);
+	// Clears the list of absolutely and relatively positioned elements.
+	void ClearPositionedElements();
 
 protected:
 	ContainerBox(OuterType outer_type, Type type, Element* element) : LayoutBox(outer_type, type), element(element)
@@ -128,8 +116,6 @@ protected:
 
 	// TODO: content_box -> content_overflow_size ?
 	bool SubmitBox(const Vector2f content_box, const Box& box, const float max_height);
-
-	bool IsScrollContainer() const { return overflow_x != Style::Overflow::Visible || overflow_y != Style::Overflow::Visible; }
 
 	Element* const element;
 
@@ -163,9 +149,29 @@ public:
 		if (!SubmitBox(content_overflow_size, box, -1.f))
 			return CloseResult::LayoutSelf;
 
-		ClosePositionedElements(box, Vector2f{});
+		ClosePositionedElements(box, {});
 
 		return CloseResult::OK;
+	}
+
+	const Box* GetBoxPtr() const override { return &element->GetBox(); }
+};
+
+class TableWrapper final : public ContainerBox {
+public:
+	TableWrapper(OuterType outer_type, Element* element) : ContainerBox(outer_type, Type::TableWrapper, element) { RMLUI_ASSERT(element); }
+
+	String DebugDumpTree(int depth) const override { return String(depth * 2, ' ') + "TableWrapper"; /* TODO */ }
+
+	void Close(const Vector2f content_overflow_size, const Box& box)
+	{
+		bool result = SubmitBox(content_overflow_size, box, -1.f);
+
+		// Since the table wrapper cannot generate scrollbars, this should always pass.
+		RMLUI_ASSERT(result);
+		(void)result;
+
+		ClosePositionedElements(box, Vector2f{});
 	}
 
 	const Box* GetBoxPtr() const override { return &element->GetBox(); }

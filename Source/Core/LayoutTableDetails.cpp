@@ -29,14 +29,16 @@
 #include "LayoutTableDetails.h"
 #include "../../Include/RmlUi/Core/ComputedValues.h"
 #include "../../Include/RmlUi/Core/Element.h"
+#include "LayoutBlockBox.h" // TODO: Only need table wrapper
 #include "LayoutDetails.h"
 #include <algorithm>
 #include <float.h>
 
 namespace Rml {
 
-bool TableGrid::Build(Element* element_table)
+bool TableGrid::Build(Element* element_table, TableWrapper& table_wrapper)
 {
+	RMLUI_ASSERT(rows.empty() && columns.empty() && cells.empty() && open_cells.empty());
 	ElementList non_parented_cell_elements;
 
 	const int num_table_children = element_table->GetNumChildren();
@@ -52,7 +54,7 @@ bool TableGrid::Build(Element* element_table)
 
 		if (!non_parented_cell_elements.empty() && display != Display::TableCell)
 		{
-			PushRow(nullptr, std::move(non_parented_cell_elements));
+			PushRow(nullptr, std::move(non_parented_cell_elements), table_wrapper);
 			non_parented_cell_elements.clear();
 		}
 
@@ -62,7 +64,7 @@ bool TableGrid::Build(Element* element_table)
 		}
 		else if (display == Display::TableRow)
 		{
-			PushRow(element, {});
+			PushRow(element, {}, table_wrapper);
 		}
 		else if (display == Display::TableRowGroup)
 		{
@@ -87,7 +89,7 @@ bool TableGrid::Build(Element* element_table)
 					continue;
 				}
 
-				PushRow(element_row, {});
+				PushRow(element_row, {}, table_wrapper);
 				num_rows_added += 1;
 			}
 
@@ -97,7 +99,7 @@ bool TableGrid::Build(Element* element_table)
 				rows[row_group_index].group_span = num_rows_added;
 			}
 			if (element->GetPosition() == Style::Position::Relative)
-				relatively_positioned_elements.push_back(element);
+				table_wrapper.AddRelativeElement(element);
 		}
 		else if (rows.empty() && display == Display::TableColumn)
 		{
@@ -122,7 +124,7 @@ bool TableGrid::Build(Element* element_table)
 
 	if (!non_parented_cell_elements.empty())
 	{
-		PushRow(nullptr, std::move(non_parented_cell_elements));
+		PushRow(nullptr, std::move(non_parented_cell_elements), table_wrapper);
 		non_parented_cell_elements.clear();
 	}
 
@@ -212,7 +214,7 @@ void TableGrid::PushOrMergeColumnsFromFirstRow(Element* element_cell, int column
 	}
 }
 
-void TableGrid::PushRow(Element* element_row, ElementList cell_elements)
+void TableGrid::PushRow(Element* element_row, ElementList cell_elements, TableWrapper& table_wrapper)
 {
 	const int row_index = (int)rows.size();
 
@@ -239,7 +241,7 @@ void TableGrid::PushRow(Element* element_row, ElementList cell_elements)
 		}
 
 		if (element_row->GetPosition() == Style::Position::Relative)
-			relatively_positioned_elements.push_back(element_row);
+			table_wrapper.AddRelativeElement(element_row);
 	}
 
 	rows.push_back(Row{element_row, nullptr, 0});
@@ -297,7 +299,7 @@ void TableGrid::PushRow(Element* element_row, ElementList cell_elements)
 		cell.column_last = column_last;
 
 		if (element_cell->GetPosition() == Style::Position::Relative)
-			relatively_positioned_elements.push_back(element_cell);
+			table_wrapper.AddRelativeElement(element_cell);
 
 		column += col_span;
 	}

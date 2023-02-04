@@ -42,7 +42,7 @@ struct FormatSettings {
 };
 
 struct ContainingBlock {
-	BlockContainer* block; // TODO: For static boxes, this could also be flex and table container boxes. In principle also inline boxes.
+	ContainerBox* container;
 	Vector2f size;
 };
 
@@ -68,7 +68,7 @@ protected:
 		type(type), parent_context(parent_context), parent_box(parent_box), root_element(root_element)
 	{}
 
-	Element* GetRootElement() { return root_element; }
+	Element* GetRootElement() const { return root_element; }
 
 	ContainingBlock GetContainingBlockForAbsolute() const
 	{
@@ -109,32 +109,6 @@ private:
 
 	UniquePtr<BlockContainer> containing_block_box; // TODO? Replace with root block container?
 	BlockContainer* root_block_container = nullptr;
-};
-
-class FlexFormattingContext final : public FormattingContext {
-public:
-	FlexFormattingContext(FormattingContext* parent_context, LayoutBox* parent_box, Element* element) :
-		FormattingContext(Type::Flex, parent_context, parent_box, element)
-	{}
-
-	void Format(Vector2f containing_block, FormatSettings format_settings) override;
-
-	FlexContainer* GetContainer() { return flex_container_box.get(); }
-	UniquePtr<FlexContainer> ExtractContainer() { return std::move(flex_container_box); }
-
-private:
-	UniquePtr<FlexContainer> flex_container_box;
-};
-
-class TableFormattingContext final : public FormattingContext {
-public:
-	TableFormattingContext(FormattingContext* parent_context, LayoutBox* parent_box, Element* element) :
-		FormattingContext(Type::Table, parent_context, parent_box, element)
-	{}
-
-	void Format(Vector2f containing_block, FormatSettings format_settings) override;
-
-private:
 };
 
 // Formats the contents for a root-level element (usually a document or floating element).

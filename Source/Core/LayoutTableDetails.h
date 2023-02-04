@@ -35,18 +35,17 @@
 
 namespace Rml {
 
+class TableWrapper;
 struct ComputedAxisSize;
 
 /*
-    TableGrid builds the structure of the table, that is a list of rows, columns, and cells, taking
-    spanning attributes into account to position cells.
+TableGrid builds the structure of the table, that is a list of rows, columns, and cells, taking
+spanning attributes into account to position cells.
 */
 class TableGrid {
 public:
-	TableGrid(ElementList& relatively_positioned_elements) : relatively_positioned_elements(relatively_positioned_elements) {}
-
 	// Build a list of columns, rows, and cells in this table.
-	bool Build(Element* element_table);
+	bool Build(Element* element_table, TableWrapper& table_wrapper);
 
 	struct Column {
 		Element* element_column = nullptr; // The '<col>' element which begins at this column, or nullptr if there is no such element or if the column
@@ -84,11 +83,9 @@ private:
 
 	void PushOrMergeColumnsFromFirstRow(Element* element_cell, int column_begin, int span);
 
-	void PushRow(Element* element_row, ElementList cell_elements);
+	void PushRow(Element* element_row, ElementList cell_elements, TableWrapper& table_wrapper);
 
 	CellList open_cells;
-
-	ElementList& relatively_positioned_elements;
 };
 
 enum class TrackSizingMode { Auto, Fixed, Flexible };

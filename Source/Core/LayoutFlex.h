@@ -30,49 +30,34 @@
 #define RMLUI_CORE_LAYOUTFLEX_H
 
 #include "../../Include/RmlUi/Core/Types.h"
+#include "LayoutFormattingContext.h"
 
 namespace Rml {
 
-class Box;
-
-class LayoutFlex {
+class FlexFormattingContext final : public FormattingContext {
 public:
-	/// Formats a flexible box, including all elements contained within.
-	/// @param[in] box The box used for dimensioning the flex container.
-	/// @param[in] min_size Minimum width and height of the flexbox.
-	/// @param[in] max_size Maximum width and height of the flexbox.
-	/// @param[in] containing_block Flexbox's containing block size.
-	/// @param[in] element_flex The flex container element.
-	/// @param[out] out_formatted_content_size The flex container element's used size.
-	/// @param[out] out_content_overflow_size  The content size of the flexbox's overflowing content.
-	/// @param[out] out_absolutely_positioned_elements List of absolutely positioned elements within the flexbox.
-	/// @param[out] out_relatively_positioned_elements List of relatively positioned elements within the flexbox.
-	static void Format(const Box& box, Vector2f min_size, Vector2f max_size, Vector2f containing_block, Element* element_flex,
-		Vector2f& out_formatted_content_size, Vector2f& out_content_overflow_size, ElementList& out_absolutely_positioned_elements,
-		ElementList& out_relatively_positioned_elements);
+	FlexFormattingContext(FormattingContext* parent_context, LayoutBox* parent_box, Element* element) :
+		FormattingContext(Type::Flex, parent_context, parent_box, element)
+	{}
+
+	FlexContainer* GetContainer() { return flex_container_box.get(); }
+	UniquePtr<FlexContainer> ExtractContainer() { return std::move(flex_container_box); }
+
+	void Format(Vector2f containing_block, FormatSettings format_settings) override;
 
 private:
-	LayoutFlex(Element* element_flex, Vector2f flex_available_content_size, Vector2f flex_content_containing_block, Vector2f flex_content_offset,
-		Vector2f flex_min_size, Vector2f flex_max_size, ElementList& absolutely_positioned_elements, ElementList& relatively_positioned_elements);
+	/// Format the flexbox and its children.
+	/// @param[out] flex_resulting_content_size The final content size of the flex container.
+	/// @param[out] flex_content_overflow_size Overflow size in case flex items or their contents overflow the container.
+	void Format(Vector2f& flex_resulting_content_size, Vector2f& flex_content_overflow_size) const;
 
-	// Format the flexbox.
-	void Format();
+	Vector2f flex_available_content_size;
+	Vector2f flex_content_containing_block;
+	Vector2f flex_content_offset;
+	Vector2f flex_min_size;
+	Vector2f flex_max_size;
 
-	Element* const element_flex;
-
-	const Vector2f flex_available_content_size;
-	const Vector2f flex_content_containing_block;
-	const Vector2f flex_content_offset;
-	const Vector2f flex_min_size;
-	const Vector2f flex_max_size;
-
-	// The final size of the table which will be determined by the size of its columns, rows, and spacing.
-	Vector2f flex_resulting_content_size;
-	// Overflow size in case flex items overflow the container or contents of any flex items overflow their box (without being caught by the item).
-	Vector2f flex_content_overflow_size;
-
-	ElementList& absolutely_positioned_elements;
-	ElementList& relatively_positioned_elements;
+	UniquePtr<FlexContainer> flex_container_box;
 };
 
 } // namespace Rml

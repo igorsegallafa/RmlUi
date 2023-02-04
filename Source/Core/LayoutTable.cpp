@@ -38,76 +38,89 @@
 
 namespace Rml {
 
-Vector2f LayoutTable::FormatTable(Box& box, Vector2f min_size, Vector2f max_size, Element* element_table, ElementList& relatively_positioned_elements)
+void TableFormattingContext::Format(Vector2f containing_block, FormatSettings format_settings)
 {
-	const ComputedValues& computed_table = element_table->GetComputedValues();
-
-	// Scrollbars are illegal in the table element.
-	if (!(computed_table.overflow_x() == Style::Overflow::Visible || computed_table.overflow_x() == Style::Overflow::Hidden) ||
-		!(computed_table.overflow_y() == Style::Overflow::Visible || computed_table.overflow_y() == Style::Overflow::Hidden))
+	table_wrapper_box = MakeUnique<TableWrapper>(LayoutBox::OuterType::BlockLevel, element_table);
+	if (table_wrapper_box->IsScrollContainer())
 	{
-		Log::Message(Log::LT_WARNING,
-			"Table elements can only have 'overflow' property values of 'visible' or 'hidden'. Table will not be formatted: %s.",
+		Log::Message(Log::LT_WARNING, "Table elements can only have 'overflow' property values of 'visible'. Table will not be formatted: %s.",
 			element_table->GetAddress().c_str());
-		return Vector2f(0);
+		return;
 	}
 
-	const Vector2f box_content_size = box.GetSize();
-	const bool table_auto_height = (box_content_size.y < 0.0f);
+	const ComputedValues& computed_table = element_table->GetComputedValues();
 
-	Vector2f table_content_offset = box.GetPosition();
-	Vector2f table_initial_content_size = Vector2f(box_content_size.x, Math::Max(0.0f, box_content_size.y));
+	// Build the initial box as specified by the table's style, as if it was a normal block element.
+	Box box;
+	LayoutDetails::BuildBox(box, containing_block, element_table, BoxContext::Block);
 
+	LayoutDetails::GetMinMaxWidth(table_min_size.x, table_max_size.x, computed_table, box, containing_block.x);
+	LayoutDetails::GetMinMaxHeight(table_min_size.y, table_max_size.y, computed_table, box, containing_block.y);
+
+	// Format the table, this may adjust the box content size.
+	const Vector2f initial_content_size = box.GetSize();
+	table_auto_height = (initial_content_size.y < 0.0f);
+
+	table_content_offset = box.GetPosition();
+	table_initial_content_size = Vector2f(initial_content_size.x, Math::Max(0.0f, initial_content_size.y));
 	Math::SnapToPixelGrid(table_content_offset, table_initial_content_size);
 
 	// When width or height is set, they act as minimum width or height, just as in CSS.
 	if (computed_table.width().type != Style::Width::Auto)
-		min_size.x = Math::Max(min_size.x, table_initial_content_size.x);
+		table_min_size.x = Math::Max(table_min_size.x, table_initial_content_size.x);
 	if (computed_table.height().type != Style::Height::Auto)
-		min_size.y = Math::Max(min_size.y, table_initial_content_size.y);
+		table_min_size.y = Math::Max(table_min_size.y, table_initial_content_size.y);
 
-	const Vector2f table_gap = Vector2f(ResolveValue(computed_table.column_gap(), table_initial_content_size.x),
+	table_gap = Vector2f(ResolveValue(computed_table.column_gap(), table_initial_content_size.x),
 		ResolveValue(computed_table.row_gap(), table_initial_content_size.y));
 
-	TableGrid grid(relatively_positioned_elements);
-	grid.Build(element_table);
+	grid.Build(element_table, *table_wrapper_box);
 
-	// Construct the layout object and format the table.
-	LayoutTable layout_table(element_table, grid, table_gap, table_content_offset, table_initial_content_size, table_auto_height, min_size, max_size);
+	Vector2f table_content_size, table_overflow_size;
 
-	layout_table.FormatTable();
+	// Format the table and its children.
+	FormatTable(table_content_size, table_overflow_size);
+
+	RMLUI_ASSERT(table_content_size.y >= 0);
 
 	// Update the box size based on the new table size.
-	box.SetContent(layout_table.table_resulting_content_size);
+	box.SetContent(table_content_size);
 
-	return layout_table.table_content_overflow_size;
+	if (table_content_size != initial_content_size)
+	{
+		// Perform this step to re-evaluate any auto margins.
+		LayoutDetails::BuildBoxSizeAndMargins(box, table_min_size, table_max_size, containing_block, element_table, BoxContext::Block, true);
+	}
+
+	table_wrapper_box->Close(table_overflow_size, box);
+
+	if (format_settings.out_visible_overflow_size)
+		*format_settings.out_visible_overflow_size = table_overflow_size;
 }
 
-LayoutTable::LayoutTable(Element* element_table, const TableGrid& grid, Vector2f table_gap, Vector2f table_content_offset,
-	Vector2f table_initial_content_size, bool table_auto_height, Vector2f table_min_size, Vector2f table_max_size) :
-	element_table(element_table),
-	grid(grid), table_auto_height(table_auto_height), table_min_size(table_min_size), table_max_size(table_max_size), table_gap(table_gap),
-	table_content_offset(table_content_offset), table_initial_content_size(table_initial_content_size)
+void TableFormattingContext::FormatTable(Vector2f& table_content_size, Vector2f& table_overflow_size) const
 {
-	table_resulting_content_size = table_initial_content_size;
+	// Defines the boxes for all columns in this table, one entry per table column (spanning columns will add multiple entries).
+	TrackBoxList columns;
+	// Defines the boxes for all rows in this table, one entry per table row.
+	TrackBoxList rows;
+	// Defines the boxes for all cells in this table.
+	BoxList cells;
+
+	DetermineColumnWidths(columns, table_content_size.x);
+
+	InitializeCellBoxes(cells, columns);
+
+	DetermineRowHeights(rows, cells, table_content_size.y);
+
+	FormatRows(rows, table_content_size.x);
+
+	FormatColumns(columns, table_content_size.y);
+
+	FormatCells(cells, table_overflow_size, rows, columns);
 }
 
-void LayoutTable::FormatTable()
-{
-	DetermineColumnWidths();
-
-	InitializeCellBoxes();
-
-	DetermineRowHeights();
-
-	FormatRows();
-
-	FormatColumns();
-
-	FormatCells();
-}
-
-void LayoutTable::DetermineColumnWidths()
+void TableFormattingContext::DetermineColumnWidths(TrackBoxList& columns, float& table_content_width) const
 {
 	// The column widths are determined entirely by any <col> elements preceding the first row, and <td> elements in the first row.
 	// If <col> has a fixed width, that is used. Otherwise, if <td> has a fixed width, that is used. Otherwise the column is 'flexible' width.
@@ -169,10 +182,10 @@ void LayoutTable::DetermineColumnWidths()
 	const float columns_full_width = BuildColumnBoxes(columns, column_metrics, grid.columns, table_gap.x);
 
 	// Adjust the table content width based on the accumulated column widths and spacing.
-	table_resulting_content_size.x = Math::Clamp(columns_full_width, table_min_size.x, table_max_size.x);
+	table_content_width = Math::Clamp(columns_full_width, table_min_size.x, table_max_size.x);
 }
 
-void LayoutTable::InitializeCellBoxes()
+void TableFormattingContext::InitializeCellBoxes(BoxList& cells, const TrackBoxList& columns) const
 {
 	// Requires that column boxes are already generated.
 	RMLUI_ASSERT(columns.size() == grid.columns.size());
@@ -193,7 +206,7 @@ void LayoutTable::InitializeCellBoxes()
 	}
 }
 
-void LayoutTable::DetermineRowHeights()
+void TableFormattingContext::DetermineRowHeights(TrackBoxList& rows, BoxList& cells, float& table_content_height) const
 {
 	/*
 	    The table height algorithm works similar to the table width algorithm. The major difference is that 'auto' row height
@@ -307,23 +320,23 @@ void LayoutTable::DetermineRowHeights()
 	// Now all heights should be either fixed or flexible, resolve all flexible heights to fixed.
 	sizing.ResolveFlexibleSize();
 
-	// Generate the column results based on the metrics.
+	// Generate the row boxes based on the metrics.
 	const float rows_full_height = BuildRowBoxes(rows, row_metrics, grid.rows, table_gap.y);
 
-	// Adjust the table content width based on the accumulated column widths and spacing.
-	table_resulting_content_size.y = Math::Clamp(Math::Max(rows_full_height, table_initial_content_size.y), table_min_size.y, table_max_size.y);
+	// Adjust the table content height based on the accumulated row heights and spacing.
+	table_content_height = Math::Clamp(Math::Max(rows_full_height, table_initial_content_size.y), table_min_size.y, table_max_size.y);
 }
 
-void LayoutTable::FormatRows()
+void TableFormattingContext::FormatRows(const TrackBoxList& rows, float table_content_width) const
 {
 	RMLUI_ASSERT(rows.size() == grid.rows.size());
 
 	// Size and position the row and row group elements.
-	auto FormatRow = [this](Element* element, float content_height, float offset_y) {
+	auto FormatRow = [this, table_content_width](Element* element, float content_height, float offset_y) {
 		Box box;
 		// We use inline context here because we only care about padding, border, and (non-auto) margin.
 		LayoutDetails::BuildBox(box, table_initial_content_size, element, BoxContext::Inline, 0.0f);
-		const Vector2f content_size(table_resulting_content_size.x - box.GetSizeAcross(Box::HORIZONTAL, Box::MARGIN, Box::PADDING), content_height);
+		const Vector2f content_size(table_content_width - box.GetSizeAcross(Box::HORIZONTAL, Box::MARGIN, Box::PADDING), content_height);
 		box.SetContent(content_size);
 		element->SetBox(box);
 
@@ -343,16 +356,16 @@ void LayoutTable::FormatRows()
 	}
 }
 
-void LayoutTable::FormatColumns()
+void TableFormattingContext::FormatColumns(const TrackBoxList& columns, float table_content_height) const
 {
 	RMLUI_ASSERT(columns.size() == grid.columns.size());
 
 	// Size and position the column and column group elements.
-	auto FormatColumn = [this](Element* element, float content_width, float offset_x) {
+	auto FormatColumn = [this, table_content_height](Element* element, float content_width, float offset_x) {
 		Box box;
 		// We use inline context here because we only care about padding, border, and (non-auto) margin.
 		LayoutDetails::BuildBox(box, table_initial_content_size, element, BoxContext::Inline, 0.0f);
-		const Vector2f content_size(content_width, table_resulting_content_size.y - box.GetSizeAcross(Box::VERTICAL, Box::MARGIN, Box::PADDING));
+		const Vector2f content_size(content_width, table_content_height - box.GetSizeAcross(Box::VERTICAL, Box::MARGIN, Box::PADDING));
 		box.SetContent(content_size);
 		element->SetBox(box);
 
@@ -372,7 +385,7 @@ void LayoutTable::FormatColumns()
 	}
 }
 
-void LayoutTable::FormatCells()
+void TableFormattingContext::FormatCells(BoxList& cells, Vector2f& table_overflow_size, const TrackBoxList& rows, const TrackBoxList& columns) const
 {
 	RMLUI_ASSERT(cells.size() == grid.cells.size());
 
@@ -446,10 +459,8 @@ void LayoutTable::FormatCells()
 		element_cell->SetOffset(cell_offset, element_table);
 
 		// The cell contents may overflow, propagate this to the table.
-		table_content_overflow_size.x =
-			Math::Max(table_content_overflow_size.x, cell_offset.x - table_content_offset.x + cell_visible_overflow_size.x);
-		table_content_overflow_size.y =
-			Math::Max(table_content_overflow_size.y, cell_offset.y - table_content_offset.y + cell_visible_overflow_size.y);
+		table_overflow_size.x = Math::Max(table_overflow_size.x, cell_offset.x - table_content_offset.x + cell_visible_overflow_size.x);
+		table_overflow_size.y = Math::Max(table_overflow_size.y, cell_offset.y - table_content_offset.y + cell_visible_overflow_size.y);
 	}
 }
 
