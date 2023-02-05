@@ -300,30 +300,25 @@ BlockContainer::CloseResult BlockContainer::Close()
 
 	if (element)
 	{
-		// Set the baseline for inline-block elements to the baseline of the last line of the element.
-		// This is a special rule for inline-blocks (see CSS 2.1 Sec. 10.8.1).
-		if (element->GetDisplay() == Style::Display::InlineBlock)
+		// Find the element baseline which is the distance from the margin bottom of the element to its baseline.
+		float element_baseline = 0;
+
+		// For inline-blocks with visible overflow, this is the baseline of the last line of the element (see CSS2 10.8.1).
+		if (element->GetDisplay() == Style::Display::InlineBlock && !IsScrollContainer())
 		{
-			// Baseline relative to the border box of our children's offset parent.
 			float baseline = 0;
 			bool found_baseline = GetBaselineOfLastLine(baseline);
 
+			// The retrieved baseline is the vertical distance from the top of our root space (the coordinate system of
+			// our local block formatting context), convert it to the element's local coordinates.
 			if (found_baseline)
 			{
-				// It is assumed here that we are the offset parent of our children. If this is not the case, we might need
-				// to take into account the offset between this box's position and our children's offset parent.
-				RMLUI_ASSERT(this == offset_parent);
-
-				// Set the element baseline which is the distance from the margin bottom of the element to its baseline.
-				float element_baseline = 0;
-				if (!IsScrollContainer())
-					element_baseline = box.GetSizeAcross(Box::VERTICAL, Box::BORDER) + box.GetEdge(Box::MARGIN, Box::BOTTOM) - baseline;
-
-				element->SetBaseline(element_baseline);
+				const float bottom_position = position.y + box.GetSizeAcross(Box::VERTICAL, Box::BORDER) + box.GetEdge(Box::MARGIN, Box::BOTTOM);
+				element_baseline = bottom_position - baseline;
 			}
 		}
-		else
-			element->SetBaseline(0);
+
+		element->SetBaseline(element_baseline);
 	}
 
 	ResetInterruptedLineBox();
