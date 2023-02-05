@@ -307,7 +307,7 @@ UniquePtr<LayoutLineBox> LayoutLineBox::DetermineVerticalPositioning(const Inlin
 	return new_line_box;
 }
 
-void LayoutLineBox::Close(Element* offset_parent, Vector2f offset_root_position, Style::TextAlign text_align)
+void LayoutLineBox::Close(Element* offset_parent, Vector2f offset_parent_position, Style::TextAlign text_align)
 {
 	RMLUI_ASSERT(is_vertically_positioned && !is_closed);
 
@@ -336,7 +336,7 @@ void LayoutLineBox::Close(Element* offset_parent, Vector2f offset_root_position,
 		const PlacedFragment placed_fragment = {
 			offset_parent,
 			fragment.fragment_handle,
-			line_position + offset_root_position + fragment.position + Vector2f(offset_horizontal_alignment, 0.f),
+			line_position - offset_parent_position + fragment.position + Vector2f(offset_horizontal_alignment, 0.f),
 			fragment.layout_width,
 			fragment.split_left,
 			fragment.split_right,

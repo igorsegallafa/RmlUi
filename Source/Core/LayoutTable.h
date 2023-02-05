@@ -49,6 +49,7 @@ public:
 
 	void Format(Vector2f containing_block, FormatSettings format_settings) override;
 
+	UniquePtr<LayoutBox> ExtractRootBox() override { return std::move(table_wrapper_box); }
 	UniquePtr<TableWrapper> ExtractTableWrapper() { return std::move(table_wrapper_box); }
 
 private:

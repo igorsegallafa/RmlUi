@@ -48,7 +48,7 @@ void FlexFormattingContext::Format(Vector2f containing_block, FormatSettings for
 	ElementScroll* element_scroll = element->GetElementScroll();
 	const ComputedValues& computed = element->GetComputedValues();
 
-	flex_container_box = MakeUnique<FlexContainer>(LayoutBox::OuterType::BlockLevel, element);
+	flex_container_box = MakeUnique<FlexContainer>(element);
 
 	// Build the initial box as specified by the flex's style, as if it was a normal block element.
 	Box box;

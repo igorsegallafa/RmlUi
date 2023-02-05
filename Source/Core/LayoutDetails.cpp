@@ -179,6 +179,13 @@ Vector2f LayoutDetails::GetContainingBlock(const BlockContainer* containing_box)
 
 	while ((containing_block.y = containing_box->GetBox().GetSize(Box::CONTENT).y) < 0)
 	{
+		auto parent = containing_box->GetParent();
+		if (!parent && containing_box->root_containing_block.y >= 0.f)
+		{
+			containing_block.y = containing_box->root_containing_block.y;
+			break;
+		}
+
 		containing_box = containing_box->GetParent();
 		if (!containing_box)
 		{

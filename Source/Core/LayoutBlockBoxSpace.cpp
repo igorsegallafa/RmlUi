@@ -151,10 +151,8 @@ Vector2f LayoutBlockBoxSpace::NextBoxPosition(float& maximum_box_width, const fl
 	// First up; we iterate through all boxes that share our edge, pushing ourself to the side of them if we intersect
 	// them. We record the height of the lowest box that gets in our way; in the event we can't be positioned at this
 	// height, we'll reposition ourselves at that height for the next iteration.
-	for (size_t i = 0; i < boxes[box_edge].size(); ++i)
+	for (const SpaceBox& fixed_box : boxes[box_edge])
 	{
-		const SpaceBox& fixed_box = boxes[box_edge][i];
-
 		// If the fixed box's bottom edge is above our top edge, then we can safely skip it.
 		if (fixed_box.offset.y + fixed_box.dimensions.y <= box_position.y)
 			continue;
@@ -196,10 +194,8 @@ Vector2f LayoutBlockBoxSpace::NextBoxPosition(float& maximum_box_width, const fl
 	// maximum width the box can stretch to, if it is placed at this location.
 	maximum_box_width = (box_edge == LEFT ? parent_edge - box_position.x : box_position.x + dimensions.x);
 
-	for (size_t i = 0; i < boxes[1 - box_edge].size(); ++i)
+	for (const SpaceBox& fixed_box : boxes[1 - box_edge])
 	{
-		const SpaceBox& fixed_box = boxes[1 - box_edge][i];
-
 		// If the fixed box's bottom edge is above our top edge, then we can safely skip it.
 		if (fixed_box.offset.y + fixed_box.dimensions.y <= box_position.y)
 			continue;
@@ -237,10 +233,8 @@ Vector2f LayoutBlockBoxSpace::NextBoxPosition(float& maximum_box_width, const fl
 	// Third; we go through all of the boxes (on both sides), checking for vertical collisions.
 	for (int i = 0; i < 2; ++i)
 	{
-		for (size_t j = 0; j < boxes[i].size(); ++j)
+		for (const SpaceBox& fixed_box : boxes[i])
 		{
-			const SpaceBox& fixed_box = boxes[i][j];
-
 			// If the fixed box's bottom edge is above our top edge, then we can safely skip it.
 			if (fixed_box.offset.y + fixed_box.dimensions.y <= box_position.y)
 				continue;

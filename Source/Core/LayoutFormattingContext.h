@@ -60,8 +60,13 @@ public:
 		MaxContent,
 	};
 
+	// TODO: Consider working directly with the final types instead of using a virtual destructor.
+	virtual ~FormattingContext() = default;
+
 	// TODO: Instead of (output) format settings, use function calls (virtual if necessary) as needed.
 	virtual void Format(Vector2f containing_block, FormatSettings format_settings) = 0;
+
+	virtual UniquePtr<LayoutBox> ExtractRootBox() { return nullptr; }
 
 protected:
 	FormattingContext(Type type, FormattingContext* parent_context, LayoutBox* parent_box, Element* root_element) :
@@ -98,17 +103,15 @@ public:
 
 	float GetShrinkToFitWidth() const;
 
+	UniquePtr<LayoutBox> ExtractRootBox() override { return std::move(root_block_container); }
+
 private:
-	bool FormatBlockBox(BlockContainer* block_container, Element* element, FormatSettings format_settings = {});
+	bool FormatBlockBox(BlockContainer* parent_container, Element* element, FormatSettings format_settings = {}, Vector2f root_containing_block = {});
 
-	bool FormatBlockContainerChild(BlockContainer* block_container, Element* element);
-	bool FormatInline(BlockContainer* block_context_box, Element* element);
-	bool FormatInlineBlock(BlockContainer* block_context_box, Element* element);
-	bool FormatFlex(BlockContainer* block_context_box, Element* element);
-	bool FormatTable(BlockContainer* block_context_box, Element* element_table);
+	bool FormatBlockContainerChild(BlockContainer* parent_container, Element* element);
+	bool FormatInlineBox(BlockContainer* parent_container, Element* element);
 
-	UniquePtr<BlockContainer> containing_block_box; // TODO? Replace with root block container?
-	BlockContainer* root_block_container = nullptr;
+	UniquePtr<BlockContainer> root_block_container;
 };
 
 // Formats the contents for a root-level element (usually a document or floating element).

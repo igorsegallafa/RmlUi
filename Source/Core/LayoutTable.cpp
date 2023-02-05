@@ -40,7 +40,7 @@ namespace Rml {
 
 void TableFormattingContext::Format(Vector2f containing_block, FormatSettings format_settings)
 {
-	table_wrapper_box = MakeUnique<TableWrapper>(LayoutBox::OuterType::BlockLevel, element_table);
+	table_wrapper_box = MakeUnique<TableWrapper>(element_table);
 	if (table_wrapper_box->IsScrollContainer())
 	{
 		Log::Message(Log::LT_WARNING, "Table elements can only have 'overflow' property values of 'visible'. Table will not be formatted: %s.",

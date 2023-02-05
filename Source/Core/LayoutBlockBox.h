@@ -43,7 +43,6 @@ class InlineContainer;
 class LayoutBox {
 public:
 	enum class Type { BlockContainer, InlineContainer, FlexContainer, TableWrapper, Replaced };
-	enum class OuterType { BlockLevel, InlineLevel };
 	enum class CloseResult { OK, LayoutSelf, LayoutParent };
 
 	Type GetType() const { return type; }
@@ -62,13 +61,12 @@ public:
 	void operator delete(void* chunk, size_t size);
 
 protected:
-	LayoutBox(OuterType outer_type, Type type) : outer_type(outer_type), type(type) {}
+	LayoutBox(Type type) : type(type) {}
 
 	// Debug dump layout tree.
 	virtual String DebugDumpTree(int depth) const = 0;
 
 private:
-	OuterType outer_type;
 	Type type;
 };
 
@@ -99,7 +97,7 @@ public:
 	void ClearPositionedElements();
 
 protected:
-	ContainerBox(OuterType outer_type, Type type, Element* element) : LayoutBox(outer_type, type), element(element)
+	ContainerBox(Type type, Element* element) : LayoutBox(type), element(element)
 	{
 		if (element)
 		{
@@ -140,7 +138,7 @@ private:
 
 class FlexContainer final : public ContainerBox {
 public:
-	FlexContainer(OuterType outer_type, Element* element) : ContainerBox(outer_type, Type::FlexContainer, element) { RMLUI_ASSERT(element); }
+	FlexContainer(Element* element) : ContainerBox(Type::FlexContainer, element) { RMLUI_ASSERT(element); }
 
 	String DebugDumpTree(int depth) const override { return String(depth * 2, ' ') + "FlexContainer"; /* TODO */ }
 
@@ -159,7 +157,7 @@ public:
 
 class TableWrapper final : public ContainerBox {
 public:
-	TableWrapper(OuterType outer_type, Element* element) : ContainerBox(outer_type, Type::TableWrapper, element) { RMLUI_ASSERT(element); }
+	TableWrapper(Element* element) : ContainerBox(Type::TableWrapper, element) { RMLUI_ASSERT(element); }
 
 	String DebugDumpTree(int depth) const override { return String(depth * 2, ' ') + "TableWrapper"; /* TODO */ }
 
@@ -188,9 +186,12 @@ public:
 	/// @param box[in] The box used for this block box.
 	/// @param min_height[in] The minimum height of the content box.
 	/// @param max_height[in] The maximum height of the content box.
-	BlockContainer(OuterType outer_type, BlockContainer* parent, Element* element, const Box& box, float min_height, float max_height);
+	BlockContainer(BlockContainer* parent, Element* element, const Box& box, float min_height, float max_height);
 	/// Releases the block box.
 	~BlockContainer();
+
+	// TODO
+	Vector2f root_containing_block = Vector2f(-1.f);
 
 	/// Closes the box. This will determine the element's height (if it was unspecified).
 	/// @return The result of the close; this may request a reformat of this element or our parent.
@@ -277,14 +278,11 @@ public:
 
 	/// Returns the block box against which all positions of boxes in the hierarchy are set relative to.
 	const BlockContainer* GetOffsetParent() const;
-	/// Returns the block box against which all positions of boxes in the hierarchy are calculated relative to.
-	// The element we'll be computing our offset relative to during layout.
-	const BlockContainer* GetOffsetRoot() const;
 
 	Box& GetBox();
 	const Box& GetBox() const;
 
-	const Box* GetBoxPtr() const override { return &GetBox(); }
+	const Box* GetBoxPtr() const override { return &box; }
 
 private:
 	void ResetContents();
@@ -314,8 +312,6 @@ private:
 
 	using BlockBoxList = Vector<UniquePtr<LayoutBox>>;
 
-	// The element we'll be computing our offset relative to during layout.
-	const BlockContainer* offset_root = nullptr;
 	// The element this block box's children are to be offset from.
 	BlockContainer* offset_parent = nullptr;
 

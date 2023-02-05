@@ -140,6 +140,8 @@ bool ContainerBox::CatchOverflow(const Vector2f content_size, const Box& box, co
 	ElementScroll* element_scroll = element->GetElementScroll();
 	bool scrollbar_size_changed = false;
 
+	// @performance If we have auto-height sizing and the horizontal scrollbar is enabled, then we can in principle
+	// simply add the scrollbar size to the height instead of formatting the element all over again.
 	if (overflow_x == Style::Overflow::Auto && content_size.x > available_space.x + 0.5f)
 	{
 		if (element_scroll->GetScrollbarSize(ElementScroll::HORIZONTAL) == 0.f)
@@ -232,23 +234,16 @@ bool ContainerBox::SubmitBox(const Vector2f content_box, const Box& box, const f
 	return true;
 }
 
-BlockContainer::BlockContainer(OuterType outer_type, BlockContainer* _parent, Element* _element, const Box& _box, float _min_height,
-	float _max_height) :
-	ContainerBox(outer_type, Type::BlockContainer, _element),
-	parent(_parent), box(_box), min_height(_min_height), max_height(_max_height)
+BlockContainer::BlockContainer(BlockContainer* _parent, Element* _element, const Box& _box, float _min_height, float _max_height) :
+	ContainerBox(Type::BlockContainer, _element), parent(_parent), box(_box), min_height(_min_height), max_height(_max_height)
 {
 	space = MakeUnique<LayoutBlockBoxSpace>(this);
-
-	// Get our offset root from our parent, if it has one; otherwise, our element is the offset parent.
-	if (parent && parent->offset_root->GetElement())
-		offset_root = parent->offset_root;
-	else
-		offset_root = this;
 
 	// Determine the offset parent for our children.
 	if (parent && parent->offset_parent->GetElement() && (!element || element->GetPosition() == Style::Position::Static))
 		offset_parent = parent->offset_parent;
 	else
+		// We are a positioned element (thereby acting as 
 		offset_parent = this;
 
 	if (element)
@@ -299,9 +294,9 @@ BlockContainer::CloseResult BlockContainer::Close()
 			return CloseResult::LayoutParent;
 	}
 
-	// If we represent a positioned element, then we can now (as we've been sized) act as the containing block for all
-	// the absolutely-positioned elements of our descendants.
-	ClosePositionedElements(box, position - offset_root->GetPosition());
+	// If we represent a positioned element, then we can now (as we've been sized) format the absolutely positioned
+	// elements that this container acts as a containing block for.
+	ClosePositionedElements(box, position);
 
 	if (element)
 	{
@@ -360,7 +355,7 @@ BlockContainer* BlockContainer::AddBlockBox(Element* child_element, const Box& b
 	if (!CloseOpenInlineContainer())
 		return nullptr;
 
-	auto child_container_ptr = MakeUnique<BlockContainer>(OuterType::BlockLevel, this, child_element, box, min_height, max_height);
+	auto child_container_ptr = MakeUnique<BlockContainer>(this, child_element, box, min_height, max_height);
 	BlockContainer* child_container = child_container_ptr.get();
 
 	// Determine the offset parent for the child element.
@@ -375,8 +370,7 @@ BlockContainer* BlockContainer::AddBlockBox(Element* child_element, const Box& b
 		{
 			// Get the next position within our offset parent's containing block.
 			child_container->position = NextBlockBoxPosition(box, child_element->GetComputedValues().clear());
-			child_element->SetOffset(child_container->position - (child_offset_parent->GetPosition() - child_container->offset_root->GetPosition()),
-				child_offset_parent->GetElement());
+			child_element->SetOffset(child_container->position - child_offset_parent->GetPosition(), child_offset_parent->GetElement());
 		}
 		else
 			child_element->SetOffset(child_container->position, nullptr);
@@ -413,8 +407,7 @@ LayoutBox* BlockContainer::AddBlockLevelBox(UniquePtr<LayoutBox> block_level_box
 	if (element)
 	{
 		// Get the next position within our offset parent's containing block.
-		Vector2f root_position = (offset_root->GetElement() ? offset_root->GetPosition() : Vector2f(0));
-		child_element->SetOffset(child_position - (child_offset_parent->GetPosition() - root_position), child_offset_parent->GetElement());
+		child_element->SetOffset(child_position - child_offset_parent->GetPosition(), child_offset_parent->GetElement());
 	}
 
 	// TODO Basically, almost copy/paste from above.
@@ -674,11 +667,6 @@ Vector2f BlockContainer::GetPosition() const
 const BlockContainer* BlockContainer::GetOffsetParent() const
 {
 	return offset_parent;
-}
-
-const BlockContainer* BlockContainer::GetOffsetRoot() const
-{
-	return offset_root;
 }
 
 Box& BlockContainer::GetBox()

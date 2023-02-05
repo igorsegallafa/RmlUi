@@ -35,14 +35,14 @@
 namespace Rml {
 
 // Table elements should be handled within FormatElementTable, log a warning when it seems like we're encountering table parts in the wild.
-static void LogUnexpectedTablePart(Element* element, Style::Display display)
+static void LogUnexpectedFlowElement(Element* element, Style::Display display)
 {
 	RMLUI_ASSERT(element);
 	String value = "*unknown";
 	StyleSheetSpecification::GetPropertySpecification().GetProperty(PropertyId::Display)->GetValue(value, Property(display));
 
-	Log::Message(Log::LT_WARNING, "Element has a display type '%s', but is not located in a table. Element will not be formatted: %s", value.c_str(),
-		element->GetAddress().c_str());
+	Log::Message(Log::LT_WARNING, "Element has a display type '%s' which cannot be located in normal flow layout. Element will not be formatted: %s",
+		value.c_str(), element->GetAddress().c_str());
 }
 
 #ifdef RMLUI_DEBUG
@@ -80,6 +80,68 @@ struct DebugDumpLayoutTree {
 };
 #endif
 
+enum class OuterDisplayType { BlockLevel, InlineLevel, Invalid };
+
+static OuterDisplayType GetOuterDisplayType(Style::Display display)
+{
+	switch (display)
+	{
+	case Style::Display::Flex:
+	case Style::Display::Table:
+	case Style::Display::Block: return OuterDisplayType::BlockLevel;
+
+	case Style::Display::InlineBlock:
+	case Style::Display::Inline: return OuterDisplayType::InlineLevel;
+
+	case Style::Display::TableRow:
+	case Style::Display::TableRowGroup:
+	case Style::Display::TableColumn:
+	case Style::Display::TableColumnGroup:
+	case Style::Display::TableCell:
+	case Style::Display::None: break;
+	}
+
+	return OuterDisplayType::Invalid;
+}
+
+static UniquePtr<FormattingContext> ConditionallyCreateIndependentFormattingContext(FormattingContext* parent_context,
+	BlockContainer* parent_container, Element* element)
+{
+	using namespace Style;
+	auto& computed = element->GetComputedValues();
+
+	const Display display = computed.display();
+
+	if (display == Display::Flex)
+		return MakeUnique<FlexFormattingContext>(parent_context, parent_container, element);
+
+	if (display == Display::Table)
+		return MakeUnique<TableFormattingContext>(parent_context, parent_container, element);
+
+#if 1
+	// TODO: This is the more correct one, but we need to handle containing blocks correctly. We essentially need to
+	// chain the container boxes past formatting contexts - or at least keep track of parent absolute containing block.
+	// However, be careful of using block container's parent for this, since that one will modify the parent when
+	// closed.
+	//   - Can we modify parent from outside block container?
+	//   - It would be nice if the parent was const pointer.
+	//   - Alternativelly, just keep track of parent absolute position containing block, and hand it down.
+	const bool establishes_bfc =
+		(computed.float_() != Float::None || computed.position() == Position::Absolute || computed.position() == Position::Fixed ||
+			computed.display() == Display::InlineBlock || computed.display() == Display::TableCell || computed.overflow_x() != Overflow::Visible ||
+			computed.overflow_y() != Overflow::Visible || !element->GetParentNode() || element->GetParentNode()->GetDisplay() == Display::Flex);
+#else
+	const bool establishes_bfc =
+		(computed.float_() != Float::None || computed.position() == Position::Absolute || computed.position() == Position::Fixed ||
+			computed.display() == Display::InlineBlock || !element->GetParentNode() || element->GetParentNode()->GetDisplay() == Display::Flex);
+#endif
+
+	if (establishes_bfc)
+		return MakeUnique<BlockFormattingContext>(parent_context, parent_container, element);
+
+	return nullptr;
+}
+
 void BlockFormattingContext::Format(Vector2f containing_block, FormatSettings format_settings)
 {
 	Element* element = GetRootElement();
@@ -91,18 +153,11 @@ void BlockFormattingContext::Format(Vector2f containing_block, FormatSettings fo
 	RMLUI_ZoneName(name.c_str(), name.size());
 #endif
 
-	// TODO: Make a lighter data structure for the containing block, or, just a pointer to the given box's containing block box.
-	containing_block_box = MakeUnique<BlockContainer>(LayoutBox::OuterType::BlockLevel, nullptr, nullptr, Box(containing_block), 0.0f, FLT_MAX);
-	DebugDumpLayoutTree debug_dump_tree(element, containing_block_box.get());
+	bool format_result = FormatBlockBox(nullptr, element, format_settings, containing_block);
 
-	for (int layout_iteration = 0; layout_iteration < 2; layout_iteration++)
-	{
-		if (FormatBlockBox(containing_block_box.get(), element, format_settings))
-			break;
-	}
-
-	// Close it so that any absolutely positioned or floated elements are placed.
-	containing_block_box->Close();
+	// Since the root box has no parent, it should not be possible to require another round of formatting.
+	RMLUI_ASSERT(format_result);
+	(void)format_result;
 
 	SubmitElementLayout(element);
 }
@@ -112,9 +167,10 @@ float BlockFormattingContext::GetShrinkToFitWidth() const
 	return root_block_container ? root_block_container->GetShrinkToFitWidth() : 0.f;
 }
 
-bool BlockFormattingContext::FormatBlockBox(BlockContainer* parent_block_container, Element* element, FormatSettings format_settings)
+bool BlockFormattingContext::FormatBlockBox(BlockContainer* parent_container, Element* element, FormatSettings format_settings,
+	Vector2f root_containing_block)
 {
-	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent_block_container);
+	const Vector2f containing_block = parent_container ? LayoutDetails::GetContainingBlock(parent_container) : root_containing_block;
 
 	Box box;
 	if (format_settings.override_initial_box)
@@ -125,25 +181,37 @@ bool BlockFormattingContext::FormatBlockBox(BlockContainer* parent_block_contain
 	float min_height, max_height;
 	LayoutDetails::GetDefiniteMinMaxHeight(min_height, max_height, element->GetComputedValues(), box, containing_block.y);
 
-	BlockContainer* new_block = parent_block_container->AddBlockBox(element, box, min_height, max_height);
-	if (!new_block)
+	BlockContainer* new_container = nullptr;
+	if (parent_container)
+	{
+		new_container = parent_container->AddBlockBox(element, box, min_height, max_height);
+	}
+	else
+	{
+		RMLUI_ASSERT(!root_block_container);
+		root_block_container = MakeUnique<BlockContainer>(nullptr, element, box, min_height, max_height);
+		root_block_container->ResetScrollbars(box);
+		root_block_container->root_containing_block = containing_block;
+		new_container = root_block_container.get();
+	}
+
+	if (!new_container)
 		return false;
 
-	if (!root_block_container)
-		root_block_container = new_block; // TODO hacky
+	DebugDumpLayoutTree debug_dump_tree(element, new_container);
 
-	// In rare cases, it is possible that we need three iterations: Once to enable the horizontal scroll bar, then to
-	// enable the vertical scroll bar, and then finally to format it with both scroll bars enabled.
+	// In rare cases, it is possible that we need three iterations: Once to enable the horizontal scrollbar, then to
+	// enable the vertical scrollbar, and then finally to format it with both scrollbars enabled.
 	for (int layout_iteration = 0; layout_iteration < 3; layout_iteration++)
 	{
 		// Format the element's children.
 		for (int i = 0; i < element->GetNumChildren(); i++)
 		{
-			if (!FormatBlockContainerChild(new_block, element->GetChild(i)))
+			if (!FormatBlockContainerChild(new_container, element->GetChild(i)))
 				i = -1;
 		}
 
-		const auto result = new_block->Close();
+		const auto result = new_container->Close();
 		if (result == BlockContainer::CloseResult::LayoutSelf)
 			// We need to reformat ourself; do a second iteration to format all of our children and close again.
 			continue;
@@ -158,12 +226,12 @@ bool BlockFormattingContext::FormatBlockBox(BlockContainer* parent_block_contain
 	SubmitElementLayout(element);
 
 	if (format_settings.out_visible_overflow_size)
-		*format_settings.out_visible_overflow_size = new_block->GetVisibleOverflowSize();
+		*format_settings.out_visible_overflow_size = new_container->GetVisibleOverflowSize();
 
 	return true;
 }
 
-bool BlockFormattingContext::FormatBlockContainerChild(BlockContainer* parent_block, Element* element)
+bool BlockFormattingContext::FormatBlockContainerChild(BlockContainer* parent_container, Element* element)
 {
 #ifdef RMLUI_ENABLE_PROFILING
 	RMLUI_ZoneScoped;
@@ -174,7 +242,7 @@ bool BlockFormattingContext::FormatBlockContainerChild(BlockContainer* parent_bl
 	// Check for special formatting tags.
 	if (element->GetTagName() == "br")
 	{
-		parent_block->AddBreak();
+		parent_container->AddBreak();
 		SubmitElementLayout(element);
 		return true;
 	}
@@ -191,108 +259,91 @@ bool BlockFormattingContext::FormatBlockContainerChild(BlockContainer* parent_bl
 	if (computed.position() == Style::Position::Absolute || computed.position() == Style::Position::Fixed)
 	{
 		// Display the element as a block element.
-		const Vector2f static_position = parent_block->GetOpenStaticPosition(display);
-		parent_block->GetAbsolutePositioningContainingBlock()->AddAbsoluteElement(element, static_position);
+		const Vector2f static_position = parent_container->GetOpenStaticPosition(display);
+		parent_container->GetAbsolutePositioningContainingBlock()->AddAbsoluteElement(element, static_position);
 		return true;
 	}
 
-	// If the element is floating, we remove it from the flow.
-	if (computed.float_() != Style::Float::None)
+	const OuterDisplayType outer_display = GetOuterDisplayType(display);
+	if (outer_display == OuterDisplayType::Invalid)
 	{
-		FormatRoot(element, LayoutDetails::GetContainingBlock(parent_block));
-		parent_block->AddFloatElement(element);
+		LogUnexpectedFlowElement(element, display);
 		return true;
 	}
 
-	// The element is nothing exceptional, so format it according to its display property.
+	// TODO: Table cells (and possibly others) are invalid in this context, don't allow them here at all. Currently they
+	// create a new formatting context here.
+	if (auto formatting_context = ConditionallyCreateIndependentFormattingContext(this, parent_container, element))
+	{
+		const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent_container);
+
+		formatting_context->Format(containing_block, FormatSettings{});
+
+		UniquePtr<LayoutBox> layout_box = formatting_context->ExtractRootBox();
+
+		// If the element is floating, we remove it from the flow.
+		if (computed.float_() != Style::Float::None)
+		{
+			parent_container->AddFloatElement(element);
+		}
+		// Otherwise, check if we have a sized block-level box.
+		else if (layout_box && outer_display == OuterDisplayType::BlockLevel)
+		{
+			if (!parent_container->AddBlockLevelBox(std::move(layout_box), element, element->GetBox()))
+				return false;
+		}
+		// Nope, then this must be an inline-level box.
+		else
+		{
+			RMLUI_ASSERT(outer_display == OuterDisplayType::InlineLevel);
+			auto inline_box_handle = parent_container->AddInlineElement(element, element->GetBox());
+			parent_container->CloseInlineElement(inline_box_handle);
+		}
+
+		// TODO: Not always positioned yet.
+		SubmitElementLayout(element);
+
+		return true;
+	}
+
+	// The element is an in-flow box participating in this same block formatting context.
 	switch (display)
 	{
-	case Style::Display::Block: return FormatBlockBox(parent_block, element);
-	case Style::Display::Inline: return FormatInline(parent_block, element);
-	case Style::Display::InlineBlock: return FormatInlineBlock(parent_block, element);
-	case Style::Display::Flex: return FormatFlex(parent_block, element);
-	case Style::Display::Table: return FormatTable(parent_block, element);
+	case Style::Display::Block: return FormatBlockBox(parent_container, element);
+	case Style::Display::Inline: return FormatInlineBox(parent_container, element);
 
 	case Style::Display::TableRow:
 	case Style::Display::TableRowGroup:
 	case Style::Display::TableColumn:
 	case Style::Display::TableColumnGroup:
-	case Style::Display::TableCell: LogUnexpectedTablePart(element, display); return true;
+	case Style::Display::TableCell:
+	case Style::Display::InlineBlock:
+	case Style::Display::Flex:
+	case Style::Display::Table:
 	case Style::Display::None: /* handled above */ RMLUI_ERROR; break;
 	}
 
 	return true;
 }
 
-bool BlockFormattingContext::FormatInline(BlockContainer* parent_block, Element* element)
+bool BlockFormattingContext::FormatInlineBox(BlockContainer* parent_container, Element* element)
 {
 	RMLUI_ZoneScopedC(0x3F6F6F);
 
-	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent_block);
+	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent_container);
 
 	Box box;
 	LayoutDetails::BuildBox(box, containing_block, element, BoxContext::Inline);
-	auto inline_box_handle = parent_block->AddInlineElement(element, box);
+	auto inline_box_handle = parent_container->AddInlineElement(element, box);
 
 	// Format the element's children.
 	for (int i = 0; i < element->GetNumChildren(); i++)
 	{
-		if (!FormatBlockContainerChild(parent_block, element->GetChild(i)))
+		if (!FormatBlockContainerChild(parent_container, element->GetChild(i)))
 			return false;
 	}
 
-	parent_block->CloseInlineElement(inline_box_handle);
-
-	return true;
-}
-
-bool BlockFormattingContext::FormatInlineBlock(BlockContainer* parent_block, Element* element)
-{
-	RMLUI_ZoneScopedC(0x1F2F2F);
-
-	// Format the element separately as a block element, then position it inside our own layout as an inline element.
-	Vector2f containing_block_size = LayoutDetails::GetContainingBlock(parent_block);
-
-	auto formatting_contex = MakeUnique<BlockFormattingContext>(this, parent_block, element);
-	formatting_contex->Format(containing_block_size, {});
-
-	auto inline_box_handle = parent_block->AddInlineElement(element, element->GetBox());
-	parent_block->CloseInlineElement(inline_box_handle);
-
-	return true;
-}
-
-bool BlockFormattingContext::FormatFlex(BlockContainer* parent_block, Element* element)
-{
-	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent_block);
-	RMLUI_ASSERT(containing_block.x >= 0.f);
-
-	auto formatting_context = MakeUnique<FlexFormattingContext>(this, parent_block, element);
-	formatting_context->Format(containing_block, FormatSettings{});
-
-	// Add the formatted flex container as a sized block-level element.
-	LayoutBox* flex_container = parent_block->AddBlockLevelBox(formatting_context->ExtractContainer(), element, element->GetBox());
-	if (!flex_container)
-		return false;
-
-	SubmitElementLayout(element);
-
-	return true;
-}
-
-bool BlockFormattingContext::FormatTable(BlockContainer* parent_block, Element* element)
-{
-	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent_block);
-
-	auto formatting_context = MakeUnique<TableFormattingContext>(this, parent_block, element);
-	formatting_context->Format(containing_block, FormatSettings{});
-
-	// Now that the table is formatted and sized, we can add it to our parent as a block-level element.
-	LayoutBox* table_wrapper = parent_block->AddBlockLevelBox(formatting_context->ExtractTableWrapper(), element, element->GetBox());
-	if (!table_wrapper)
-		return false;
-
-	SubmitElementLayout(element);
+	parent_container->CloseInlineElement(inline_box_handle);
 
 	return true;
 }

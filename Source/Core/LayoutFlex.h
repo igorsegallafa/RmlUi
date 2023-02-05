@@ -41,6 +41,8 @@ public:
 	{}
 
 	FlexContainer* GetContainer() { return flex_container_box.get(); }
+
+	UniquePtr<LayoutBox> ExtractRootBox() override { return std::move(flex_container_box); }
 	UniquePtr<FlexContainer> ExtractContainer() { return std::move(flex_container_box); }
 
 	void Format(Vector2f containing_block, FormatSettings format_settings) override;

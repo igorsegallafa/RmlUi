@@ -61,7 +61,7 @@ public:
 
 	// Closes the line and submits all fragments. Thereby positioning, sizing, and placing their corresponding boxes.
 	// @note The line must have been vertically positioned before closing.
-	void Close(Element* offset_parent, Vector2f offset_root_position, Style::TextAlign text_align);
+	void Close(Element* offset_parent, Vector2f offset_parent_position, Style::TextAlign text_align);
 
 	float GetBoxCursor() const { return box_cursor; }
 	Vector2f GetPosition() const { return line_position; }

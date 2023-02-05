@@ -157,8 +157,9 @@ void InlineLevelBox_Atomic::Submit(const PlacedFragment& placed_fragment)
 {
 	const Vector2f margin_position = {placed_fragment.position.x, placed_fragment.position.y - GetHeightAboveBaseline()};
 	const Vector2f margin_edge = {box.GetEdge(Box::MARGIN, Box::LEFT), box.GetEdge(Box::MARGIN, Box::TOP)};
+	const Vector2f border_position = margin_position + margin_edge;
 
-	GetElement()->SetOffset(margin_position + margin_edge, placed_fragment.offset_parent);
+	GetElement()->SetOffset(border_position, placed_fragment.offset_parent);
 	GetElement()->SetBox(box);
 	SubmitElementOnLayout();
 }
