@@ -39,6 +39,7 @@
 			background-color: #fffa;
 			border: 1px black;
 			padding: 10px;
+			position: relative;
 		}
 	</style>
 </head>
