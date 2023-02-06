@@ -37,13 +37,9 @@ namespace Rml {
 class Box;
 
 struct FormatSettings {
+	ContainerBox* parent_container = nullptr; // TODO: A bit hacky to have this here.
 	const Box* override_initial_box = nullptr;
 	Vector2f* out_visible_overflow_size = nullptr;
-};
-
-struct ContainingBlock {
-	ContainerBox* container;
-	Vector2f size;
 };
 
 class FormattingContext {
@@ -69,35 +65,28 @@ public:
 	virtual UniquePtr<LayoutBox> ExtractRootBox() { return nullptr; }
 
 protected:
-	FormattingContext(Type type, FormattingContext* parent_context, LayoutBox* parent_box, Element* root_element) :
+	FormattingContext(Type type, FormattingContext* parent_context, const LayoutBox* parent_box, Element* root_element) :
 		type(type), parent_context(parent_context), parent_box(parent_box), root_element(root_element)
 	{}
 
 	Element* GetRootElement() const { return root_element; }
-
-	ContainingBlock GetContainingBlockForAbsolute() const
-	{
-		// TODO
-	}
-	ContainingBlock GetContainingBlockForStatic() const
-	{
-		// TODO
-	}
 
 	static void SubmitElementLayout(Element* element) { element->OnLayout(); }
 
 private:
 	Type type;
 	FormattingContext* parent_context;
-	LayoutBox* parent_box;
+	const LayoutBox* parent_box;
 	Element* root_element;
 };
 
 class BlockFormattingContext final : public FormattingContext {
 public:
-	BlockFormattingContext(FormattingContext* parent_context, LayoutBox* parent_box, Element* element) :
+	BlockFormattingContext(FormattingContext* parent_context, const LayoutBox* parent_box, Element* element) :
 		FormattingContext(Type::Block, parent_context, parent_box, element)
-	{}
+	{
+		RMLUI_ASSERT(element);
+	}
 
 	void Format(Vector2f containing_block, FormatSettings format_settings) override;
 

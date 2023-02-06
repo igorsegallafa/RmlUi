@@ -189,7 +189,7 @@ bool BlockFormattingContext::FormatBlockBox(BlockContainer* parent_container, El
 	else
 	{
 		RMLUI_ASSERT(!root_block_container);
-		root_block_container = MakeUnique<BlockContainer>(nullptr, element, box, min_height, max_height);
+		root_block_container = MakeUnique<BlockContainer>(format_settings.parent_container, nullptr, element, box, min_height, max_height);
 		root_block_container->ResetScrollbars(box);
 		root_block_container->root_containing_block = containing_block;
 		new_container = root_block_container.get();
@@ -259,8 +259,9 @@ bool BlockFormattingContext::FormatBlockContainerChild(BlockContainer* parent_co
 	if (computed.position() == Style::Position::Absolute || computed.position() == Style::Position::Fixed)
 	{
 		// Display the element as a block element.
-		const Vector2f static_position = parent_container->GetOpenStaticPosition(display);
-		parent_container->GetAbsolutePositioningContainingBlock()->AddAbsoluteElement(element, static_position);
+		const BlockContainer* offset_parent = parent_container->GetOffsetParent();
+		const Vector2f static_position = parent_container->GetOpenStaticPosition(display) - offset_parent->GetPosition();
+		parent_container->GetAbsolutePositioningContainingBlock()->AddAbsoluteElement(element, static_position, offset_parent->GetElement());
 		return true;
 	}
 
@@ -271,13 +272,11 @@ bool BlockFormattingContext::FormatBlockContainerChild(BlockContainer* parent_co
 		return true;
 	}
 
-	// TODO: Table cells (and possibly others) are invalid in this context, don't allow them here at all. Currently they
-	// create a new formatting context here.
 	if (auto formatting_context = ConditionallyCreateIndependentFormattingContext(this, parent_container, element))
 	{
 		const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent_container);
 
-		formatting_context->Format(containing_block, FormatSettings{});
+		formatting_context->Format(containing_block, FormatSettings{parent_container, nullptr, nullptr});
 
 		UniquePtr<LayoutBox> layout_box = formatting_context->ExtractRootBox();
 
@@ -357,14 +356,14 @@ void FormatRoot(Element* element, Vector2f containing_block, FormatSettings form
 
 	if (display == Display::Flex)
 	{
-		auto formatting_context = MakeUnique<FlexFormattingContext>(nullptr, nullptr, element);
+		auto formatting_context = MakeUnique<FlexFormattingContext>(nullptr, format_settings.parent_container, element);
 		formatting_context->Format(containing_block, format_settings);
 		return;
 	}
 
 	if (display == Display::Table)
 	{
-		auto formatting_context = MakeUnique<TableFormattingContext>(nullptr, nullptr, element);
+		auto formatting_context = MakeUnique<TableFormattingContext>(nullptr, format_settings.parent_container, element);
 		formatting_context->Format(containing_block, format_settings);
 		return;
 	}
@@ -376,7 +375,7 @@ void FormatRoot(Element* element, Vector2f containing_block, FormatSettings form
 
 	if (establishes_bfc)
 	{
-		auto formatting_context = MakeUnique<BlockFormattingContext>(nullptr, nullptr, element);
+		auto formatting_context = MakeUnique<BlockFormattingContext>(nullptr, format_settings.parent_container, element);
 		formatting_context->Format(containing_block, format_settings);
 		return;
 	}

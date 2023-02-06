@@ -48,7 +48,7 @@ void FlexFormattingContext::Format(Vector2f containing_block, FormatSettings for
 	ElementScroll* element_scroll = element->GetElementScroll();
 	const ComputedValues& computed = element->GetComputedValues();
 
-	flex_container_box = MakeUnique<FlexContainer>(element);
+	flex_container_box = MakeUnique<FlexContainer>(element, format_settings.parent_container);
 
 	// Build the initial box as specified by the flex's style, as if it was a normal block element.
 	Box box;
@@ -248,7 +248,7 @@ void FlexFormattingContext::Format(Vector2f& flex_resulting_content_size, Vector
 		}
 		else if (computed.position() == Style::Position::Absolute || computed.position() == Style::Position::Fixed)
 		{
-			flex_container_box->AddAbsoluteElement(element, {});
+			flex_container_box->AddAbsoluteElement(element, {}, element_flex);
 			continue;
 		}
 		else if (computed.position() == Style::Position::Relative)
@@ -314,7 +314,7 @@ void FlexFormattingContext::Format(Vector2f& flex_resulting_content_size, Vector
 			if (initial_box_size.x < 0.f)
 				format_box.SetContent(Vector2f(flex_available_content_size.x - item.cross.sum_edges, initial_box_size.y));
 
-			LayoutEngine::FormatElement(element, flex_content_containing_block, FormatSettings{&format_box, nullptr});
+			LayoutEngine::FormatElement(element, flex_content_containing_block, FormatSettings{flex_container_box.get(), &format_box, nullptr});
 			item.inner_flex_base_size = element->GetBox().GetSize().y;
 		}
 
@@ -596,7 +596,8 @@ void FlexFormattingContext::Format(Vector2f& flex_resulting_content_size, Vector
 				if (content_size.y < 0.0f)
 				{
 					item.box.SetContent(Vector2f(used_main_size_inner, content_size.y));
-					LayoutEngine::FormatElement(item.element, flex_content_containing_block, FormatSettings{&item.box, nullptr});
+					LayoutEngine::FormatElement(item.element, flex_content_containing_block,
+						FormatSettings{flex_container_box.get(), &item.box, nullptr});
 					item.hypothetical_cross_size = item.element->GetBox().GetSize().y + item.cross.sum_edges;
 				}
 				else
@@ -853,7 +854,8 @@ void FlexFormattingContext::Format(Vector2f& flex_resulting_content_size, Vector
 			item.box.SetContent(item_size);
 
 			Vector2f cell_visible_overflow_size;
-			LayoutEngine::FormatElement(item.element, flex_content_containing_block, {&item.box, &cell_visible_overflow_size});
+			LayoutEngine::FormatElement(item.element, flex_content_containing_block,
+				FormatSettings{flex_container_box.get(), &item.box, &cell_visible_overflow_size});
 
 			// Set the position of the element within the the flex container
 			item.element->SetOffset(flex_content_offset + item_offset, element_flex);

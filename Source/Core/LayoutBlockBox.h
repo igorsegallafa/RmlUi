@@ -87,23 +87,28 @@ public:
 	/// laid out, sized and positioned appropriately once this box is finished. This should only be called on boxes
 	/// rendering in a block-context.
 	/// @param element[in] The element to be positioned absolutely within this block box.
-	void AddAbsoluteElement(Element* element, Vector2f static_position);
+	void AddAbsoluteElement(Element* element, Vector2f static_position, Element* static_relative_offset_parent);
 	/// Adds a relatively positioned descendent which we act as a containing block for.
 	void AddRelativeElement(Element* element);
 
 	/// Formats, sizes, and positions all absolute elements in this block.
-	void ClosePositionedElements(const Box& box, Vector2f root_relative_position);
+	void ClosePositionedElements(const Box& box);
 	// Clears the list of absolutely and relatively positioned elements, without formatting them.
 	void ClearPositionedElements();
 
+	ContainerBox* GetParent() { return parent_container; }
+	Element* GetElement() { return element; }
+	Style::Position GetPositionProperty() const { return position_property; }
+
 protected:
-	ContainerBox(Type type, Element* element) : LayoutBox(type), element(element)
+	ContainerBox(Type type, Element* element, ContainerBox* parent_container) : LayoutBox(type), element(element), parent_container(parent_container)
 	{
 		if (element)
 		{
 			const auto& computed = element->GetComputedValues();
 			overflow_x = computed.overflow_x();
 			overflow_y = computed.overflow_y();
+			position_property = computed.position();
 		}
 	}
 
@@ -122,7 +127,8 @@ private:
 
 	struct AbsoluteElement {
 		Element* element;
-		Vector2f position;
+		Vector2f static_position;               // The hypothetical position of the element as if it was placed in normal flow.
+		Element* static_position_offset_parent; // The element for which the static position is offset from.
 	};
 
 	using AbsoluteElementList = Vector<AbsoluteElement>;
@@ -134,11 +140,17 @@ private:
 
 	Style::Overflow overflow_x = Style::Overflow::Visible;
 	Style::Overflow overflow_y = Style::Overflow::Visible;
+	Style::Position position_property = Style::Position::Static;
+
+	ContainerBox* parent_container = nullptr;
 };
 
 class FlexContainer final : public ContainerBox {
 public:
-	FlexContainer(Element* element) : ContainerBox(Type::FlexContainer, element) { RMLUI_ASSERT(element); }
+	FlexContainer(Element* element, ContainerBox* parent_container) : ContainerBox(Type::FlexContainer, element, parent_container)
+	{
+		RMLUI_ASSERT(element);
+	}
 
 	String DebugDumpTree(int depth) const override { return String(depth * 2, ' ') + "FlexContainer"; /* TODO */ }
 
@@ -147,7 +159,7 @@ public:
 		if (!SubmitBox(content_overflow_size, box, -1.f))
 			return CloseResult::LayoutSelf;
 
-		ClosePositionedElements(box, {});
+		ClosePositionedElements(box);
 
 		return CloseResult::OK;
 	}
@@ -157,7 +169,10 @@ public:
 
 class TableWrapper final : public ContainerBox {
 public:
-	TableWrapper(Element* element) : ContainerBox(Type::TableWrapper, element) { RMLUI_ASSERT(element); }
+	TableWrapper(Element* element, ContainerBox* parent_container) : ContainerBox(Type::TableWrapper, element, parent_container)
+	{
+		RMLUI_ASSERT(element);
+	}
 
 	String DebugDumpTree(int depth) const override { return String(depth * 2, ' ') + "TableWrapper"; /* TODO */ }
 
@@ -169,7 +184,7 @@ public:
 		RMLUI_ASSERT(result);
 		(void)result;
 
-		ClosePositionedElements(box, Vector2f{});
+		ClosePositionedElements(box);
 	}
 
 	const Box* GetBoxPtr() const override { return &element->GetBox(); }
@@ -186,7 +201,8 @@ public:
 	/// @param box[in] The box used for this block box.
 	/// @param min_height[in] The minimum height of the content box.
 	/// @param max_height[in] The maximum height of the content box.
-	BlockContainer(BlockContainer* parent, Element* element, const Box& box, float min_height, float max_height);
+	BlockContainer(ContainerBox* parent_container, BlockContainer* parent_block_container, Element* element, const Box& box, float min_height,
+		float max_height);
 	/// Releases the block box.
 	~BlockContainer();
 
@@ -239,7 +255,8 @@ public:
 	Vector2f GetOpenStaticPosition(Style::Display display) const;
 
 	// TODO: Generalize to all formatting contexts, and transcend them.
-	BlockContainer* GetAbsolutePositioningContainingBlock();
+	// TODO: Remove, should be part of external containing block calculations.
+	ContainerBox* GetAbsolutePositioningContainingBlock();
 
 	/// Returns the offset from the top-left corner of this box's offset element the next child box will be positioned at.
 	/// @param[in] top_margin The top margin of the box. This will be collapsed as appropriate against other block boxes.

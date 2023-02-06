@@ -65,9 +65,9 @@ void ContainerBox::ResetScrollbars(const Box& box)
 		element->GetElementScroll()->DisableScrollbar(ElementScroll::VERTICAL);
 }
 
-void ContainerBox::AddAbsoluteElement(Element* element, Vector2f static_position)
+void ContainerBox::AddAbsoluteElement(Element* element, Vector2f static_position, Element* static_relative_offset_parent)
 {
-	absolute_elements.push_back(AbsoluteElement{element, static_position});
+	absolute_elements.push_back(AbsoluteElement{element, static_position, static_relative_offset_parent});
 }
 
 void ContainerBox::AddRelativeElement(Element* element)
@@ -75,18 +75,26 @@ void ContainerBox::AddRelativeElement(Element* element)
 	relative_elements.push_back(element);
 }
 
-void ContainerBox::ClosePositionedElements(const Box& box, Vector2f root_relative_position)
+void ContainerBox::ClosePositionedElements(const Box& box)
 {
 	if (!absolute_elements.empty())
 	{
 		// The size of the containing box, including the padding. This is used to resolve relative offsets.
 		Vector2f containing_block = box.GetSize(Box::PADDING);
 
-		for (size_t i = 0; i < absolute_elements.size(); i++)
+		for (const AbsoluteElement& absolute : absolute_elements)
 		{
-			Element* absolute_element = absolute_elements[i].element;
-			Vector2f absolute_position = absolute_elements[i].position;
-			absolute_position -= root_relative_position; // position - offset_root->GetPosition();
+			Element* absolute_element = absolute.element;
+
+			// Find the static position relative to this containing block. First, calculate the offset from ourself to
+			// the static position's offset parent. Assumes (1) that this container box is part of the containing block
+			// chain of the static position offset parent, and (2) that all offsets in this chain has been set already.
+			Vector2f relative_position;
+			for (Element* ancestor = absolute.static_position_offset_parent; ancestor && ancestor != element; ancestor = ancestor->GetOffsetParent())
+				relative_position += ancestor->GetRelativeOffset(Box::BORDER);
+
+			// Now simply add the result to the stored static position to get the static position in our local space.
+			Vector2f offset = relative_position + absolute.static_position;
 
 			// Lay out the element.
 			LayoutEngine::FormatElement(absolute_element, containing_block);
@@ -94,11 +102,11 @@ void ContainerBox::ClosePositionedElements(const Box& box, Vector2f root_relativ
 			// Now that the element's box has been built, we can offset the position we determined was appropriate for
 			// it by the element's margin. This is necessary because the coordinate system for the box begins at the
 			// border, not the margin.
-			absolute_position.x += absolute_element->GetBox().GetEdge(Box::MARGIN, Box::LEFT);
-			absolute_position.y += absolute_element->GetBox().GetEdge(Box::MARGIN, Box::TOP);
+			offset.x += absolute_element->GetBox().GetEdge(Box::MARGIN, Box::LEFT);
+			offset.y += absolute_element->GetBox().GetEdge(Box::MARGIN, Box::TOP);
 
 			// Set the offset of the element; the element itself will take care of any RCSS-defined positional offsets.
-			absolute_element->SetOffset(absolute_position, element);
+			absolute_element->SetOffset(offset, element);
 		}
 
 		absolute_elements.clear();
@@ -234,17 +242,35 @@ bool ContainerBox::SubmitBox(const Vector2f content_box, const Box& box, const f
 	return true;
 }
 
-BlockContainer::BlockContainer(BlockContainer* _parent, Element* _element, const Box& _box, float _min_height, float _max_height) :
-	ContainerBox(Type::BlockContainer, _element), parent(_parent), box(_box), min_height(_min_height), max_height(_max_height)
+BlockContainer::BlockContainer(ContainerBox* _parent_container, BlockContainer* _parent, Element* _element, const Box& _box, float _min_height,
+	float _max_height) :
+	ContainerBox(Type::BlockContainer, _element, _parent_container),
+	parent(_parent), box(_box), min_height(_min_height), max_height(_max_height)
 {
 	space = MakeUnique<LayoutBlockBoxSpace>(this);
 
-	// Determine the offset parent for our children.
-	if (parent && parent->offset_parent->GetElement() && (!element || element->GetPosition() == Style::Position::Static))
-		offset_parent = parent->offset_parent;
-	else
-		// We are a positioned element (thereby acting as 
+	RMLUI_ASSERT(parent || element); // If we are the root, we must represent an element.
+	RMLUI_ASSERT(element);           // TODO Is this reasonable?
+
+#if 0
+	// Classic approach. Tries to choose an offset parent based on how the absolute offset and clipping region is
+	// calculated, feels a bit ad-hoc.
+	if (!parent || GetPositionProperty() != Style::Position::Static ||
+		(element && element->GetComputedValues().clip().GetType() != Style::Clip::Type::Auto))
 		offset_parent = this;
+	else
+		offset_parent = parent->offset_parent;
+#elif 0
+	// Always use the BFC root. The issue here is that relatively positioned elements assume the offset parent is the
+	// containing block for their percentage sizing calculations, but it's not in this case.
+	offset_parent = (parent ? parent->offset_parent : this);
+#else
+	// We act as the containing block for static and relative children, so this way our children's offset parent and
+	// containing block coinside, which is a nice feature.
+	// TODO Could generalize this so that the offset parent is defined to always be the element's containing block. To
+	// complete this we also need to consider absolute children of inline boxes.
+	offset_parent = this;
+#endif
 
 	if (element)
 		wrap_content = (element->GetComputedValues().white_space() != Style::WhiteSpace::Nowrap);
@@ -296,7 +322,7 @@ BlockContainer::CloseResult BlockContainer::Close()
 
 	// If we represent a positioned element, then we can now (as we've been sized) format the absolutely positioned
 	// elements that this container acts as a containing block for.
-	ClosePositionedElements(box, position);
+	ClosePositionedElements(box);
 
 	if (element)
 	{
@@ -350,7 +376,7 @@ BlockContainer* BlockContainer::AddBlockBox(Element* child_element, const Box& b
 	if (!CloseOpenInlineContainer())
 		return nullptr;
 
-	auto child_container_ptr = MakeUnique<BlockContainer>(this, child_element, box, min_height, max_height);
+	auto child_container_ptr = MakeUnique<BlockContainer>(this, this, child_element, box, min_height, max_height);
 	BlockContainer* child_container = child_container_ptr.get();
 
 	// Determine the offset parent for the child element.
@@ -509,12 +535,11 @@ Vector2f BlockContainer::GetOpenStaticPosition(Style::Display display) const
 	return static_position;
 }
 
-BlockContainer* BlockContainer::GetAbsolutePositioningContainingBlock()
+ContainerBox* BlockContainer::GetAbsolutePositioningContainingBlock()
 {
-	BlockContainer* absolute_parent = this;
-	while (absolute_parent != absolute_parent->offset_parent)
-		absolute_parent = absolute_parent->parent;
-	return absolute_parent;
+	ContainingBlock containing_block = LayoutDetails::GetContainingBlock(this, Style::Position::Absolute, {});
+
+	return containing_block.container ? containing_block.container : offset_parent;
 }
 
 Vector2f BlockContainer::NextBoxPosition(float top_margin, Style::Clear clear_property) const

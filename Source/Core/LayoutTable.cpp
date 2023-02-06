@@ -40,7 +40,7 @@ namespace Rml {
 
 void TableFormattingContext::Format(Vector2f containing_block, FormatSettings format_settings)
 {
-	table_wrapper_box = MakeUnique<TableWrapper>(element_table);
+	table_wrapper_box = MakeUnique<TableWrapper>(element_table, format_settings.parent_container);
 	if (table_wrapper_box->IsScrollContainer())
 	{
 		Log::Message(Log::LT_WARNING, "Table elements can only have 'overflow' property values of 'visible'. Table will not be formatted: %s.",
@@ -290,7 +290,7 @@ void TableFormattingContext::DetermineRowHeights(TrackBoxList& rows, BoxList& ce
 				// If both the row and the cell heights are 'auto', we need to format the cell to get its height.
 				if (box.GetSize().y < 0)
 				{
-					LayoutEngine::FormatElement(element_cell, table_initial_content_size, FormatSettings{&box, nullptr});
+					LayoutEngine::FormatElement(element_cell, table_initial_content_size, FormatSettings{table_wrapper_box.get(), &box, nullptr});
 					box.SetContent(element_cell->GetBox().GetSize());
 				}
 
@@ -408,7 +408,7 @@ void TableFormattingContext::FormatCells(BoxList& cells, Vector2f& table_overflo
 			if (is_aligned)
 			{
 				// We need to format the cell to know how much padding to add.
-				LayoutEngine::FormatElement(element_cell, table_initial_content_size, FormatSettings{&box, nullptr});
+				LayoutEngine::FormatElement(element_cell, table_initial_content_size, FormatSettings{table_wrapper_box.get(), &box, nullptr});
 				box.SetContent(element_cell->GetBox().GetSize());
 			}
 			else
@@ -453,7 +453,8 @@ void TableFormattingContext::FormatCells(BoxList& cells, Vector2f& table_overflo
 		//   instead set the new box and offset all descending elements whose offset parent is the cell, to account for the new padding box.
 		//   That should be faster than formatting the element again, but there may be edge-cases not accounted for.
 		Vector2f cell_visible_overflow_size;
-		LayoutEngine::FormatElement(element_cell, table_initial_content_size, FormatSettings{&box, &cell_visible_overflow_size});
+		LayoutEngine::FormatElement(element_cell, table_initial_content_size,
+			FormatSettings{table_wrapper_box.get(), &box, &cell_visible_overflow_size});
 
 		// Set the position of the element within the the table container
 		element_cell->SetOffset(cell_offset, element_table);

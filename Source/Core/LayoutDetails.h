@@ -36,6 +36,7 @@ namespace Rml {
 
 class Box;
 class BlockContainer;
+class ContainerBox;
 
 /**
     ComputedAxisSize is an abstraction of an element's computed size properties along a single axis, either horizontally or vertically,
@@ -48,6 +49,11 @@ struct ComputedAxisSize {
 	Style::Margin margin_a, margin_b;
 	float border_a, border_b;
 	Style::BoxSizing box_sizing;
+};
+
+struct ContainingBlock {
+	ContainerBox* container;
+	Vector2f size;
 };
 
 enum class BoxContext { Block, Inline, FlexOrTable };
@@ -84,6 +90,9 @@ public:
 	/// @param[in] containing_box The leaf box.
 	/// @return The dimensions of the content area, using the latest fixed dimensions for width and height in the hierarchy.
 	static Vector2f GetContainingBlock(const BlockContainer* containing_box);
+
+	// TODO
+	static ContainingBlock GetContainingBlock(ContainerBox* parent_container, const Style::Position position, Vector2f initial_containing_block);
 
 	/// Builds margins of a Box, and resolves any auto width or height for non-inline elements. The height may be left unresolved if it depends on the
 	/// element's children.

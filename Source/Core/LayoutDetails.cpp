@@ -166,7 +166,51 @@ void LayoutDetails::GetDefiniteMinMaxHeight(float& min_height, float& max_height
 	}
 }
 
-// Returns the fully-resolved, fixed-width and -height containing block from a block box.
+ContainingBlock LayoutDetails::GetContainingBlock(ContainerBox* parent_container, const Style::Position position, Vector2f initial_containing_block)
+{
+	using Style::Position;
+
+	ContainerBox* container = parent_container;
+	Box::Area area = Box::CONTENT;
+
+	if (position == Position::Fixed)
+	{
+		return {nullptr, initial_containing_block};
+	}
+	else if (position == Position::Absolute)
+	{
+		// TODO: Should we return nullptr or the tree root if we don't have any positioned ancestors?
+		while (container && container->GetParent() && container->GetPositionProperty() == Position::Static)
+			container = container->GetParent();
+		area = Box::PADDING;
+	}
+
+	if (!container)
+		return {nullptr, initial_containing_block};
+
+	const Box* box = container->GetBoxPtr();
+	if (!box)
+	{
+		RMLUI_ERROR;
+		return {container, {}};
+	}
+
+	Vector2f containing_block = box->GetSize(area);
+
+	if (Element* element = container->GetElement())
+	{
+		ElementScroll* element_scroll = element->GetElementScroll();
+		containing_block -= {
+			element_scroll->GetScrollbarSize(ElementScroll::VERTICAL),
+			element_scroll->GetScrollbarSize(ElementScroll::HORIZONTAL),
+		};
+	}
+
+	containing_block = Math::Max(containing_block, Vector2f(0.f));
+
+	return {container, containing_block};
+}
+
 Vector2f LayoutDetails::GetContainingBlock(const BlockContainer* containing_box)
 {
 	RMLUI_ASSERT(containing_box);
@@ -251,7 +295,7 @@ float LayoutDetails::GetShrinkToFitWidth(Element* element, Vector2f containing_b
 	// TODO: Only considers block formatting contexts, however, we just as well might have flex or table formatting contexts.
 	auto formatting_context = MakeUnique<BlockFormattingContext>(nullptr, nullptr, element);
 
-	formatting_context->Format(containing_block, FormatSettings{&box, nullptr});
+	formatting_context->Format(containing_block, FormatSettings{nullptr, &box, nullptr});
 
 	return Math::Min(containing_block.x, formatting_context->GetShrinkToFitWidth());
 }
