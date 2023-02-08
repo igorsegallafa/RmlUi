@@ -165,6 +165,11 @@ public:
 	}
 
 	const Box* GetBoxPtr() const override { return &element->GetBox(); }
+
+	Box& GetBox() { return box; }
+
+private:
+	Box box;
 };
 
 class TableWrapper final : public ContainerBox {
@@ -187,7 +192,12 @@ public:
 		ClosePositionedElements(box);
 	}
 
-	const Box* GetBoxPtr() const override { return &element->GetBox(); }
+	const Box* GetBoxPtr() const override { return &box; }
+
+	Box& GetBox() { return box; }
+
+private:
+	Box box;
 };
 
 /**
@@ -201,6 +211,9 @@ public:
 	/// @param box[in] The box used for this block box.
 	/// @param min_height[in] The minimum height of the content box.
 	/// @param max_height[in] The maximum height of the content box.
+	// TODO: This parent container / block container division is ugly. They're normally the same, except for the BFC root, which only provides the
+	// parent container (not parent block container). We only want to increment our parent cursor if it is in the same BFC context. Then again,
+	// perhaps we don't want that either, but instead increment it from our parent always?
 	BlockContainer(ContainerBox* parent_container, BlockContainer* parent_block_container, Element* element, const Box& box, float min_height,
 		float max_height);
 	/// Releases the block box.

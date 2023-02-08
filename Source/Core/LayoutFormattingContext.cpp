@@ -104,8 +104,8 @@ static OuterDisplayType GetOuterDisplayType(Style::Display display)
 	return OuterDisplayType::Invalid;
 }
 
-static UniquePtr<FormattingContext> ConditionallyCreateIndependentFormattingContext(FormattingContext* parent_context,
-	BlockContainer* parent_container, Element* element)
+UniquePtr<FormattingContext> FormattingContext::ConditionallyCreateIndependentFormattingContext(const FormattingContext* parent_context,
+	ContainerBox* parent_container, Element* element)
 {
 	using namespace Style;
 	auto& computed = element->GetComputedValues();
@@ -118,23 +118,10 @@ static UniquePtr<FormattingContext> ConditionallyCreateIndependentFormattingCont
 	if (display == Display::Table)
 		return MakeUnique<TableFormattingContext>(parent_context, parent_container, element);
 
-#if 1
-	// TODO: This is the more correct one, but we need to handle containing blocks correctly. We essentially need to
-	// chain the container boxes past formatting contexts - or at least keep track of parent absolute containing block.
-	// However, be careful of using block container's parent for this, since that one will modify the parent when
-	// closed.
-	//   - Can we modify parent from outside block container?
-	//   - It would be nice if the parent was const pointer.
-	//   - Alternativelly, just keep track of parent absolute position containing block, and hand it down.
 	const bool establishes_bfc =
 		(computed.float_() != Float::None || computed.position() == Position::Absolute || computed.position() == Position::Fixed ||
 			computed.display() == Display::InlineBlock || computed.display() == Display::TableCell || computed.overflow_x() != Overflow::Visible ||
 			computed.overflow_y() != Overflow::Visible || !element->GetParentNode() || element->GetParentNode()->GetDisplay() == Display::Flex);
-#else
-	const bool establishes_bfc =
-		(computed.float_() != Float::None || computed.position() == Position::Absolute || computed.position() == Position::Fixed ||
-			computed.display() == Display::InlineBlock || !element->GetParentNode() || element->GetParentNode()->GetDisplay() == Display::Flex);
-#endif
 
 	if (establishes_bfc)
 		return MakeUnique<BlockFormattingContext>(parent_context, parent_container, element);
@@ -189,7 +176,7 @@ bool BlockFormattingContext::FormatBlockBox(BlockContainer* parent_container, El
 	else
 	{
 		RMLUI_ASSERT(!root_block_container);
-		root_block_container = MakeUnique<BlockContainer>(format_settings.parent_container, nullptr, element, box, min_height, max_height);
+		root_block_container = MakeUnique<BlockContainer>(GetParentBoxOfContext(), nullptr, element, box, min_height, max_height);
 		root_block_container->ResetScrollbars(box);
 		root_block_container->root_containing_block = containing_block;
 		new_container = root_block_container.get();
@@ -276,7 +263,7 @@ bool BlockFormattingContext::FormatBlockContainerChild(BlockContainer* parent_co
 	{
 		const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent_container);
 
-		formatting_context->Format(containing_block, FormatSettings{parent_container, nullptr, nullptr});
+		formatting_context->Format(containing_block, FormatSettings{nullptr, nullptr});
 
 		UniquePtr<LayoutBox> layout_box = formatting_context->ExtractRootBox();
 
@@ -345,43 +332,6 @@ bool BlockFormattingContext::FormatInlineBox(BlockContainer* parent_container, E
 	parent_container->CloseInlineElement(inline_box_handle);
 
 	return true;
-}
-
-void FormatRoot(Element* element, Vector2f containing_block, FormatSettings format_settings)
-{
-	using namespace Style;
-	auto& computed = element->GetComputedValues();
-
-	const Display display = computed.display();
-
-	if (display == Display::Flex)
-	{
-		auto formatting_context = MakeUnique<FlexFormattingContext>(nullptr, format_settings.parent_container, element);
-		formatting_context->Format(containing_block, format_settings);
-		return;
-	}
-
-	if (display == Display::Table)
-	{
-		auto formatting_context = MakeUnique<TableFormattingContext>(nullptr, format_settings.parent_container, element);
-		formatting_context->Format(containing_block, format_settings);
-		return;
-	}
-
-	const bool establishes_bfc =
-		(computed.float_() != Float::None || computed.position() == Position::Absolute || computed.position() == Position::Fixed ||
-			computed.display() == Display::InlineBlock || computed.display() == Display::TableCell || computed.overflow_x() != Overflow::Visible ||
-			computed.overflow_y() != Overflow::Visible || !element->GetParentNode() || element->GetParentNode()->GetDisplay() == Display::Flex);
-
-	if (establishes_bfc)
-	{
-		auto formatting_context = MakeUnique<BlockFormattingContext>(nullptr, format_settings.parent_container, element);
-		formatting_context->Format(containing_block, format_settings);
-		return;
-	}
-
-	// TODO: Handle gracefully?
-	RMLUI_ERROR;
 }
 
 } // namespace Rml

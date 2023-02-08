@@ -49,7 +49,7 @@ namespace Rml {
 class InlineContainer final : public ContainerBox {
 public:
 	/// Creates a new block box in an inline context.
-	InlineContainer(BlockContainer* parent, float element_line_height, bool wrap_content);
+	InlineContainer(BlockContainer* parent, float available_width, float element_line_height, bool wrap_content);
 	~InlineContainer();
 
 	/// Adds a new inline-level element to this inline-context box.

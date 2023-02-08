@@ -37,7 +37,6 @@ namespace Rml {
 class Box;
 
 struct FormatSettings {
-	ContainerBox* parent_container = nullptr; // TODO: A bit hacky to have this here.
 	const Box* override_initial_box = nullptr;
 	Vector2f* out_visible_overflow_size = nullptr;
 };
@@ -56,6 +55,10 @@ public:
 		MaxContent,
 	};
 
+	// TODO Do we care about parent context?
+	static UniquePtr<FormattingContext> ConditionallyCreateIndependentFormattingContext(const FormattingContext* parent_context,
+		ContainerBox* parent_container, Element* element);
+
 	// TODO: Consider working directly with the final types instead of using a virtual destructor.
 	virtual ~FormattingContext() = default;
 
@@ -65,24 +68,26 @@ public:
 	virtual UniquePtr<LayoutBox> ExtractRootBox() { return nullptr; }
 
 protected:
-	FormattingContext(Type type, FormattingContext* parent_context, const LayoutBox* parent_box, Element* root_element) :
+	FormattingContext(Type type, const FormattingContext* parent_context, ContainerBox* parent_box, Element* root_element) :
 		type(type), parent_context(parent_context), parent_box(parent_box), root_element(root_element)
 	{}
 
 	Element* GetRootElement() const { return root_element; }
 
+	ContainerBox* GetParentBoxOfContext() const { return parent_box; }
+
 	static void SubmitElementLayout(Element* element) { element->OnLayout(); }
 
 private:
 	Type type;
-	FormattingContext* parent_context;
-	const LayoutBox* parent_box;
+	const FormattingContext* parent_context;
+	ContainerBox* parent_box;
 	Element* root_element;
 };
 
 class BlockFormattingContext final : public FormattingContext {
 public:
-	BlockFormattingContext(FormattingContext* parent_context, const LayoutBox* parent_box, Element* element) :
+	BlockFormattingContext(const FormattingContext* parent_context, ContainerBox* parent_box, Element* element) :
 		FormattingContext(Type::Block, parent_context, parent_box, element)
 	{
 		RMLUI_ASSERT(element);
@@ -102,9 +107,6 @@ private:
 
 	UniquePtr<BlockContainer> root_block_container;
 };
-
-// Formats the contents for a root-level element (usually a document or floating element).
-void FormatRoot(Element* element, Vector2f containing_block, FormatSettings format_settings = {});
 
 } // namespace Rml
 #endif

@@ -41,14 +41,13 @@
 
 namespace Rml {
 
-InlineContainer::InlineContainer(BlockContainer* _parent, float _element_line_height, bool _wrap_content) :
+InlineContainer::InlineContainer(BlockContainer* _parent, float _available_width, float _element_line_height, bool _wrap_content) :
 	ContainerBox(Type::InlineContainer, nullptr, _parent), parent(_parent), element_line_height(_element_line_height), wrap_content(_wrap_content),
 	root_inline_box(_parent->GetElement())
 {
 	RMLUI_ASSERT(_parent);
 
-	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent);
-	box_size = Vector2f(containing_block.x, -1);
+	box_size = Vector2f(_available_width, -1);
 	position = parent->NextBoxPosition();
 	text_align = parent->GetElement()->GetComputedValues().text_align();
 }

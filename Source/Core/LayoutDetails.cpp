@@ -217,11 +217,11 @@ Vector2f LayoutDetails::GetContainingBlock(const BlockContainer* containing_box)
 
 	Vector2f containing_block;
 
-	containing_block.x = containing_box->GetBox().GetSize(Box::CONTENT).x;
+	containing_block.x = containing_box->GetBox().GetSize().x;
 	if (Element* element = containing_box->GetElement())
 		containing_block.x -= element->GetElementScroll()->GetScrollbarSize(ElementScroll::VERTICAL);
 
-	while ((containing_block.y = containing_box->GetBox().GetSize(Box::CONTENT).y) < 0)
+	while ((containing_block.y = containing_box->GetBox().GetSize().y) < 0)
 	{
 		auto parent = containing_box->GetParent();
 		if (!parent && containing_box->root_containing_block.y >= 0.f)
@@ -295,7 +295,7 @@ float LayoutDetails::GetShrinkToFitWidth(Element* element, Vector2f containing_b
 	// TODO: Only considers block formatting contexts, however, we just as well might have flex or table formatting contexts.
 	auto formatting_context = MakeUnique<BlockFormattingContext>(nullptr, nullptr, element);
 
-	formatting_context->Format(containing_block, FormatSettings{nullptr, &box, nullptr});
+	formatting_context->Format(containing_block, FormatSettings{&box, nullptr});
 
 	return Math::Min(containing_block.x, formatting_context->GetShrinkToFitWidth());
 }

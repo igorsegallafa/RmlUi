@@ -40,7 +40,7 @@ namespace Rml {
 
 void TableFormattingContext::Format(Vector2f containing_block, FormatSettings format_settings)
 {
-	table_wrapper_box = MakeUnique<TableWrapper>(element_table, format_settings.parent_container);
+	table_wrapper_box = MakeUnique<TableWrapper>(element_table, GetParentBoxOfContext());
 	if (table_wrapper_box->IsScrollContainer())
 	{
 		Log::Message(Log::LT_WARNING, "Table elements can only have 'overflow' property values of 'visible'. Table will not be formatted: %s.",
@@ -51,7 +51,7 @@ void TableFormattingContext::Format(Vector2f containing_block, FormatSettings fo
 	const ComputedValues& computed_table = element_table->GetComputedValues();
 
 	// Build the initial box as specified by the table's style, as if it was a normal block element.
-	Box box;
+	Box& box = table_wrapper_box->GetBox();
 	LayoutDetails::BuildBox(box, containing_block, element_table, BoxContext::Block);
 
 	LayoutDetails::GetMinMaxWidth(table_min_size.x, table_max_size.x, computed_table, box, containing_block.x);
@@ -290,7 +290,7 @@ void TableFormattingContext::DetermineRowHeights(TrackBoxList& rows, BoxList& ce
 				// If both the row and the cell heights are 'auto', we need to format the cell to get its height.
 				if (box.GetSize().y < 0)
 				{
-					LayoutEngine::FormatElement(element_cell, table_initial_content_size, FormatSettings{table_wrapper_box.get(), &box, nullptr});
+					FormatCell(element_cell, &box);
 					box.SetContent(element_cell->GetBox().GetSize());
 				}
 
@@ -408,7 +408,7 @@ void TableFormattingContext::FormatCells(BoxList& cells, Vector2f& table_overflo
 			if (is_aligned)
 			{
 				// We need to format the cell to know how much padding to add.
-				LayoutEngine::FormatElement(element_cell, table_initial_content_size, FormatSettings{table_wrapper_box.get(), &box, nullptr});
+				FormatCell(element_cell, &box);
 				box.SetContent(element_cell->GetBox().GetSize());
 			}
 			else
@@ -453,8 +453,7 @@ void TableFormattingContext::FormatCells(BoxList& cells, Vector2f& table_overflo
 		//   instead set the new box and offset all descending elements whose offset parent is the cell, to account for the new padding box.
 		//   That should be faster than formatting the element again, but there may be edge-cases not accounted for.
 		Vector2f cell_visible_overflow_size;
-		LayoutEngine::FormatElement(element_cell, table_initial_content_size,
-			FormatSettings{table_wrapper_box.get(), &box, &cell_visible_overflow_size});
+		FormatCell(element_cell, &box, &cell_visible_overflow_size);
 
 		// Set the position of the element within the the table container
 		element_cell->SetOffset(cell_offset, element_table);
@@ -463,6 +462,14 @@ void TableFormattingContext::FormatCells(BoxList& cells, Vector2f& table_overflo
 		table_overflow_size.x = Math::Max(table_overflow_size.x, cell_offset.x - table_content_offset.x + cell_visible_overflow_size.x);
 		table_overflow_size.y = Math::Max(table_overflow_size.y, cell_offset.y - table_content_offset.y + cell_visible_overflow_size.y);
 	}
+}
+
+void TableFormattingContext::FormatCell(Element* element_cell, const Box* override_initial_box, Vector2f* out_cell_visible_overflow_size) const
+{
+	auto formatting_context = ConditionallyCreateIndependentFormattingContext(this, table_wrapper_box.get(), element_cell);
+	RMLUI_ASSERTMSG(formatting_context, "Table cells should always generate an independent formatting context");
+
+	formatting_context->Format(table_initial_content_size, FormatSettings{override_initial_box, out_cell_visible_overflow_size});
 }
 
 } // namespace Rml

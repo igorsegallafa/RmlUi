@@ -36,7 +36,7 @@ namespace Rml {
 
 class FlexFormattingContext final : public FormattingContext {
 public:
-	FlexFormattingContext(FormattingContext* parent_context, LayoutBox* parent_box, Element* element) :
+	FlexFormattingContext(const FormattingContext* parent_context, ContainerBox* parent_box, Element* element) :
 		FormattingContext(Type::Flex, parent_context, parent_box, element)
 	{}
 
@@ -52,6 +52,9 @@ private:
 	/// @param[out] flex_resulting_content_size The final content size of the flex container.
 	/// @param[out] flex_content_overflow_size Overflow size in case flex items or their contents overflow the container.
 	void Format(Vector2f& flex_resulting_content_size, Vector2f& flex_content_overflow_size) const;
+
+	// Format a flex item in an independent formatting context.
+	void FormatFlexItem(Element* element, const Box* override_initial_box, Vector2f* out_cell_visible_overflow_size = nullptr) const;
 
 	Vector2f flex_available_content_size;
 	Vector2f flex_content_containing_block;

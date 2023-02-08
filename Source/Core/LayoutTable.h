@@ -43,14 +43,13 @@ using TrackBoxList = Vector<TrackBox>;
 
 class TableFormattingContext final : public FormattingContext {
 public:
-	TableFormattingContext(FormattingContext* parent_context, LayoutBox* parent_box, Element* element) :
+	TableFormattingContext(const FormattingContext* parent_context, ContainerBox* parent_box, Element* element) :
 		FormattingContext(Type::Table, parent_context, parent_box, element), element_table(element)
 	{}
 
 	void Format(Vector2f containing_block, FormatSettings format_settings) override;
 
 	UniquePtr<LayoutBox> ExtractRootBox() override { return std::move(table_wrapper_box); }
-	UniquePtr<TableWrapper> ExtractTableWrapper() { return std::move(table_wrapper_box); }
 
 private:
 	using BoxList = Vector<Box>;
@@ -78,6 +77,9 @@ private:
 
 	// Format the table cell elements.
 	void FormatCells(BoxList& cells, Vector2f& table_overflow_size, const TrackBoxList& rows, const TrackBoxList& column) const;
+
+	// Format the table cell in an independent formatting context.
+	void FormatCell(Element* element_cell, const Box* override_initial_box, Vector2f* out_cell_visible_overflow_size = nullptr) const;
 
 	Element* const element_table;
 

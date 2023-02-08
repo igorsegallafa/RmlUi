@@ -48,10 +48,10 @@ void FlexFormattingContext::Format(Vector2f containing_block, FormatSettings for
 	ElementScroll* element_scroll = element->GetElementScroll();
 	const ComputedValues& computed = element->GetComputedValues();
 
-	flex_container_box = MakeUnique<FlexContainer>(element, format_settings.parent_container);
+	flex_container_box = MakeUnique<FlexContainer>(element, GetParentBoxOfContext());
 
 	// Build the initial box as specified by the flex's style, as if it was a normal block element.
-	Box box;
+	Box& box = flex_container_box->GetBox();
 	LayoutDetails::BuildBox(box, containing_block, element, BoxContext::Block);
 
 	// Start with any auto-scrollbars off.
@@ -314,7 +314,7 @@ void FlexFormattingContext::Format(Vector2f& flex_resulting_content_size, Vector
 			if (initial_box_size.x < 0.f)
 				format_box.SetContent(Vector2f(flex_available_content_size.x - item.cross.sum_edges, initial_box_size.y));
 
-			LayoutEngine::FormatElement(element, flex_content_containing_block, FormatSettings{flex_container_box.get(), &format_box, nullptr});
+			FormatFlexItem(element, &format_box);
 			item.inner_flex_base_size = element->GetBox().GetSize().y;
 		}
 
@@ -596,8 +596,7 @@ void FlexFormattingContext::Format(Vector2f& flex_resulting_content_size, Vector
 				if (content_size.y < 0.0f)
 				{
 					item.box.SetContent(Vector2f(used_main_size_inner, content_size.y));
-					LayoutEngine::FormatElement(item.element, flex_content_containing_block,
-						FormatSettings{flex_container_box.get(), &item.box, nullptr});
+					FormatFlexItem(item.element, &item.box);
 					item.hypothetical_cross_size = item.element->GetBox().GetSize().y + item.cross.sum_edges;
 				}
 				else
@@ -854,8 +853,7 @@ void FlexFormattingContext::Format(Vector2f& flex_resulting_content_size, Vector
 			item.box.SetContent(item_size);
 
 			Vector2f cell_visible_overflow_size;
-			LayoutEngine::FormatElement(item.element, flex_content_containing_block,
-				FormatSettings{flex_container_box.get(), &item.box, &cell_visible_overflow_size});
+			FormatFlexItem(item.element, &item.box, &cell_visible_overflow_size);
 
 			// Set the position of the element within the the flex container
 			item.element->SetOffset(flex_content_offset + item_offset, element_flex);
@@ -869,6 +867,14 @@ void FlexFormattingContext::Format(Vector2f& flex_resulting_content_size, Vector
 	}
 
 	flex_resulting_content_size = MainCrossToVec2(used_main_size, used_cross_size);
+}
+
+void FlexFormattingContext::FormatFlexItem(Element* element, const Box* override_initial_box, Vector2f* out_cell_visible_overflow_size) const
+{
+	auto formatting_context = ConditionallyCreateIndependentFormattingContext(this, flex_container_box.get(), element);
+	RMLUI_ASSERTMSG(formatting_context, "Flex items should always generate an independent formatting context");
+
+	formatting_context->Format(flex_content_containing_block, FormatSettings{override_initial_box, out_cell_visible_overflow_size});
 }
 
 } // namespace Rml

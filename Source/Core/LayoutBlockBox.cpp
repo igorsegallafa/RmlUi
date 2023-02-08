@@ -97,7 +97,10 @@ void ContainerBox::ClosePositionedElements(const Box& box)
 			Vector2f offset = relative_position + absolute.static_position;
 
 			// Lay out the element.
-			LayoutEngine::FormatElement(absolute_element, containing_block);
+			// TODO: Parent context?
+			auto formatting_context = FormattingContext::ConditionallyCreateIndependentFormattingContext(nullptr, this, absolute_element);
+			RMLUI_ASSERTMSG(formatting_context, "Absolutely positioned elements should always generate an independent formatting context");
+			formatting_context->Format(containing_block, {});
 
 			// Now that the element's box has been built, we can offset the position we determined was appropriate for
 			// it by the element's margin. This is necessary because the coordinate system for the box begins at the
@@ -114,6 +117,7 @@ void ContainerBox::ClosePositionedElements(const Box& box)
 
 	// Any relatively positioned elements that we act as containing block for may also need to be have their positions
 	// updated to reflect changes to the size of this block box.
+	// TODO: Maybe do this first, in case the static position of absolutely positioned elements depends on any of these relative positions.
 	for (Element* child : relative_elements)
 		child->UpdateOffset();
 
@@ -177,12 +181,6 @@ bool ContainerBox::CatchOverflow(const Vector2f content_size, const Box& box, co
 
 bool ContainerBox::SubmitBox(const Vector2f content_box, const Box& box, const float max_height)
 {
-	if (!element)
-	{
-		SetVisibleOverflowSize({});
-		return true;
-	}
-
 	// TODO: Properly compute the visible overflow size / scrollable overflow rectangle.
 	//       https://www.w3.org/TR/css-overflow-3/#scrollable
 	//
@@ -227,7 +225,7 @@ bool ContainerBox::SubmitBox(const Vector2f content_box, const Box& box, const f
 		{
 			visible_overflow_size = border_size;
 
-			// Format any scrollbars which were enabled on this element.
+			// Format any scrollbars in case they were enabled on this element.
 			element->GetElementScroll()->FormatScrollbars();
 		}
 		else
@@ -746,7 +744,10 @@ InlineContainer* BlockContainer::EnsureOpenInlineContainer()
 	if (!inline_container)
 	{
 		const float line_height = element->GetLineHeight();
-		auto inline_container_ptr = MakeUnique<InlineContainer>(this, line_height, wrap_content);
+		const float scrollbar_width = (IsScrollContainer() ? element->GetElementScroll()->GetScrollbarSize(ElementScroll::VERTICAL) : 0.f);
+		const float available_width = box.GetSize().x - scrollbar_width;
+
+		auto inline_container_ptr = MakeUnique<InlineContainer>(this, available_width, line_height, wrap_content);
 		inline_container = inline_container_ptr.get();
 		block_boxes.push_back(std::move(inline_container_ptr));
 

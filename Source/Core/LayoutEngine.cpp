@@ -55,9 +55,9 @@ struct LayoutChunk {
 };
 
 static constexpr std::size_t ChunkSizeBig = std::max({sizeof(BlockContainer), sizeof(InlineContainer)});
-static constexpr std::size_t ChunkSizeMedium = std::max({sizeof(InlineBox)});
-static constexpr std::size_t ChunkSizeSmall = std::max({sizeof(InlineLevelBox_Text), sizeof(InlineLevelBox_Atomic), sizeof(LayoutLineBox),
-	sizeof(LayoutBlockBoxSpace), sizeof(FlexContainer), sizeof(TableWrapper)});
+static constexpr std::size_t ChunkSizeMedium = std::max({sizeof(InlineBox), sizeof(FlexContainer), sizeof(TableWrapper)});
+static constexpr std::size_t ChunkSizeSmall =
+	std::max({sizeof(InlineLevelBox_Text), sizeof(InlineLevelBox_Atomic), sizeof(LayoutLineBox), sizeof(LayoutBlockBoxSpace)});
 
 static Pool<LayoutChunk<ChunkSizeBig>> layout_chunk_pool_big(50, true);
 static Pool<LayoutChunk<ChunkSizeMedium>> layout_chunk_pool_medium(50, true);
@@ -94,9 +94,23 @@ void LayoutEngine::DeallocateLayoutChunk(void* chunk, size_t size)
 	}
 }
 
-void LayoutEngine::FormatElement(Element* element, Vector2f containing_block, FormatSettings format_settings)
+void LayoutEngine::FormatElement(Element* element, Vector2f containing_block)
 {
-	FormatRoot(element, containing_block, format_settings);
+	auto formatting_context = FormattingContext::ConditionallyCreateIndependentFormattingContext(nullptr, nullptr, element);
+
+	if (!formatting_context)
+	{
+		Log::Message(Log::LT_ERROR, "Element does not create an independent formatting context and cannot be formatted: %s",
+			element->GetAddress().c_str());
+		RMLUI_ERROR;
+		return;
+	}
+
+	// TODO: Can we get rid of the containing block from the below call? Instead, we could make a root containing block
+	// here as a separate layout box. 
+	// All other calls to this function in principle use LayoutDetails::GetContainingBlock, so it would be nice if we
+	// could move that to inside the function.
+	formatting_context->Format(containing_block, {});
 }
 
 } // namespace Rml
