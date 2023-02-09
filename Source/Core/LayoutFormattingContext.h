@@ -56,21 +56,18 @@ public:
 	};
 
 	// TODO Do we care about parent context?
-	static UniquePtr<FormattingContext> ConditionallyCreateIndependentFormattingContext(const FormattingContext* parent_context,
-		ContainerBox* parent_container, Element* element);
+	static UniquePtr<FormattingContext> ConditionallyCreateIndependentFormattingContext(ContainerBox* parent_container, Element* element);
 
 	// TODO: Consider working directly with the final types instead of using a virtual destructor.
 	virtual ~FormattingContext() = default;
 
 	// TODO: Instead of (output) format settings, use function calls (virtual if necessary) as needed.
-	virtual void Format(Vector2f containing_block, FormatSettings format_settings) = 0;
+	virtual void Format(FormatSettings format_settings) = 0;
 
 	virtual UniquePtr<LayoutBox> ExtractRootBox() { return nullptr; }
 
 protected:
-	FormattingContext(Type type, const FormattingContext* parent_context, ContainerBox* parent_box, Element* root_element) :
-		type(type), parent_context(parent_context), parent_box(parent_box), root_element(root_element)
-	{}
+	FormattingContext(Type type, ContainerBox* parent_box, Element* root_element) : type(type), parent_box(parent_box), root_element(root_element) {}
 
 	Element* GetRootElement() const { return root_element; }
 
@@ -80,27 +77,25 @@ protected:
 
 private:
 	Type type;
-	const FormattingContext* parent_context;
 	ContainerBox* parent_box;
 	Element* root_element;
 };
 
 class BlockFormattingContext final : public FormattingContext {
 public:
-	BlockFormattingContext(const FormattingContext* parent_context, ContainerBox* parent_box, Element* element) :
-		FormattingContext(Type::Block, parent_context, parent_box, element)
+	BlockFormattingContext(ContainerBox* parent_box, Element* element) : FormattingContext(Type::Block, parent_box, element)
 	{
 		RMLUI_ASSERT(element);
 	}
 
-	void Format(Vector2f containing_block, FormatSettings format_settings) override;
+	void Format(FormatSettings format_settings) override;
 
 	float GetShrinkToFitWidth() const;
 
 	UniquePtr<LayoutBox> ExtractRootBox() override { return std::move(root_block_container); }
 
 private:
-	bool FormatBlockBox(BlockContainer* parent_container, Element* element, FormatSettings format_settings = {}, Vector2f root_containing_block = {});
+	bool FormatBlockBox(BlockContainer* parent_container, Element* element);
 
 	bool FormatBlockContainerChild(BlockContainer* parent_container, Element* element);
 	bool FormatInlineBox(BlockContainer* parent_container, Element* element);

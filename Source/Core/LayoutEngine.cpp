@@ -96,7 +96,11 @@ void LayoutEngine::DeallocateLayoutChunk(void* chunk, size_t size)
 
 void LayoutEngine::FormatElement(Element* element, Vector2f containing_block)
 {
-	auto formatting_context = FormattingContext::ConditionallyCreateIndependentFormattingContext(nullptr, nullptr, element);
+	RMLUI_ASSERT(element && containing_block.x >= 0 && containing_block.y >= 0);
+
+	RootBox root(containing_block);
+
+	auto formatting_context = FormattingContext::ConditionallyCreateIndependentFormattingContext(&root, element);
 
 	if (!formatting_context)
 	{
@@ -110,7 +114,7 @@ void LayoutEngine::FormatElement(Element* element, Vector2f containing_block)
 	// here as a separate layout box. 
 	// All other calls to this function in principle use LayoutDetails::GetContainingBlock, so it would be nice if we
 	// could move that to inside the function.
-	formatting_context->Format(containing_block, {});
+	formatting_context->Format({});
 }
 
 } // namespace Rml

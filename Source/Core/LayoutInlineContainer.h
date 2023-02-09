@@ -45,8 +45,7 @@ namespace Rml {
 
     @author Michael R. P. Ragazzon
  */
-// TODO: Hmm, I guess this could just as well be derived from LayoutBox, or even fully outside the layout box model.
-class InlineContainer final : public ContainerBox {
+class InlineContainer final : public LayoutBox {
 public:
 	/// Creates a new block box in an inline context.
 	InlineContainer(BlockContainer* parent, float available_width, float element_line_height, bool wrap_content);

@@ -38,7 +38,9 @@ namespace Rml {
 class Box;
 
 /**
-    @author Robert Curry
+	@author Michael R. P. Ragazzon
+
+	Original authors: Robert Curry, and Peter Curry
  */
 
 class LayoutEngine {
@@ -50,9 +52,6 @@ public:
 	/// @param[in] override_initial_box Optional pointer to a box to override the generated box for the element.
 	/// @param[out] visible_overflow_size Optionally output the overflow size of the element.
 	static void FormatElement(Element* element, Vector2f containing_block);
-
-	// TODO Format an element in normal flow layout.
-	//static bool FormatElementFlow(BlockContainer* block_context_box, Element* element);
 
 	static void* AllocateLayoutChunk(size_t size);
 	static void DeallocateLayoutChunk(void* chunk, size_t size);

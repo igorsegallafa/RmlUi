@@ -38,7 +38,7 @@
 
 namespace Rml {
 
-void TableFormattingContext::Format(Vector2f containing_block, FormatSettings format_settings)
+void TableFormattingContext::Format(FormatSettings format_settings)
 {
 	table_wrapper_box = MakeUnique<TableWrapper>(element_table, GetParentBoxOfContext());
 	if (table_wrapper_box->IsScrollContainer())
@@ -48,6 +48,8 @@ void TableFormattingContext::Format(Vector2f containing_block, FormatSettings fo
 		return;
 	}
 
+	const Vector2f containing_block = LayoutDetails::GetContainingBlock(GetParentBoxOfContext(), element_table->GetPosition()).size;
+	RMLUI_ASSERT(containing_block.x >= 0.f);
 	const ComputedValues& computed_table = element_table->GetComputedValues();
 
 	// Build the initial box as specified by the table's style, as if it was a normal block element.
@@ -466,10 +468,10 @@ void TableFormattingContext::FormatCells(BoxList& cells, Vector2f& table_overflo
 
 void TableFormattingContext::FormatCell(Element* element_cell, const Box* override_initial_box, Vector2f* out_cell_visible_overflow_size) const
 {
-	auto formatting_context = ConditionallyCreateIndependentFormattingContext(this, table_wrapper_box.get(), element_cell);
+	auto formatting_context = ConditionallyCreateIndependentFormattingContext(table_wrapper_box.get(), element_cell);
 	RMLUI_ASSERTMSG(formatting_context, "Table cells should always generate an independent formatting context");
 
-	formatting_context->Format(table_initial_content_size, FormatSettings{override_initial_box, out_cell_visible_overflow_size});
+	formatting_context->Format(FormatSettings{override_initial_box, out_cell_visible_overflow_size});
 }
 
 } // namespace Rml

@@ -166,27 +166,24 @@ void LayoutDetails::GetDefiniteMinMaxHeight(float& min_height, float& max_height
 	}
 }
 
-ContainingBlock LayoutDetails::GetContainingBlock(ContainerBox* parent_container, const Style::Position position, Vector2f initial_containing_block)
+ContainingBlock LayoutDetails::GetContainingBlock(ContainerBox* parent_container, const Style::Position position)
 {
+	RMLUI_ASSERT(parent_container);
 	using Style::Position;
 
 	ContainerBox* container = parent_container;
 	Box::Area area = Box::CONTENT;
 
-	if (position == Position::Fixed)
+	// For absolutely positioned boxes we look for the first positioned ancestor. We deviate from the CSS specs by using
+	// the same rules for fixed boxes, as that is particularly helpful for handles and other widgets that should not
+	// scroll with the window. This is a common design pattern in target applications for this library, but may be
+	// reconsidered in the future.
+	if (position == Position::Absolute || position == Position::Fixed)
 	{
-		return {nullptr, initial_containing_block};
-	}
-	else if (position == Position::Absolute)
-	{
-		// TODO: Should we return nullptr or the tree root if we don't have any positioned ancestors?
 		while (container && container->GetParent() && container->GetPositionProperty() == Position::Static)
 			container = container->GetParent();
 		area = Box::PADDING;
 	}
-
-	if (!container)
-		return {nullptr, initial_containing_block};
 
 	const Box* box = container->GetBoxPtr();
 	if (!box)
@@ -197,58 +194,25 @@ ContainingBlock LayoutDetails::GetContainingBlock(ContainerBox* parent_container
 
 	Vector2f containing_block = box->GetSize(area);
 
-	if (Element* element = container->GetElement())
+	if (position == Position::Static || position == Position::Relative)
 	{
-		ElementScroll* element_scroll = element->GetElementScroll();
-		containing_block -= {
-			element_scroll->GetScrollbarSize(ElementScroll::VERTICAL),
-			element_scroll->GetScrollbarSize(ElementScroll::HORIZONTAL),
-		};
+		// For static elements we subtract the scrollbar size so that elements normally don't overlap their parent's
+		// scrollbars. In CSS, this would also be done for absolutely positioned elements, we might want to copy that
+		// behavior in the future. If so, we would also need to change the element offset behavior, and ideally also
+		// make positioned boxes contribute to the scrollable area.
+		if (Element* element = container->GetElement())
+		{
+			ElementScroll* element_scroll = element->GetElementScroll();
+			containing_block.x -= element_scroll->GetScrollbarSize(ElementScroll::VERTICAL);
+			containing_block.y -= element_scroll->GetScrollbarSize(ElementScroll::HORIZONTAL);
+		}
 	}
 
+	// TODO: Handle auto sized dimensions correctly (in particular, height/max-height should resolve to auto/none when
+	// containing block is indefinite).
 	containing_block = Math::Max(containing_block, Vector2f(0.f));
 
 	return {container, containing_block};
-}
-
-Vector2f LayoutDetails::GetContainingBlock(const BlockContainer* containing_box)
-{
-	RMLUI_ASSERT(containing_box);
-
-	Vector2f containing_block;
-
-	containing_block.x = containing_box->GetBox().GetSize().x;
-	if (Element* element = containing_box->GetElement())
-		containing_block.x -= element->GetElementScroll()->GetScrollbarSize(ElementScroll::VERTICAL);
-
-	while ((containing_block.y = containing_box->GetBox().GetSize().y) < 0)
-	{
-		auto parent = containing_box->GetParent();
-		if (!parent && containing_box->root_containing_block.y >= 0.f)
-		{
-			containing_block.y = containing_box->root_containing_block.y;
-			break;
-		}
-
-		containing_box = containing_box->GetParent();
-		if (!containing_box)
-		{
-			RMLUI_ERROR;
-			containing_block.y = 0;
-			break;
-		}
-	}
-
-	if (containing_box)
-	{
-		if (Element* element = containing_box->GetElement())
-			containing_block.y -= element->GetElementScroll()->GetScrollbarSize(ElementScroll::HORIZONTAL);
-	}
-
-	containing_block.x = Math::Max(0.0f, containing_block.x);
-	containing_block.y = Math::Max(0.0f, containing_block.y);
-
-	return containing_block;
 }
 
 void LayoutDetails::BuildBoxSizeAndMargins(Box& box, Vector2f min_size, Vector2f max_size, Vector2f containing_block, Element* element,
@@ -293,9 +257,10 @@ float LayoutDetails::GetShrinkToFitWidth(Element* element, Vector2f containing_b
 	// width. Also, children of elements with a fixed width and height don't need to be formatted further. Further, we
 	// might get away with not closing the boxes during formatting.
 	// TODO: Only considers block formatting contexts, however, we just as well might have flex or table formatting contexts.
-	auto formatting_context = MakeUnique<BlockFormattingContext>(nullptr, nullptr, element);
+	RootBox root(containing_block);
+	auto formatting_context = MakeUnique<BlockFormattingContext>(&root, element);
 
-	formatting_context->Format(containing_block, FormatSettings{&box, nullptr});
+	formatting_context->Format(FormatSettings{&box, nullptr});
 
 	return Math::Min(containing_block.x, formatting_context->GetShrinkToFitWidth());
 }

@@ -43,11 +43,10 @@ using TrackBoxList = Vector<TrackBox>;
 
 class TableFormattingContext final : public FormattingContext {
 public:
-	TableFormattingContext(const FormattingContext* parent_context, ContainerBox* parent_box, Element* element) :
-		FormattingContext(Type::Table, parent_context, parent_box, element), element_table(element)
+	TableFormattingContext(ContainerBox* parent_box, Element* element) : FormattingContext(Type::Table, parent_box, element), element_table(element)
 	{}
 
-	void Format(Vector2f containing_block, FormatSettings format_settings) override;
+	void Format(FormatSettings format_settings) override;
 
 	UniquePtr<LayoutBox> ExtractRootBox() override { return std::move(table_wrapper_box); }
 

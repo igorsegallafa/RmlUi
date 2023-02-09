@@ -42,13 +42,17 @@ class InlineContainer;
 
 class LayoutBox {
 public:
-	enum class Type { BlockContainer, InlineContainer, FlexContainer, TableWrapper, Replaced };
+	enum class Type { Root, BlockContainer, InlineContainer, FlexContainer, TableWrapper, Replaced };
 	enum class CloseResult { OK, LayoutSelf, LayoutParent };
 
 	Type GetType() const { return type; }
 
+	// Returns the border size of this box including overflowing content. Similar to the scrollable overflow rectangle,
+	// but shrinked if overflow is caught here. This can be wider than the box if we are overflowing.
+	// @note Only available after the box has been closed.
+	Vector2f GetVisibleOverflowSize() const { return visible_overflow_size; }
+
 	// TODO: Do we really want virtual for these?
-	virtual Vector2f GetVisibleOverflowSize() const { return Vector2f(0.f); }
 	virtual const Box* GetBoxPtr() const { return nullptr; }
 	virtual bool GetBaselineOfLastLine(float& /*out_baseline*/) const { return false; }
 
@@ -63,21 +67,19 @@ public:
 protected:
 	LayoutBox(Type type) : type(type) {}
 
+	void SetVisibleOverflowSize(Vector2f size) { visible_overflow_size = size; }
+
 	// Debug dump layout tree.
 	virtual String DebugDumpTree(int depth) const = 0;
 
 private:
 	Type type;
+
+	Vector2f visible_overflow_size;
 };
 
 class ContainerBox : public LayoutBox {
 public:
-	// Returns the border size of this box including overflowing content. Similar to the scrollable overflow rectangle,
-	// but shrinked if overflow is caught here. This can be wider than the box if we are overflowing.
-	// @note Only available after the box has been closed.
-	Vector2f GetVisibleOverflowSize() const override { return visible_overflow_size; }
-	void SetVisibleOverflowSize(Vector2f size) { visible_overflow_size = size; }
-
 	bool IsScrollContainer() const { return overflow_x != Style::Overflow::Visible || overflow_y != Style::Overflow::Visible; }
 
 	// Determine if this element should have scrollbars or not, and create them if so.
@@ -92,7 +94,7 @@ public:
 	void AddRelativeElement(Element* element);
 
 	/// Formats, sizes, and positions all absolute elements in this block.
-	void ClosePositionedElements(const Box& box);
+	void ClosePositionedElements();
 	// Clears the list of absolutely and relatively positioned elements, without formatting them.
 	void ClearPositionedElements();
 
@@ -123,8 +125,6 @@ protected:
 	Element* const element;
 
 private:
-	Vector2f visible_overflow_size;
-
 	struct AbsoluteElement {
 		Element* element;
 		Vector2f static_position;               // The hypothetical position of the element as if it was placed in normal flow.
@@ -145,6 +145,18 @@ private:
 	ContainerBox* parent_container = nullptr;
 };
 
+class RootBox final : public ContainerBox {
+public:
+	RootBox(Vector2f containing_block) : ContainerBox(Type::Root, nullptr, nullptr), box(containing_block) {}
+
+	const Box* GetBoxPtr() const override { return &box; }
+
+	String DebugDumpTree(int depth) const override { return String(depth * 2, ' ') + "RootBox"; /* TODO */ }
+
+private:
+	Box box;
+};
+
 class FlexContainer final : public ContainerBox {
 public:
 	FlexContainer(Element* element, ContainerBox* parent_container) : ContainerBox(Type::FlexContainer, element, parent_container)
@@ -159,12 +171,12 @@ public:
 		if (!SubmitBox(content_overflow_size, box, -1.f))
 			return CloseResult::LayoutSelf;
 
-		ClosePositionedElements(box);
+		ClosePositionedElements();
 
 		return CloseResult::OK;
 	}
 
-	const Box* GetBoxPtr() const override { return &element->GetBox(); }
+	const Box* GetBoxPtr() const override { return &box; }
 
 	Box& GetBox() { return box; }
 
@@ -189,7 +201,7 @@ public:
 		RMLUI_ASSERT(result);
 		(void)result;
 
-		ClosePositionedElements(box);
+		ClosePositionedElements();
 	}
 
 	const Box* GetBoxPtr() const override { return &box; }
@@ -201,7 +213,12 @@ private:
 };
 
 /**
-    @author Peter Curry
+    A container for block-level boxes.
+
+    TODO We act as the containing block for static and relative children, so this way our children's offset parent and
+    containing block coincide, which is a nice feature.
+    TODO Could generalize this so that the offset parent is defined to always be the element's containing block. To
+    complete this we also need to consider absolute children of inline boxes.
  */
 class BlockContainer final : public ContainerBox {
 public:
@@ -211,20 +228,14 @@ public:
 	/// @param box[in] The box used for this block box.
 	/// @param min_height[in] The minimum height of the content box.
 	/// @param max_height[in] The maximum height of the content box.
-	// TODO: This parent container / block container division is ugly. They're normally the same, except for the BFC root, which only provides the
-	// parent container (not parent block container). We only want to increment our parent cursor if it is in the same BFC context. Then again,
-	// perhaps we don't want that either, but instead increment it from our parent always?
-	BlockContainer(ContainerBox* parent_container, BlockContainer* parent_block_container, Element* element, const Box& box, float min_height,
-		float max_height);
+	BlockContainer(ContainerBox* parent_container, Element* element, const Box& box, float min_height, float max_height);
 	/// Releases the block box.
 	~BlockContainer();
 
-	// TODO
-	Vector2f root_containing_block = Vector2f(-1.f);
-
 	/// Closes the box. This will determine the element's height (if it was unspecified).
+	/// @param parent_block_box Our parent which will be sized to contain this box, or nullptr for the root of the block formatting context.
 	/// @return The result of the close; this may request a reformat of this element or our parent.
-	CloseResult Close();
+	CloseResult Close(BlockContainer* parent_block_container);
 
 	/// Called by a closing block box child. Increments the cursor.
 	/// @param[in] child The closing child block-level box.
@@ -267,10 +278,6 @@ public:
 	// Estimate the static position of a hypothetical next element to be placed.
 	Vector2f GetOpenStaticPosition(Style::Display display) const;
 
-	// TODO: Generalize to all formatting contexts, and transcend them.
-	// TODO: Remove, should be part of external containing block calculations.
-	ContainerBox* GetAbsolutePositioningContainingBlock();
-
 	/// Returns the offset from the top-left corner of this box's offset element the next child box will be positioned at.
 	/// @param[in] top_margin The top margin of the box. This will be collapsed as appropriate against other block boxes.
 	/// @param[in] clear_property The value of the underlying element's clear property.
@@ -296,18 +303,12 @@ public:
 	/// Returns the block box's element.
 	Element* GetElement() const;
 
-	/// Returns the block box's parent.
-	const BlockContainer* GetParent() const;
-
 	/// Returns the block box space.
 	const LayoutBlockBoxSpace* GetBlockBoxSpace() const;
 
 	/// Returns the position of the block box, relative to its parent's content area.
 	/// @return The relative position of the block box.
 	Vector2f GetPosition() const;
-
-	/// Returns the block box against which all positions of boxes in the hierarchy are set relative to.
-	const BlockContainer* GetOffsetParent() const;
 
 	Box& GetBox();
 	const Box& GetBox() const;
@@ -341,12 +342,6 @@ private:
 	String DebugDumpTree(int depth) const override;
 
 	using BlockBoxList = Vector<UniquePtr<LayoutBox>>;
-
-	// The element this block box's children are to be offset from.
-	BlockContainer* offset_parent = nullptr;
-
-	// The box's block parent. This will be nullptr for the root of the box tree.
-	BlockContainer* parent = nullptr;
 
 	// The block box's position.
 	Vector2f position;

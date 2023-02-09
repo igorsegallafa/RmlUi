@@ -86,13 +86,11 @@ public:
 	static void GetDefiniteMinMaxHeight(float& min_height, float& max_height, const ComputedValues& computed, const Box& box,
 		float containing_block_height);
 
-	/// Returns the fully-resolved, fixed-width and -height containing block from a block box.
-	/// @param[in] containing_box The leaf box.
-	/// @return The dimensions of the content area, using the latest fixed dimensions for width and height in the hierarchy.
-	static Vector2f GetContainingBlock(const BlockContainer* containing_box);
-
-	// TODO
-	static ContainingBlock GetContainingBlock(ContainerBox* parent_container, const Style::Position position, Vector2f initial_containing_block);
+	/// Returns the containing block for a box.
+	/// @param[in] parent_container The parent container of the current box.
+	/// @param[in] child_position The position property of the current box.
+	/// @return The containing block box and size.
+	static ContainingBlock GetContainingBlock(ContainerBox* parent_container, Style::Position position);
 
 	/// Builds margins of a Box, and resolves any auto width or height for non-inline elements. The height may be left unresolved if it depends on the
 	/// element's children.

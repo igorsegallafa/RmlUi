@@ -36,16 +36,14 @@ namespace Rml {
 
 class FlexFormattingContext final : public FormattingContext {
 public:
-	FlexFormattingContext(const FormattingContext* parent_context, ContainerBox* parent_box, Element* element) :
-		FormattingContext(Type::Flex, parent_context, parent_box, element)
-	{}
+	FlexFormattingContext(ContainerBox* parent_box, Element* element) : FormattingContext(Type::Flex, parent_box, element) {}
 
 	FlexContainer* GetContainer() { return flex_container_box.get(); }
 
 	UniquePtr<LayoutBox> ExtractRootBox() override { return std::move(flex_container_box); }
 	UniquePtr<FlexContainer> ExtractContainer() { return std::move(flex_container_box); }
 
-	void Format(Vector2f containing_block, FormatSettings format_settings) override;
+	void Format(FormatSettings format_settings) override;
 
 private:
 	/// Format the flexbox and its children.

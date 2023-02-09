@@ -104,8 +104,7 @@ static OuterDisplayType GetOuterDisplayType(Style::Display display)
 	return OuterDisplayType::Invalid;
 }
 
-UniquePtr<FormattingContext> FormattingContext::ConditionallyCreateIndependentFormattingContext(const FormattingContext* parent_context,
-	ContainerBox* parent_container, Element* element)
+UniquePtr<FormattingContext> FormattingContext::ConditionallyCreateIndependentFormattingContext(ContainerBox* parent_container, Element* element)
 {
 	using namespace Style;
 	auto& computed = element->GetComputedValues();
@@ -113,10 +112,10 @@ UniquePtr<FormattingContext> FormattingContext::ConditionallyCreateIndependentFo
 	const Display display = computed.display();
 
 	if (display == Display::Flex)
-		return MakeUnique<FlexFormattingContext>(parent_context, parent_container, element);
+		return MakeUnique<FlexFormattingContext>(parent_container, element);
 
 	if (display == Display::Table)
-		return MakeUnique<TableFormattingContext>(parent_context, parent_container, element);
+		return MakeUnique<TableFormattingContext>(parent_container, element);
 
 	const bool establishes_bfc =
 		(computed.float_() != Float::None || computed.position() == Position::Absolute || computed.position() == Position::Fixed ||
@@ -124,15 +123,15 @@ UniquePtr<FormattingContext> FormattingContext::ConditionallyCreateIndependentFo
 			computed.overflow_y() != Overflow::Visible || !element->GetParentNode() || element->GetParentNode()->GetDisplay() == Display::Flex);
 
 	if (establishes_bfc)
-		return MakeUnique<BlockFormattingContext>(parent_context, parent_container, element);
+		return MakeUnique<BlockFormattingContext>(parent_container, element);
 
 	return nullptr;
 }
 
-void BlockFormattingContext::Format(Vector2f containing_block, FormatSettings format_settings)
+void BlockFormattingContext::Format(FormatSettings format_settings)
 {
 	Element* element = GetRootElement();
-	RMLUI_ASSERT(element && containing_block.x >= 0 && containing_block.y >= 0);
+	RMLUI_ASSERT(element && !root_block_container);
 
 #ifdef RMLUI_ENABLE_PROFILING
 	RMLUI_ZoneScopedC(0xB22222);
@@ -140,24 +139,7 @@ void BlockFormattingContext::Format(Vector2f containing_block, FormatSettings fo
 	RMLUI_ZoneName(name.c_str(), name.size());
 #endif
 
-	bool format_result = FormatBlockBox(nullptr, element, format_settings, containing_block);
-
-	// Since the root box has no parent, it should not be possible to require another round of formatting.
-	RMLUI_ASSERT(format_result);
-	(void)format_result;
-
-	SubmitElementLayout(element);
-}
-
-float BlockFormattingContext::GetShrinkToFitWidth() const
-{
-	return root_block_container ? root_block_container->GetShrinkToFitWidth() : 0.f;
-}
-
-bool BlockFormattingContext::FormatBlockBox(BlockContainer* parent_container, Element* element, FormatSettings format_settings,
-	Vector2f root_containing_block)
-{
-	const Vector2f containing_block = parent_container ? LayoutDetails::GetContainingBlock(parent_container) : root_containing_block;
+	const Vector2f containing_block = LayoutDetails::GetContainingBlock(GetParentBoxOfContext(), element->GetPosition()).size;
 
 	Box box;
 	if (format_settings.override_initial_box)
@@ -168,17 +150,40 @@ bool BlockFormattingContext::FormatBlockBox(BlockContainer* parent_container, El
 	float min_height, max_height;
 	LayoutDetails::GetDefiniteMinMaxHeight(min_height, max_height, element->GetComputedValues(), box, containing_block.y);
 
+	root_block_container = MakeUnique<BlockContainer>(GetParentBoxOfContext(), element, box, min_height, max_height);
+	root_block_container->ResetScrollbars(box);
+
+	// Format the element. Since the root box has no block box parent, it should not be possible to require another round of formatting.
+	RMLUI_VERIFY(FormatBlockBox(nullptr, element));
+
+	SubmitElementLayout(element);
+
+	if (format_settings.out_visible_overflow_size)
+		*format_settings.out_visible_overflow_size = root_block_container->GetVisibleOverflowSize();
+}
+
+float BlockFormattingContext::GetShrinkToFitWidth() const
+{
+	return root_block_container ? root_block_container->GetShrinkToFitWidth() : 0.f;
+}
+
+bool BlockFormattingContext::FormatBlockBox(BlockContainer* parent_container, Element* element)
+{
 	BlockContainer* new_container = nullptr;
 	if (parent_container)
 	{
+		const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent_container, element->GetPosition()).size;
+
+		Box box;
+		LayoutDetails::BuildBox(box, containing_block, element);
+		float min_height, max_height;
+		LayoutDetails::GetDefiniteMinMaxHeight(min_height, max_height, element->GetComputedValues(), box, containing_block.y);
+
 		new_container = parent_container->AddBlockBox(element, box, min_height, max_height);
 	}
 	else
 	{
-		RMLUI_ASSERT(!root_block_container);
-		root_block_container = MakeUnique<BlockContainer>(GetParentBoxOfContext(), nullptr, element, box, min_height, max_height);
-		root_block_container->ResetScrollbars(box);
-		root_block_container->root_containing_block = containing_block;
+		RMLUI_ASSERT(root_block_container);
 		new_container = root_block_container.get();
 	}
 
@@ -198,7 +203,7 @@ bool BlockFormattingContext::FormatBlockBox(BlockContainer* parent_container, El
 				i = -1;
 		}
 
-		const auto result = new_container->Close();
+		const auto result = new_container->Close(parent_container);
 		if (result == BlockContainer::CloseResult::LayoutSelf)
 			// We need to reformat ourself; do a second iteration to format all of our children and close again.
 			continue;
@@ -211,9 +216,6 @@ bool BlockFormattingContext::FormatBlockBox(BlockContainer* parent_container, El
 	}
 
 	SubmitElementLayout(element);
-
-	if (format_settings.out_visible_overflow_size)
-		*format_settings.out_visible_overflow_size = new_container->GetVisibleOverflowSize();
 
 	return true;
 }
@@ -243,12 +245,12 @@ bool BlockFormattingContext::FormatBlockContainerChild(BlockContainer* parent_co
 
 	// Check for an absolute position; if this has been set, then we remove it from the flow and add it to the current
 	// block box to be laid out and positioned once the block has been closed and sized.
-	if (computed.position() == Style::Position::Absolute || computed.position() == Style::Position::Fixed)
+	const Style::Position position_property = computed.position();
+	if (position_property == Style::Position::Absolute || position_property == Style::Position::Fixed)
 	{
-		// Display the element as a block element.
-		const BlockContainer* offset_parent = parent_container->GetOffsetParent();
-		const Vector2f static_position = parent_container->GetOpenStaticPosition(display) - offset_parent->GetPosition();
-		parent_container->GetAbsolutePositioningContainingBlock()->AddAbsoluteElement(element, static_position, offset_parent->GetElement());
+		const Vector2f static_position = parent_container->GetOpenStaticPosition(display) - parent_container->GetPosition();
+		ContainingBlock containing_block = LayoutDetails::GetContainingBlock(parent_container, position_property);
+		containing_block.container->AddAbsoluteElement(element, static_position, parent_container->GetElement());
 		return true;
 	}
 
@@ -259,11 +261,9 @@ bool BlockFormattingContext::FormatBlockContainerChild(BlockContainer* parent_co
 		return true;
 	}
 
-	if (auto formatting_context = ConditionallyCreateIndependentFormattingContext(this, parent_container, element))
+	if (auto formatting_context = ConditionallyCreateIndependentFormattingContext(parent_container, element))
 	{
-		const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent_container);
-
-		formatting_context->Format(containing_block, FormatSettings{nullptr, nullptr});
+		formatting_context->Format({});
 
 		UniquePtr<LayoutBox> layout_box = formatting_context->ExtractRootBox();
 
@@ -316,7 +316,7 @@ bool BlockFormattingContext::FormatInlineBox(BlockContainer* parent_container, E
 {
 	RMLUI_ZoneScopedC(0x3F6F6F);
 
-	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent_container);
+	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent_container, element->GetPosition()).size;
 
 	Box box;
 	LayoutDetails::BuildBox(box, containing_block, element, BoxContext::Inline);

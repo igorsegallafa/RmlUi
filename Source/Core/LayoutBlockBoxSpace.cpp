@@ -106,8 +106,9 @@ float LayoutBlockBoxSpace::PlaceFloat(Element* element, float cursor)
 	extent_bottom_right_margin = Math::Max(extent_bottom_right_margin, margin_offset + element_margin_size);
 	extent_bottom_right_border = Math::Max(extent_bottom_right_border, border_offset + element_border_size);
 
-	// Shift the offset into the correct space relative to the element's offset parent.
-	element->SetOffset(element_border_offset - parent->GetOffsetParent()->GetPosition(), parent->GetOffsetParent()->GetElement());
+	// Shift the offset into our parent's space, which acts as the element's containing block.
+	// TODO: Once we share space inside BFC, pass in which block container to place it relative to.
+	element->SetOffset(element_border_offset - parent->GetPosition(), parent->GetElement());
 
 	return element_margin_offset.y + element_margin_size.y;
 }

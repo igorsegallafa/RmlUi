@@ -42,7 +42,7 @@
 namespace Rml {
 
 InlineContainer::InlineContainer(BlockContainer* _parent, float _available_width, float _element_line_height, bool _wrap_content) :
-	ContainerBox(Type::InlineContainer, nullptr, _parent), parent(_parent), element_line_height(_element_line_height), wrap_content(_wrap_content),
+	LayoutBox(Type::InlineContainer), parent(_parent), element_line_height(_element_line_height), wrap_content(_wrap_content),
 	root_inline_box(_parent->GetElement())
 {
 	RMLUI_ASSERT(_parent);
@@ -212,10 +212,9 @@ void InlineContainer::CloseOpenLineBox(bool split_all_open_boxes, UniquePtr<Layo
 		if (height_of_line > line_box->GetLineMinimumHeight())
 			UpdateLineBoxPlacement(line_box, 0.f, height_of_line);
 
-		// Find the position of the line box relative to its parent's block box's offset parent. Now that the line has
-		// been given a final position and size, close the line box to submit all the fragments.
-		const BlockContainer* offset_parent = parent->GetOffsetParent();
-		line_box->Close(offset_parent->GetElement(), offset_parent->GetPosition(), text_align);
+		// Now that the line has been given a final position and size, close the line box to submit all the fragments.
+		// Our parent block container acts as the containing block for our inline boxes.
+		line_box->Close(parent->GetElement(), parent->GetPosition(), text_align);
 
 		// Move the cursor down, unless we should collapse the line.
 		if (!line_box->CanCollapseLine())

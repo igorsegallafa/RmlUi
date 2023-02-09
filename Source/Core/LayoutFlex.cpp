@@ -39,14 +39,15 @@
 
 namespace Rml {
 
-void FlexFormattingContext::Format(Vector2f containing_block, FormatSettings format_settings)
+void FlexFormattingContext::Format(FormatSettings format_settings)
 {
-	RMLUI_ASSERT(containing_block.x >= 0.f);
-	RMLUI_ASSERT(!flex_container_box);
-
 	Element* element = GetRootElement();
 	ElementScroll* element_scroll = element->GetElementScroll();
 	const ComputedValues& computed = element->GetComputedValues();
+
+	const Vector2f containing_block = LayoutDetails::GetContainingBlock(GetParentBoxOfContext(), element->GetPosition()).size;
+	RMLUI_ASSERT(containing_block.x >= 0.f);
+	RMLUI_ASSERT(!flex_container_box);
 
 	flex_container_box = MakeUnique<FlexContainer>(element, GetParentBoxOfContext());
 
@@ -871,10 +872,10 @@ void FlexFormattingContext::Format(Vector2f& flex_resulting_content_size, Vector
 
 void FlexFormattingContext::FormatFlexItem(Element* element, const Box* override_initial_box, Vector2f* out_cell_visible_overflow_size) const
 {
-	auto formatting_context = ConditionallyCreateIndependentFormattingContext(this, flex_container_box.get(), element);
+	auto formatting_context = ConditionallyCreateIndependentFormattingContext(flex_container_box.get(), element);
 	RMLUI_ASSERTMSG(formatting_context, "Flex items should always generate an independent formatting context");
 
-	formatting_context->Format(flex_content_containing_block, FormatSettings{override_initial_box, out_cell_visible_overflow_size});
+	formatting_context->Format(FormatSettings{override_initial_box, out_cell_visible_overflow_size});
 }
 
 } // namespace Rml
