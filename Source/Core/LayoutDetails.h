@@ -89,13 +89,13 @@ public:
 	/// Returns the containing block for a box.
 	/// @param[in] parent_container The parent container of the current box.
 	/// @param[in] child_position The position property of the current box.
-	/// @return The containing block box and size.
+	/// @return The containing block box and size, possibly indefinite along one or both axes.
 	static ContainingBlock GetContainingBlock(ContainerBox* parent_container, Style::Position position);
 
 	/// Builds margins of a Box, and resolves any auto width or height for non-inline elements. The height may be left unresolved if it depends on the
 	/// element's children.
-	/// @param[in,out] box The box to generate. The padding and borders must be set on the box already. The content area is used instead of the width
-	/// and height properties, and -1 means auto width/height.
+	/// @param[in,out] box The box to generate. The padding and borders, in addition to any definite content area, must be set on the box already.
+	/// Auto width and height are specified by negative content size.
 	/// @param[in] min_size The element's minimum width and height.
 	/// @param[in] max_size The element's maximum width and height.
 	/// @param[in] containing_block The size of the containing block.

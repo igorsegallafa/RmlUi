@@ -41,7 +41,7 @@ namespace Rml {
 // Convert width or height of a border box to the width or height of its corresponding content box.
 static inline float BorderSizeToContentSize(float border_size, float border_padding_edges_size)
 {
-	if (border_size < 0.0f || border_size == FLT_MAX)
+	if (border_size < 0.0f || border_size >= FLT_MAX)
 		return border_size;
 
 	return Math::Max(0.0f, border_size - border_padding_edges_size);
@@ -85,14 +85,17 @@ void LayoutDetails::BuildBox(Box& box, Vector2f containing_block, Element* eleme
 	// For inline non-replaced elements, width and height are ignored, so we can skip the calculations.
 	if (box_context == BoxContext::Block || box_context == BoxContext::FlexOrTable || replaced_element)
 	{
-		if (content_area.x < 0 && computed.width().type != Style::Width::Auto)
-			content_area.x = ResolveValue(computed.width(), containing_block.x);
+		content_area.x = ResolveValueOr(computed.width(), containing_block.x, -1.f);
+		content_area.y = ResolveValueOr(computed.height(), containing_block.y, -1.f);
 
-		if (content_area.y < 0 && computed.height().type != Style::Width::Auto)
-			content_area.y = ResolveValue(computed.height(), containing_block.y);
-
-		min_size = Vector2f(ResolveValue(computed.min_width(), containing_block.x), ResolveValue(computed.min_height(), containing_block.y));
-		max_size = Vector2f(ResolveValue(computed.max_width(), containing_block.x), ResolveValue(computed.max_height(), containing_block.y));
+		min_size = Vector2f{
+			ResolveValueOr(computed.min_width(), containing_block.x, 0.f),
+			ResolveValueOr(computed.min_height(), containing_block.y, 0.f),
+		};
+		max_size = Vector2f{
+			ResolveValueOr(computed.max_width(), containing_block.x, FLT_MAX),
+			ResolveValueOr(computed.max_height(), containing_block.y, FLT_MAX),
+		};
 
 		// Adjust sizes for the given box sizing model.
 		if (computed.box_sizing() == Style::BoxSizing::BorderBox)
@@ -126,8 +129,8 @@ void LayoutDetails::BuildBox(Box& box, Vector2f containing_block, Element* eleme
 
 void LayoutDetails::GetMinMaxWidth(float& min_width, float& max_width, const ComputedValues& computed, const Box& box, float containing_block_width)
 {
-	min_width = ResolveValue(computed.min_width(), containing_block_width);
-	max_width = ResolveValue(computed.max_width(), containing_block_width);
+	min_width = ResolveValueOr(computed.min_width(), containing_block_width, 0.f);
+	max_width = ResolveValueOr(computed.max_width(), containing_block_width, FLT_MAX);
 
 	if (computed.box_sizing() == Style::BoxSizing::BorderBox)
 	{
@@ -140,8 +143,8 @@ void LayoutDetails::GetMinMaxWidth(float& min_width, float& max_width, const Com
 void LayoutDetails::GetMinMaxHeight(float& min_height, float& max_height, const ComputedValues& computed, const Box& box,
 	float containing_block_height)
 {
-	min_height = ResolveValue(computed.min_height(), containing_block_height);
-	max_height = ResolveValue(computed.max_height(), containing_block_height);
+	min_height = ResolveValueOr(computed.min_height(), containing_block_height, 0.f);
+	max_height = ResolveValueOr(computed.max_height(), containing_block_height, FLT_MAX);
 
 	if (computed.box_sizing() == Style::BoxSizing::BorderBox)
 	{
@@ -203,14 +206,12 @@ ContainingBlock LayoutDetails::GetContainingBlock(ContainerBox* parent_container
 		if (Element* element = container->GetElement())
 		{
 			ElementScroll* element_scroll = element->GetElementScroll();
-			containing_block.x -= element_scroll->GetScrollbarSize(ElementScroll::VERTICAL);
-			containing_block.y -= element_scroll->GetScrollbarSize(ElementScroll::HORIZONTAL);
+			if (containing_block.x >= 0.f)
+				containing_block.x = Math::Max(containing_block.x - element_scroll->GetScrollbarSize(ElementScroll::VERTICAL), 0.f);
+			if (containing_block.y >= 0.f)
+				containing_block.y = Math::Max(containing_block.y - element_scroll->GetScrollbarSize(ElementScroll::HORIZONTAL), 0.f);
 		}
 	}
-
-	// TODO: Handle auto sized dimensions correctly (in particular, height/max-height should resolve to auto/none when
-	// containing block is indefinite).
-	containing_block = Math::Max(containing_block, Vector2f(0.f));
 
 	return {container, containing_block};
 }
@@ -257,7 +258,7 @@ float LayoutDetails::GetShrinkToFitWidth(Element* element, Vector2f containing_b
 	// width. Also, children of elements with a fixed width and height don't need to be formatted further. Further, we
 	// might get away with not closing the boxes during formatting.
 	// TODO: Only considers block formatting contexts, however, we just as well might have flex or table formatting contexts.
-	RootBox root(containing_block);
+	RootBox root(Math::Max(containing_block, Vector2f(0.f)));
 	auto formatting_context = MakeUnique<BlockFormattingContext>(&root, element);
 
 	formatting_context->Format(FormatSettings{&box, nullptr});

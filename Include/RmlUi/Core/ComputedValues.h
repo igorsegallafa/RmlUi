@@ -399,11 +399,20 @@ namespace Style {
 
 } // namespace Style
 
-// Resolves a computed LengthPercentage value to the base unit 'px'.
-// Percentages are scaled by the base_value.
-// Note: Auto must be manually handled during layout, here it returns zero.
-RMLUICORE_API float ResolveValue(Style::LengthPercentageAuto length, float base_value);
-RMLUICORE_API float ResolveValue(Style::LengthPercentage length, float base_value);
+// Resolves a computed LengthPercentage(Auto) value to the base unit 'px'.
+// Percentages are scaled by the base value, if definite (>= 0), otherwise return the default value.
+// Auto lengths always return the default value.
+RMLUICORE_API float ResolveValueOr(Style::LengthPercentageAuto length, float base_value, float default_value);
+RMLUICORE_API float ResolveValueOr(Style::LengthPercentage length, float base_value, float default_value);
+
+RMLUICORE_API_INLINE float ResolveValue(Style::LengthPercentageAuto length, float base_value)
+{
+	return ResolveValueOr(length, base_value, 0.f);
+}
+RMLUICORE_API_INLINE float ResolveValue(Style::LengthPercentage length, float base_value)
+{
+	return ResolveValueOr(length, base_value, 0.f);
+}
 
 using ComputedValues = Style::ComputedValues;
 
