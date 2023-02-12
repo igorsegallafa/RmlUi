@@ -83,10 +83,8 @@ private:
 
 class BlockFormattingContext final : public FormattingContext {
 public:
-	BlockFormattingContext(ContainerBox* parent_box, Element* element) : FormattingContext(Type::Block, parent_box, element)
-	{
-		RMLUI_ASSERT(element);
-	}
+	BlockFormattingContext(ContainerBox* parent_box, Element* element);
+	~BlockFormattingContext();
 
 	void Format(FormatSettings format_settings) override;
 
@@ -100,6 +98,7 @@ private:
 	bool FormatBlockContainerChild(BlockContainer* parent_container, Element* element);
 	bool FormatInlineBox(BlockContainer* parent_container, Element* element);
 
+	UniquePtr<LayoutBlockBoxSpace> float_space;
 	UniquePtr<BlockContainer> root_block_container;
 };
 

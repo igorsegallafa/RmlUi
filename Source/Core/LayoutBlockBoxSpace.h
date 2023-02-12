@@ -48,7 +48,7 @@ enum class LayoutFloatBoxEdge { Border, Margin };
 
 class LayoutBlockBoxSpace {
 public:
-	LayoutBlockBoxSpace(const BlockContainer* parent);
+	LayoutBlockBoxSpace();
 	~LayoutBlockBoxSpace();
 
 	/// Imports boxes from another block into this space.
@@ -61,7 +61,7 @@ public:
 	/// @param[in] dimensions The minimum available space required for the box.
 	/// @param[in] nowrap Restrict from wrapping down, returned vertical position always placed at ideal cursor.
 	/// @return The generated position for the box.
-	Vector2f NextBoxPosition(float& box_width, float cursor, Vector2f dimensions, bool nowrap) const;
+	Vector2f NextBoxPosition(const BlockContainer* parent, float& box_width, float cursor, Vector2f dimensions, bool nowrap) const;
 
 	/// Determines the position of a floated element within our block box.
 	/// @param[out] box_width The available width for the box.
@@ -70,14 +70,15 @@ public:
 	/// @param[in] float_property The element's computed float property.
 	/// @param[in] clear_property The element's computed clear property.
 	/// @return The next placement position for the float at its top-left margin position.
-	Vector2f NextFloatPosition(float& box_width, float cursor, Vector2f dimensions, Style::Float float_property, Style::Clear clear_property) const;
+	Vector2f NextFloatPosition(const BlockContainer* parent, float& box_width, float cursor, Vector2f dimensions, Style::Float float_property,
+		Style::Clear clear_property) const;
 
 	/// Generates and sets the position for a floating box of a given size within our block box. The element's box
 	/// is then added into our list of floating boxes.
 	/// @param[in] element The element to position.
 	/// @param[in] cursor The ideal vertical position for the box.
 	/// @return The offset of the bottom outer edge of the element.
-	float PlaceFloat(Element* element, float cursor);
+	float PlaceFloat(const BlockContainer* parent, Element* element, float cursor);
 
 	/// Determines the appropriate vertical position for an object that is choosing to clear floating elements to
 	/// the left or right (or both).
@@ -91,6 +92,16 @@ public:
 	/// @note Generally, the border box is used when determining overflow, while the margin box is used for layout sizing.
 	Vector2f GetDimensions(LayoutFloatBoxEdge edge) const;
 
+	// TODO: This will clear everything, for all boxes in the current block formatting context!
+	void Reset()
+	{
+		for (auto& box_list : boxes)
+			box_list.clear();
+		extent_bottom_right_border = {};
+		extent_bottom_right_border = {};
+		extent_bottom_right_margin = {};
+	}
+
 	void* operator new(size_t size);
 	void operator delete(void* chunk, size_t size);
 
@@ -98,7 +109,8 @@ private:
 	enum AnchorEdge { LEFT = 0, RIGHT = 1, NUM_ANCHOR_EDGES = 2 };
 
 	// Generates the position for an arbitrary box within our space layout, floated against either the left or right edge.
-	Vector2f NextBoxPosition(float& maximum_box_width, float cursor, Vector2f dimensions, bool nowrap, Style::Float float_property) const;
+	Vector2f NextBoxPosition(const BlockContainer* parent, float& maximum_box_width, float cursor, Vector2f dimensions, bool nowrap,
+		Style::Float float_property) const;
 
 	struct SpaceBox {
 		Vector2f offset;
@@ -106,9 +118,6 @@ private:
 	};
 
 	using SpaceBoxList = Vector<SpaceBox>;
-
-	// Our block-box parent.
-	const BlockContainer* parent;
 
 	// The boxes floating in our space.
 	SpaceBoxList boxes[NUM_ANCHOR_EDGES];

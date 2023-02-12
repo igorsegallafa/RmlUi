@@ -36,12 +36,14 @@
 
 namespace Rml {
 
-LayoutBlockBoxSpace::LayoutBlockBoxSpace(const BlockContainer* _parent) : parent(_parent) {}
+LayoutBlockBoxSpace::LayoutBlockBoxSpace() {}
 
 LayoutBlockBoxSpace::~LayoutBlockBoxSpace() {}
 
 void LayoutBlockBoxSpace::ImportSpace(const LayoutBlockBoxSpace& space)
 {
+	RMLUI_ASSERT(&space != this);
+
 	// Copy all the boxes from the parent into this space. Could do some optimisation here!
 	for (int i = 0; i < NUM_ANCHOR_EDGES; ++i)
 	{
@@ -52,13 +54,14 @@ void LayoutBlockBoxSpace::ImportSpace(const LayoutBlockBoxSpace& space)
 	// TODO: Copy extents from the other space too?
 }
 
-Vector2f LayoutBlockBoxSpace::NextBoxPosition(float& box_width, float cursor, const Vector2f dimensions, bool nowrap) const
+Vector2f LayoutBlockBoxSpace::NextBoxPosition(const BlockContainer* parent, float& box_width, float cursor, const Vector2f dimensions,
+	bool nowrap) const
 {
-	return NextBoxPosition(box_width, cursor, dimensions, nowrap, Style::Float::None);
+	return NextBoxPosition(parent, box_width, cursor, dimensions, nowrap, Style::Float::None);
 }
 
-Vector2f LayoutBlockBoxSpace::NextFloatPosition(float& out_box_width, float cursor, Vector2f dimensions, Style::Float float_property,
-	Style::Clear clear_property) const
+Vector2f LayoutBlockBoxSpace::NextFloatPosition(const BlockContainer* parent, float& out_box_width, float cursor, Vector2f dimensions,
+	Style::Float float_property, Style::Clear clear_property) const
 {
 	// Shift the cursor down (if necessary) so it isn't placed any higher than a previously-floated box.
 	for (int i = 0; i < NUM_ANCHOR_EDGES; ++i)
@@ -72,12 +75,12 @@ Vector2f LayoutBlockBoxSpace::NextFloatPosition(float& out_box_width, float curs
 
 	// Find a place to put this box.
 	const bool nowrap = false;
-	const Vector2f margin_offset = NextBoxPosition(out_box_width, cursor, dimensions, nowrap, float_property);
+	const Vector2f margin_offset = NextBoxPosition(parent, out_box_width, cursor, dimensions, nowrap, float_property);
 
 	return margin_offset;
 }
 
-float LayoutBlockBoxSpace::PlaceFloat(Element* element, float cursor)
+float LayoutBlockBoxSpace::PlaceFloat(const BlockContainer* parent, Element* element, float cursor)
 {
 	const Box& element_box = element->GetBox();
 	const Vector2f element_margin_top_left = {element_box.GetEdge(Box::MARGIN, Box::LEFT), element_box.GetEdge(Box::MARGIN, Box::TOP)};
@@ -90,24 +93,19 @@ float LayoutBlockBoxSpace::PlaceFloat(Element* element, float cursor)
 	Style::Clear clear_property = element->GetComputedValues().clear();
 
 	float unused_box_width = 0.f;
-	const Vector2f element_margin_offset = NextFloatPosition(unused_box_width, cursor, element_margin_size, float_property, clear_property);
+	const Vector2f element_margin_offset = NextFloatPosition(parent, unused_box_width, cursor, element_margin_size, float_property, clear_property);
 	const Vector2f element_border_offset = element_margin_offset + element_margin_top_left;
 
 	// It's been placed, so we can now add it to our list of floating boxes.
 	boxes[float_property == Style::Float::Left ? LEFT : RIGHT].push_back(SpaceBox{element_margin_offset, element_margin_size});
 
-	// Determine offsets relative to our container.
-	const Vector2f parent_content_offset = parent->GetPosition() + parent->GetBox().GetPosition();
-	const Vector2f margin_offset = element_margin_offset - parent_content_offset;
-	const Vector2f border_offset = element_border_offset - parent_content_offset;
-
 	// Set our extents so they enclose the new box.
-	extent_top_left_border = Math::Min(extent_top_left_border, border_offset);
-	extent_bottom_right_margin = Math::Max(extent_bottom_right_margin, margin_offset + element_margin_size);
-	extent_bottom_right_border = Math::Max(extent_bottom_right_border, border_offset + element_border_size);
+	extent_top_left_border = Math::Min(extent_top_left_border, element_border_offset);
+	extent_bottom_right_margin = Math::Max(extent_bottom_right_margin, element_margin_offset + element_margin_size);
+	extent_bottom_right_border = Math::Max(extent_bottom_right_border, element_border_offset + element_border_size);
 
 	// Shift the offset into our parent's space, which acts as the element's containing block.
-	// TODO: Once we share space inside BFC, pass in which block container to place it relative to.
+	// TODO: Move this outside function?
 	element->SetOffset(element_border_offset - parent->GetPosition(), parent->GetElement());
 
 	return element_margin_offset.y + element_margin_size.y;
@@ -133,19 +131,19 @@ float LayoutBlockBoxSpace::DetermineClearPosition(float cursor, Style::Clear cle
 	return cursor;
 }
 
-Vector2f LayoutBlockBoxSpace::NextBoxPosition(float& maximum_box_width, const float cursor, const Vector2f dimensions, const bool nowrap,
-	const Style::Float float_property) const
+Vector2f LayoutBlockBoxSpace::NextBoxPosition(const BlockContainer* parent, float& maximum_box_width, const float cursor, const Vector2f dimensions,
+	const bool nowrap, const Style::Float float_property) const
 {
 	const float parent_scrollbar_width = parent->GetElement()->GetElementScroll()->GetScrollbarSize(ElementScroll::VERTICAL);
-	const float parent_origin = parent->GetPosition().x + parent->GetBox().GetPosition(Box::CONTENT).x;
-	const float parent_edge = parent->GetBox().GetSize().x + parent_origin - parent_scrollbar_width;
+	const float parent_edge_left = parent->GetPosition().x + parent->GetBox().GetPosition().x;
+	const float parent_edge_right = parent_edge_left + parent->GetBox().GetSize().x - parent_scrollbar_width;
 
 	const AnchorEdge box_edge = (float_property == Style::Float::Right ? RIGHT : LEFT);
 
-	Vector2f box_position = {parent_origin, cursor};
+	Vector2f box_position = {parent_edge_left, cursor};
 
 	if (box_edge == RIGHT)
-		box_position.x += parent->GetBox().GetSize().x - dimensions.x - parent_scrollbar_width;
+		box_position.x = parent_edge_right - dimensions.x;
 
 	float next_cursor = FLT_MAX;
 
@@ -185,15 +183,16 @@ Vector2f LayoutBlockBoxSpace::NextBoxPosition(float& maximum_box_width, const fl
 			next_cursor = Math::Min(next_cursor, fixed_box.offset.y + fixed_box.dimensions.y);
 
 			// Were we pushed out of our containing box? If so, try again at the next cursor position.
-			float normalised_position = box_position.x - parent_origin;
+			float normalised_position = box_position.x - parent_edge_left;
+			// TODO: Subtract parent scrollbar? Or just compare box_position to parent_edge_right?
 			if (normalised_position < 0 || normalised_position + dimensions.x > parent->GetBox().GetSize().x)
-				return NextBoxPosition(maximum_box_width, next_cursor + 0.01f, dimensions, nowrap, float_property);
+				return NextBoxPosition(parent, maximum_box_width, next_cursor + 0.01f, dimensions, nowrap, float_property);
 		}
 	}
 
 	// Second; we go through all of the boxes on the other edge, checking for horizontal collisions and determining the
 	// maximum width the box can stretch to, if it is placed at this location.
-	maximum_box_width = (box_edge == LEFT ? parent_edge - box_position.x : box_position.x + dimensions.x);
+	maximum_box_width = (box_edge == LEFT ? parent_edge_right - box_position.x : box_position.x + dimensions.x);
 
 	for (const SpaceBox& fixed_box : boxes[1 - box_edge])
 	{
@@ -223,7 +222,7 @@ Vector2f LayoutBlockBoxSpace::NextBoxPosition(float& maximum_box_width, const fl
 		if (collision && !nowrap)
 		{
 			next_cursor = Math::Min(next_cursor, fixed_box.offset.y + fixed_box.dimensions.y);
-			return NextBoxPosition(maximum_box_width, next_cursor + 0.01f, dimensions, nowrap, float_property);
+			return NextBoxPosition(parent, maximum_box_width, next_cursor + 0.01f, dimensions, nowrap, float_property);
 		}
 	}
 
@@ -256,7 +255,7 @@ Vector2f LayoutBlockBoxSpace::NextBoxPosition(float& maximum_box_width, const fl
 			// D'oh! We hit this box. Ah well; we'll try again lower down the page, at the highest bottom-edge of any
 			// of the boxes we've been pushed around by so far.
 			next_cursor = Math::Min(next_cursor, fixed_box.offset.y + fixed_box.dimensions.y);
-			return NextBoxPosition(maximum_box_width, next_cursor + 0.01f, dimensions, nowrap, float_property);
+			return NextBoxPosition(parent, maximum_box_width, next_cursor + 0.01f, dimensions, nowrap, float_property);
 		}
 	}
 

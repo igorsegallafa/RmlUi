@@ -28,6 +28,7 @@
 
 #include "LayoutFormattingContext.h"
 #include "../../Include/RmlUi/Core/Element.h"
+#include "LayoutBlockBoxSpace.h"
 #include "LayoutDetails.h"
 #include "LayoutFlex.h"
 #include "LayoutTable.h"
@@ -128,6 +129,14 @@ UniquePtr<FormattingContext> FormattingContext::ConditionallyCreateIndependentFo
 	return nullptr;
 }
 
+BlockFormattingContext::BlockFormattingContext(ContainerBox* parent_box, Element* element) :
+	FormattingContext(Type::Block, parent_box, element)
+{
+	RMLUI_ASSERT(element);
+}
+
+BlockFormattingContext::~BlockFormattingContext() {}
+
 void BlockFormattingContext::Format(FormatSettings format_settings)
 {
 	Element* element = GetRootElement();
@@ -138,6 +147,8 @@ void BlockFormattingContext::Format(FormatSettings format_settings)
 	auto name = CreateString(80, "%s %x", element->GetAddress(false, false).c_str(), element);
 	RMLUI_ZoneName(name.c_str(), name.size());
 #endif
+
+	float_space = MakeUnique<LayoutBlockBoxSpace>();
 
 	const Vector2f containing_block = LayoutDetails::GetContainingBlock(GetParentBoxOfContext(), element->GetPosition()).size;
 
@@ -150,7 +161,7 @@ void BlockFormattingContext::Format(FormatSettings format_settings)
 	float min_height, max_height;
 	LayoutDetails::GetDefiniteMinMaxHeight(min_height, max_height, element->GetComputedValues(), box, containing_block.y);
 
-	root_block_container = MakeUnique<BlockContainer>(GetParentBoxOfContext(), element, box, min_height, max_height);
+	root_block_container = MakeUnique<BlockContainer>(GetParentBoxOfContext(), float_space.get(), element, box, min_height, max_height);
 	root_block_container->ResetScrollbars(box);
 
 	// Format the element. Since the root box has no block box parent, it should not be possible to require another round of formatting.

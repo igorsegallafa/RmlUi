@@ -237,12 +237,12 @@ bool ContainerBox::SubmitBox(const Vector2f content_box, const Box& box, const f
 	return true;
 }
 
-BlockContainer::BlockContainer(ContainerBox* _parent_container, Element* _element, const Box& _box, float _min_height, float _max_height) :
-	ContainerBox(Type::BlockContainer, _element, _parent_container), box(_box), min_height(_min_height), max_height(_max_height)
+BlockContainer::BlockContainer(ContainerBox* _parent_container, LayoutBlockBoxSpace* space, Element* _element, const Box& _box, float _min_height,
+	float _max_height) :
+	ContainerBox(Type::BlockContainer, _element, _parent_container),
+	box(_box), min_height(_min_height), max_height(_max_height), space(space)
 {
-	space = MakeUnique<LayoutBlockBoxSpace>(this);
-
-	// For now we require
+	// TODO: Is this reasonable? If so, cleanup class with this assumption.
 	RMLUI_ASSERT(element);
 
 	if (element)
@@ -264,16 +264,16 @@ BlockContainer::CloseResult BlockContainer::Close(BlockContainer* parent_block_c
 		Vector2f content_area = box.GetSize();
 		content_area.y = Math::Clamp(box_cursor, min_height, max_height);
 
-		if (element)
-			content_area.y = Math::Max(content_area.y, space->GetDimensions(LayoutFloatBoxEdge::Margin).y);
+		if (element && !parent_block_container)
+			content_area.y = Math::Max(content_area.y, space->GetDimensions(LayoutFloatBoxEdge::Margin).y - (position.y + box.GetPosition().y));
 
 		box.SetContent(content_area);
 	}
 
 	// Check how big our floated area is.
-	const Vector2f space_box = space->GetDimensions(LayoutFloatBoxEdge::Border);
+	const Vector2f space_box = space->GetDimensions(LayoutFloatBoxEdge::Border) - (position + box.GetPosition());
 
-	// Start with the inner content size, as set by the child blocks boxes or external formatting contexts.
+	// Start with the inner content size, as set by the child block boxes or external formatting contexts.
 	Vector2f content_box = Math::Max(inner_content_size, space_box);
 	content_box.y = Math::Max(content_box.y, box_cursor);
 
@@ -351,11 +351,10 @@ BlockContainer* BlockContainer::AddBlockBox(Element* child_element, const Box& b
 	if (!CloseOpenInlineContainer())
 		return nullptr;
 
-	auto child_container_ptr = MakeUnique<BlockContainer>(this, child_element, box, min_height, max_height);
+	auto child_container_ptr = MakeUnique<BlockContainer>(this, space, child_element, box, min_height, max_height);
 	BlockContainer* child_container = child_container_ptr.get();
 
-	// Determine the offset parent for the child element.
-	child_container->space->ImportSpace(*space);
+	// child_container->space->ImportSpace(*space);
 
 	// Get the next position within our offset parent's containing block.
 	child_container->position = NextBlockBoxPosition(box, child_element->GetComputedValues().clear());
@@ -380,7 +379,7 @@ LayoutBox* BlockContainer::AddBlockLevelBox(UniquePtr<LayoutBox> block_level_box
 	if (!CloseOpenInlineContainer())
 		return nullptr;
 
-	Vector2f child_position = NextBlockBoxPosition(box, child_element->GetComputedValues().clear());
+	Vector2f child_position = NextBlockBoxPosition(box, Style::Clear::Both); // TODO child_element->GetComputedValues().clear()
 
 	// TODO: Essentially the same as above in 'AddBlockBox'.
 	// Get the next position within our offset parent's containing block.
@@ -457,7 +456,7 @@ void BlockContainer::AddFloatElement(Element* element)
 	if (InlineContainer* inline_container = GetOpenInlineContainer())
 	{
 		// Try to add the float to our inline container, placing it next to any open line if possible. Otherwise, queue it for later.
-		if (!queued_float_elements.empty() || !inline_container->PlaceFloatElement(element, space.get()))
+		if (!queued_float_elements.empty() || !inline_container->PlaceFloatElement(element, space))
 		{
 			queued_float_elements.push_back(element);
 		}
@@ -616,7 +615,7 @@ Element* BlockContainer::GetElement() const
 
 const LayoutBlockBoxSpace* BlockContainer::GetBlockBoxSpace() const
 {
-	return space.get();
+	return space;
 }
 
 Vector2f BlockContainer::GetPosition() const
@@ -639,12 +638,16 @@ void BlockContainer::ResetContents()
 	RMLUI_ZoneScopedC(0xDD3322);
 
 	block_boxes.clear();
-	space = MakeUnique<LayoutBlockBoxSpace>(this);
+	queued_float_elements.clear();
+
+	// TODO: This is wrong, will clear everything in the current block formatting context, instead, we should just clear
+	// floats up to the container that will be reformatted.
+	space->Reset();
 
 	box_cursor = 0;
 	interrupted_line_box.reset();
 
-	inner_content_size = Vector2f(0);
+	inner_content_size = {};
 }
 
 String BlockContainer::DebugDumpTree(int depth) const
@@ -765,7 +768,7 @@ void BlockContainer::ResetInterruptedLineBox()
 void BlockContainer::PlaceFloat(Element* element, float offset)
 {
 	const Vector2f box_position = NextBoxPosition();
-	space->PlaceFloat(element, box_position.y + offset);
+	space->PlaceFloat(this, element, box_position.y + offset);
 }
 
 bool BlockContainer::GetBaselineOfLastLine(float& out_baseline) const

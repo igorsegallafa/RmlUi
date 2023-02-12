@@ -28,8 +28,9 @@
 		}
 		.box.flow-root {
 			/*display: flow-root;*/  /* Not yet implemented */
+			overflow: hidden;        /* Use this instead to establish a BFC */
 			background-color: #f0f8ff;
-			border: 5px #4682b4;
+			border-color: #4682b4;
 		}
 		.float {
 			float: left;
@@ -51,9 +52,7 @@
 </section>
 <section>
 	<div class="float">Try to resize this outer float<handle size_target="#parent"/></div>
-	<div class="box flow-root">
-		<p><code>display: flow-root</code></p>
-	</div>
+	<div class="box flow-root"><p><code>display: flow-root</code></p></div>
 </section>
 <handle size_target="#document"/>
 </body>

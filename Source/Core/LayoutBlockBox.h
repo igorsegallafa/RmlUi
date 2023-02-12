@@ -228,7 +228,7 @@ public:
 	/// @param box[in] The box used for this block box.
 	/// @param min_height[in] The minimum height of the content box.
 	/// @param max_height[in] The maximum height of the content box.
-	BlockContainer(ContainerBox* parent_container, Element* element, const Box& box, float min_height, float max_height);
+	BlockContainer(ContainerBox* parent_container, LayoutBlockBoxSpace* space, Element* element, const Box& box, float min_height, float max_height);
 	/// Releases the block box.
 	~BlockContainer();
 
@@ -358,10 +358,10 @@ private:
 
 	// TODO: All comments in the following.
 
+	// Used by block contexts only; stores the block box space managing our space, as occupied by floating elements of this box and our ancestors.
+	LayoutBlockBoxSpace* space;
 	// Used by block contexts only; stores the list of block boxes under this box.
 	BlockBoxList block_boxes;
-	// Used by block contexts only; stores the block box space managing our space, as occupied by floating elements of this box and our ancestors.
-	UniquePtr<LayoutBlockBoxSpace> space;
 	// Stores any floating elements that are waiting for a line break to be positioned.
 	ElementList queued_float_elements;
 	// Used by block contexts only; stores an inline element hierarchy that was interrupted by a child block box.

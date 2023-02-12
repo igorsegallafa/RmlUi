@@ -147,7 +147,7 @@ bool InlineContainer::PlaceFloatElement(Element* element, LayoutBlockBoxSpace* s
 
 		const float line_box_top = position.y + box_cursor;
 		float available_width = 0.f;
-		const Vector2f float_position = space->NextFloatPosition(available_width, line_box_top, margin_size, float_property, clear_property);
+		const Vector2f float_position = space->NextFloatPosition(parent, available_width, line_box_top, margin_size, float_property, clear_property);
 
 		const float line_box_bottom = line_box_top + element_line_height;
 		const float line_box_and_element_width = margin_size.x + line_box->GetBoxCursor();
@@ -155,7 +155,7 @@ bool InlineContainer::PlaceFloatElement(Element* element, LayoutBlockBoxSpace* s
 		// If the float can be positioned on this line, and it can fit next to the line's contents, place it now.
 		if (float_position.y < line_box_bottom && line_box_and_element_width <= available_width)
 		{
-			space->PlaceFloat(element, position.y + box_cursor);
+			space->PlaceFloat(parent, element, position.y + box_cursor);
 			UpdateLineBoxPlacement(line_box, 0.f, element_line_height);
 			return true;
 		}
@@ -245,7 +245,8 @@ void InlineContainer::UpdateLineBoxPlacement(LayoutLineBox* line_box, float mini
 	// @performance: We might benefit from doing this search only when the minimum dimensions change, or if we get new inline floats.
 	const float ideal_position_y = position.y + box_cursor;
 	float available_width = 0.f;
-	const Vector2f line_position = parent->GetBlockBoxSpace()->NextBoxPosition(available_width, ideal_position_y, minimum_dimensions, !wrap_content);
+	const Vector2f line_position =
+		parent->GetBlockBoxSpace()->NextBoxPosition(parent, available_width, ideal_position_y, minimum_dimensions, !wrap_content);
 	available_width = Math::Max(available_width, 0.f);
 
 	line_box->SetLineBox(line_position, available_width, minimum_dimensions.y);
