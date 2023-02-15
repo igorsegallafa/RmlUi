@@ -96,7 +96,7 @@ void FlexFormattingContext::Format(FormatSettings format_settings)
 
 		Box sized_box = box;
 		sized_box.SetContent(formatted_content_size);
-		if (flex_container_box->Close(content_overflow_size, sized_box) == LayoutBox::CloseResult::OK)
+		if (flex_container_box->Close(content_overflow_size, sized_box))
 		{
 			// box.SetContent(formatted_content_size);
 

@@ -55,7 +55,7 @@ struct DebugDumpLayoutTree {
 
 	DebugDumpLayoutTree(Element* element, BlockContainer* block_box) : element(element), block_box(block_box)
 	{
-		// When an element with this ID is encountered, dump the formatted layout tree (including all sub-layouts).
+		// When an element with this ID is encountered, dump the formatted layout tree (including for all descendant formatting contexts).
 		static const String debug_trigger_id = "rmlui-debug-layout";
 		is_printing_tree_root = element->HasAttribute(debug_trigger_id);
 		if (is_printing_tree_root)
@@ -129,8 +129,7 @@ UniquePtr<FormattingContext> FormattingContext::ConditionallyCreateIndependentFo
 	return nullptr;
 }
 
-BlockFormattingContext::BlockFormattingContext(ContainerBox* parent_box, Element* element) :
-	FormattingContext(Type::Block, parent_box, element)
+BlockFormattingContext::BlockFormattingContext(ContainerBox* parent_box, Element* element) : FormattingContext(Type::Block, parent_box, element)
 {
 	RMLUI_ASSERT(element);
 }
@@ -140,15 +139,13 @@ BlockFormattingContext::~BlockFormattingContext() {}
 void BlockFormattingContext::Format(FormatSettings format_settings)
 {
 	Element* element = GetRootElement();
-	RMLUI_ASSERT(element && !root_block_container);
+	RMLUI_ASSERT(element && !root_block_container && !float_space);
 
 #ifdef RMLUI_ENABLE_PROFILING
 	RMLUI_ZoneScopedC(0xB22222);
 	auto name = CreateString(80, "%s %x", element->GetAddress(false, false).c_str(), element);
 	RMLUI_ZoneName(name.c_str(), name.size());
 #endif
-
-	float_space = MakeUnique<LayoutBlockBoxSpace>();
 
 	const Vector2f containing_block = LayoutDetails::GetContainingBlock(GetParentBoxOfContext(), element->GetPosition()).size;
 
@@ -161,11 +158,33 @@ void BlockFormattingContext::Format(FormatSettings format_settings)
 	float min_height, max_height;
 	LayoutDetails::GetDefiniteMinMaxHeight(min_height, max_height, element->GetComputedValues(), box, containing_block.y);
 
+	float_space = MakeUnique<LayoutBlockBoxSpace>();
 	root_block_container = MakeUnique<BlockContainer>(GetParentBoxOfContext(), float_space.get(), element, box, min_height, max_height);
-	root_block_container->ResetScrollbars(box);
 
-	// Format the element. Since the root box has no block box parent, it should not be possible to require another round of formatting.
-	RMLUI_VERIFY(FormatBlockBox(nullptr, element));
+	BlockContainer* container = root_block_container.get();
+	DebugDumpLayoutTree debug_dump_tree(element, container);
+	
+	container->ResetScrollbars(box);
+
+	// Format the element's children. In rare cases, it is possible that we need three iterations: Once to enable the
+	// horizontal scrollbar, then to enable the vertical scrollbar, and finally to format with both scrollbars enabled.
+	for (int layout_iteration = 0; layout_iteration < 3; layout_iteration++)
+	{
+		bool all_children_formatted = true;
+		for (int i = 0; i < element->GetNumChildren() && all_children_formatted; i++)
+		{
+			if (!FormatBlockContainerChild(container, element->GetChild(i)))
+				all_children_formatted = false;
+		}
+
+		if (all_children_formatted && container->Close(nullptr))
+			// Success, break out of the loop.
+			break;
+
+		// Otherwise, restart formatting now that one or both scrollbars have been enabled.
+		float_space->Reset();
+		root_block_container->ResetContents();
+	}
 
 	SubmitElementLayout(element);
 
@@ -180,53 +199,51 @@ float BlockFormattingContext::GetShrinkToFitWidth() const
 
 bool BlockFormattingContext::FormatBlockBox(BlockContainer* parent_container, Element* element)
 {
-	BlockContainer* new_container = nullptr;
-	if (parent_container)
-	{
-		const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent_container, element->GetPosition()).size;
+	RMLUI_ZoneScopedC(0x2F4F4F);
+	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent_container, element->GetPosition()).size;
 
-		Box box;
-		LayoutDetails::BuildBox(box, containing_block, element);
-		float min_height, max_height;
-		LayoutDetails::GetDefiniteMinMaxHeight(min_height, max_height, element->GetComputedValues(), box, containing_block.y);
+	Box box;
+	LayoutDetails::BuildBox(box, containing_block, element);
+	float min_height, max_height;
+	LayoutDetails::GetDefiniteMinMaxHeight(min_height, max_height, element->GetComputedValues(), box, containing_block.y);
 
-		new_container = parent_container->AddBlockBox(element, box, min_height, max_height);
-	}
-	else
-	{
-		RMLUI_ASSERT(root_block_container);
-		new_container = root_block_container.get();
-	}
-
-	if (!new_container)
+	BlockContainer* container = parent_container->AddBlockBox(element, box, min_height, max_height);
+	if (!container)
 		return false;
 
-	DebugDumpLayoutTree debug_dump_tree(element, new_container);
-
-	// In rare cases, it is possible that we need three iterations: Once to enable the horizontal scrollbar, then to
-	// enable the vertical scrollbar, and then finally to format it with both scrollbars enabled.
-	for (int layout_iteration = 0; layout_iteration < 3; layout_iteration++)
+	// Format our children. This may result in scrollbars being added to our formatting context root, then we need to
+	// bail out and restart formatting for the current block formatting context.
+	for (int i = 0; i < element->GetNumChildren(); i++)
 	{
-		// Format the element's children.
-		for (int i = 0; i < element->GetNumChildren(); i++)
-		{
-			if (!FormatBlockContainerChild(new_container, element->GetChild(i)))
-				i = -1;
-		}
-
-		const auto result = new_container->Close(parent_container);
-		if (result == BlockContainer::CloseResult::LayoutSelf)
-			// We need to reformat ourself; do a second iteration to format all of our children and close again.
-			continue;
-		else if (result == BlockContainer::CloseResult::LayoutParent)
-			// We caused our parent to add a vertical scrollbar; bail out!
+		if (!FormatBlockContainerChild(container, element->GetChild(i)))
 			return false;
-
-		// Otherwise, we are all good to finish up.
-		break;
 	}
 
+	if (!container->Close(parent_container))
+		return false;
+
 	SubmitElementLayout(element);
+
+	return true;
+}
+
+bool BlockFormattingContext::FormatInlineBox(BlockContainer* parent_container, Element* element)
+{
+	RMLUI_ZoneScopedC(0x3F6F6F);
+	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent_container, element->GetPosition()).size;
+
+	Box box;
+	LayoutDetails::BuildBox(box, containing_block, element, BoxContext::Inline);
+	auto inline_box_handle = parent_container->AddInlineElement(element, box);
+
+	// Format the element's children.
+	for (int i = 0; i < element->GetNumChildren(); i++)
+	{
+		if (!FormatBlockContainerChild(parent_container, element->GetChild(i)))
+			return false;
+	}
+
+	parent_container->CloseInlineElement(inline_box_handle);
 
 	return true;
 }
@@ -250,12 +267,12 @@ bool BlockFormattingContext::FormatBlockContainerChild(BlockContainer* parent_co
 	auto& computed = element->GetComputedValues();
 	const Style::Display display = computed.display();
 
-	// Fetch the display property, and don't lay this element out if it is set to a display type of none.
+	// Don't lay this element out if it is set to a display type of none.
 	if (display == Style::Display::None)
 		return true;
 
-	// Check for an absolute position; if this has been set, then we remove it from the flow and add it to the current
-	// block box to be laid out and positioned once the block has been closed and sized.
+	// Check for absolutely positioned elements: they are removed from the flow and added to the box representing their
+	// containing block, to be layed out and positioned once that box has been closed and sized.
 	const Style::Position position_property = computed.position();
 	if (position_property == Style::Position::Absolute || position_property == Style::Position::Fixed)
 	{
@@ -319,28 +336,6 @@ bool BlockFormattingContext::FormatBlockContainerChild(BlockContainer* parent_co
 	case Style::Display::Table:
 	case Style::Display::None: /* handled above */ RMLUI_ERROR; break;
 	}
-
-	return true;
-}
-
-bool BlockFormattingContext::FormatInlineBox(BlockContainer* parent_container, Element* element)
-{
-	RMLUI_ZoneScopedC(0x3F6F6F);
-
-	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent_container, element->GetPosition()).size;
-
-	Box box;
-	LayoutDetails::BuildBox(box, containing_block, element, BoxContext::Inline);
-	auto inline_box_handle = parent_container->AddInlineElement(element, box);
-
-	// Format the element's children.
-	for (int i = 0; i < element->GetNumChildren(); i++)
-	{
-		if (!FormatBlockContainerChild(parent_container, element->GetChild(i)))
-			return false;
-	}
-
-	parent_container->CloseInlineElement(inline_box_handle);
 
 	return true;
 }

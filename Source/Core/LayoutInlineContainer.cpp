@@ -164,7 +164,7 @@ bool InlineContainer::PlaceFloatElement(Element* element, LayoutBlockBoxSpace* s
 	return false;
 }
 
-InlineContainer::CloseResult InlineContainer::Close(UniquePtr<LayoutLineBox>* out_open_line_box)
+bool InlineContainer::Close(UniquePtr<LayoutLineBox>* out_open_line_box)
 {
 	// The parent container may need the open line box to be split and resumed.
 	CloseOpenLineBox(true, out_open_line_box);
@@ -195,9 +195,9 @@ InlineContainer::CloseResult InlineContainer::Close(UniquePtr<LayoutLineBox>* ou
 	// Increment the parent's cursor.
 	// If this close fails, it means this block box has caused our parent block box to generate an automatic vertical scrollbar.
 	if (!parent->CloseChildBox(this, position, box_size, 0.f))
-		return CloseResult::LayoutParent;
+		return false;
 
-	return CloseResult::OK;
+	return true;
 }
 
 void InlineContainer::CloseOpenLineBox(bool split_all_open_boxes, UniquePtr<LayoutLineBox>* out_split_line)

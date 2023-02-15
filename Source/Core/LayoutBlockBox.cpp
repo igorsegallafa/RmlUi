@@ -248,12 +248,11 @@ BlockContainer::BlockContainer(ContainerBox* _parent_container, LayoutBlockBoxSp
 
 BlockContainer::~BlockContainer() {}
 
-BlockContainer::CloseResult BlockContainer::Close(BlockContainer* parent_block_container)
+bool BlockContainer::Close(BlockContainer* parent_block_container)
 {
 	// If the last child of this block box is an inline box, then we haven't closed it; close it now!
-	CloseResult result = CloseInlineBlockBox();
-	if (result != CloseResult::OK)
-		return CloseResult::LayoutSelf;
+	if (!CloseInlineBlockBox())
+		return false;
 
 	// Set this box's height, if necessary.
 	if (box.GetSize().y < 0)
@@ -275,10 +274,7 @@ BlockContainer::CloseResult BlockContainer::Close(BlockContainer* parent_block_c
 	content_box.y = Math::Max(content_box.y, box_cursor);
 
 	if (!SubmitBox(content_box, box, max_height))
-	{
-		ResetContents();
-		return CloseResult::LayoutSelf;
-	}
+		return false;
 
 	// Increment the parent's cursor.
 	if (parent_block_container)
@@ -287,7 +283,7 @@ BlockContainer::CloseResult BlockContainer::Close(BlockContainer* parent_block_c
 
 		// If this close fails, it means this block box has caused our parent block box to generate an automatic vertical scrollbar.
 		if (!parent_block_container->CloseChildBox(this, position, box.GetSize(Box::BORDER), box.GetEdge(Box::MARGIN, Box::BOTTOM)))
-			return CloseResult::LayoutParent;
+			return false;
 	}
 
 	// Now that we have been sized, we can proceed with formatting and placing positioned elements that this container
@@ -316,7 +312,7 @@ BlockContainer::CloseResult BlockContainer::Close(BlockContainer* parent_block_c
 
 	ResetInterruptedLineBox();
 
-	return CloseResult::OK;
+	return true;
 }
 
 bool BlockContainer::CloseChildBox(LayoutBox* child, Vector2f child_position, Vector2f child_size, float child_margin_bottom)
@@ -330,13 +326,9 @@ bool BlockContainer::CloseChildBox(LayoutBox* child, Vector2f child_position, Ve
 
 	const Vector2f content_size = Math::Max(Vector2f{box.GetSize().x, box_cursor}, inner_content_size);
 
-	if (!CatchOverflow(content_size, box, max_height))
-	{
-		ResetContents();
-		return false;
-	}
+	const bool result = CatchOverflow(content_size, box, max_height);
 
-	return true;
+	return result;
 }
 
 BlockContainer* BlockContainer::AddBlockBox(Element* child_element, const Box& box, float min_height, float max_height)
@@ -609,10 +601,6 @@ void BlockContainer::ResetContents()
 	block_boxes.clear();
 	queued_float_elements.clear();
 
-	// TODO: This is wrong, will clear everything in the current block formatting context, instead, we should just clear
-	// floats up to the container that will be reformatted.
-	space->Reset();
-
 	box_cursor = 0;
 	interrupted_line_box.reset();
 
@@ -684,7 +672,7 @@ const LayoutBox* BlockContainer::GetOpenLayoutBox() const
 	return nullptr;
 }
 
-BlockContainer::CloseResult BlockContainer::CloseInlineBlockBox()
+bool BlockContainer::CloseInlineBlockBox()
 {
 	if (InlineContainer* inline_container = GetOpenInlineContainer())
 	{
@@ -692,7 +680,7 @@ BlockContainer::CloseResult BlockContainer::CloseInlineBlockBox()
 		return inline_container->Close(&interrupted_line_box);
 	}
 
-	return CloseResult::OK;
+	return true;
 }
 
 bool BlockContainer::CloseOpenInlineContainer()
@@ -703,7 +691,7 @@ bool BlockContainer::CloseOpenInlineContainer()
 	{
 		UniquePtr<LayoutLineBox> open_line_box;
 
-		if (inline_container->Close(&open_line_box) != CloseResult::OK)
+		if (!inline_container->Close(&open_line_box))
 			return false;
 
 		if (open_line_box)
@@ -729,7 +717,7 @@ void BlockContainer::ResetInterruptedLineBox()
 {
 	if (interrupted_line_box)
 	{
-		Log::Message(Log::LT_WARNING, "Interrupted line box leaked.");
+		RMLUI_ERROR; // Internal error: Interrupted line box leaked.
 		interrupted_line_box.reset();
 	}
 }

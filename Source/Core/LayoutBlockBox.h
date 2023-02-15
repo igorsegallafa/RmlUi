@@ -43,7 +43,6 @@ class InlineContainer;
 class LayoutBox {
 public:
 	enum class Type { Root, BlockContainer, InlineContainer, FlexContainer, TableWrapper, Replaced };
-	enum class CloseResult { OK, LayoutSelf, LayoutParent };
 
 	Type GetType() const { return type; }
 
@@ -166,14 +165,14 @@ public:
 
 	String DebugDumpTree(int depth) const override { return String(depth * 2, ' ') + "FlexContainer"; /* TODO */ }
 
-	CloseResult Close(const Vector2f content_overflow_size, const Box& box)
+	bool Close(const Vector2f content_overflow_size, const Box& box)
 	{
 		if (!SubmitBox(content_overflow_size, box, -1.f))
-			return CloseResult::LayoutSelf;
+			return false;
 
 		ClosePositionedElements();
 
-		return CloseResult::OK;
+		return true;
 	}
 
 	const Box* GetBoxPtr() const override { return &box; }
@@ -234,15 +233,15 @@ public:
 
 	/// Closes the box. This will determine the element's height (if it was unspecified).
 	/// @param parent_block_box Our parent which will be sized to contain this box, or nullptr for the root of the block formatting context.
-	/// @return The result of the close; this may request a reformat of this element or our parent.
-	CloseResult Close(BlockContainer* parent_block_container);
+	/// @return False if the block box caused an automatic vertical scrollbar to appear, forcing a reformat of the current block formatting context.
+	bool Close(BlockContainer* parent_block_container);
 
 	/// Called by a closing block box child. Increments the cursor.
 	/// @param[in] child The closing child block-level box.
 	/// @param[in] child_position The border position of the child, relative to the current block formatting context.
 	/// @param[in] child_size The border size of the child.
 	/// @param[in] child_margin_bottom The bottom margin width of the child.
-	/// @return False if the block box caused an automatic vertical scrollbar to appear, forcing an entire reformat of the block box.
+	/// @return False if the block box caused an automatic vertical scrollbar to appear, forcing a reformat of the current block formatting context.
 	/// TODO: Can we simplify this? Rename? This is more like increment box cursor and enlarge content size, and only needed for block-level boxes.
 	bool CloseChildBox(LayoutBox* child, Vector2f child_position, Vector2f child_size, float child_margin_bottom);
 
@@ -294,6 +293,9 @@ public:
 	/// Set the inner content size if it is larger than the current value on each axis individually.
 	void ExtendInnerContentSize(Vector2f inner_content_size);
 
+	// Reset this box, so that it can be formatted again.
+	void ResetContents();
+
 	/// Returns the block box's element.
 	Element* GetElement() const;
 
@@ -310,8 +312,6 @@ public:
 	const Box* GetBoxPtr() const override { return &box; }
 
 private:
-	void ResetContents();
-
 	InlineContainer* EnsureOpenInlineContainer();
 	InlineContainer* GetOpenInlineContainer();
 	const InlineContainer* GetOpenInlineContainer() const;
@@ -319,8 +319,8 @@ private:
 	const BlockContainer* GetOpenBlockContainer() const;
 	const LayoutBox* GetOpenLayoutBox() const;
 
-	// Closes our last block box, if it is an open inline block box.
-	CloseResult CloseInlineBlockBox();
+	// Closes our last block box, if it is an open inline block box. Returns false if our formatting context needs to be reformatted.
+	bool CloseInlineBlockBox();
 	// Closes the inline container if there is one open.
 	bool CloseOpenInlineContainer();
 
@@ -365,8 +365,6 @@ private:
 	// The inner content size (excluding any padding/border/margins).
 	// This is extended as child block boxes are closed, or from external formatting contexts.
 	Vector2f inner_content_size;
-
-	bool vertical_overflow = false;
 };
 
 } // namespace Rml

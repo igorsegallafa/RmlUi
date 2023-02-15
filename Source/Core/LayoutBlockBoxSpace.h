@@ -92,7 +92,7 @@ public:
 	/// @note Generally, the border box is used when determining overflow, while the margin box is used for layout sizing.
 	Vector2f GetDimensions(LayoutFloatBoxEdge edge) const;
 
-	// TODO: This will clear everything, for all boxes in the current block formatting context!
+	/// Clear all floating boxes placed in this space.
 	void Reset()
 	{
 		for (auto& box_list : boxes)

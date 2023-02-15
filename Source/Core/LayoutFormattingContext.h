@@ -55,7 +55,6 @@ public:
 		MaxContent,
 	};
 
-	// TODO Do we care about parent context?
 	static UniquePtr<FormattingContext> ConditionallyCreateIndependentFormattingContext(ContainerBox* parent_container, Element* element);
 
 	// TODO: Consider working directly with the final types instead of using a virtual destructor.
@@ -94,9 +93,9 @@ public:
 
 private:
 	bool FormatBlockBox(BlockContainer* parent_container, Element* element);
+	bool FormatInlineBox(BlockContainer* parent_container, Element* element);
 
 	bool FormatBlockContainerChild(BlockContainer* parent_container, Element* element);
-	bool FormatInlineBox(BlockContainer* parent_container, Element* element);
 
 	UniquePtr<LayoutBlockBoxSpace> float_space;
 	UniquePtr<BlockContainer> root_block_container;

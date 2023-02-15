@@ -76,8 +76,8 @@ public:
 
 	/// Closes the box. This will determine the element's height (if it was unspecified).
 	/// @param[out] Optionally, output the open inline box.
-	/// @return The result of the close; this may request a reformat of this element or our parent.
-	CloseResult Close(UniquePtr<LayoutLineBox>* out_open_line_box);
+	/// @return True if the element was closed, false if our formatting context needs to be reformatted.
+	bool Close(UniquePtr<LayoutLineBox>* out_open_line_box);
 
 	/// Calculate the dimensions of the box's internal content width; i.e. the size used to calculate the shrink-to-fit width.
 	float GetShrinkToFitWidth() const;
