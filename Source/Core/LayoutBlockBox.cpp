@@ -242,11 +242,8 @@ BlockContainer::BlockContainer(ContainerBox* _parent_container, LayoutBlockBoxSp
 	ContainerBox(Type::BlockContainer, _element, _parent_container),
 	box(_box), min_height(_min_height), max_height(_max_height), space(space)
 {
-	// TODO: Is this reasonable? If so, cleanup class with this assumption.
 	RMLUI_ASSERT(element);
-
-	if (element)
-		wrap_content = (element->GetComputedValues().white_space() != Style::WhiteSpace::Nowrap);
+	wrap_content = (element->GetComputedValues().white_space() != Style::WhiteSpace::Nowrap);
 }
 
 BlockContainer::~BlockContainer() {}
@@ -261,13 +258,13 @@ BlockContainer::CloseResult BlockContainer::Close(BlockContainer* parent_block_c
 	// Set this box's height, if necessary.
 	if (box.GetSize().y < 0)
 	{
-		Vector2f content_area = box.GetSize();
-		content_area.y = Math::Clamp(box_cursor, min_height, max_height);
+		float content_height = box_cursor;
 
-		if (element && !parent_block_container)
-			content_area.y = Math::Max(content_area.y, space->GetDimensions(LayoutFloatBoxEdge::Margin).y - (position.y + box.GetPosition().y));
+		if (!parent_block_container)
+			content_height = Math::Max(content_height, space->GetDimensions(LayoutFloatBoxEdge::Margin).y - (position.y + box.GetPosition().y));
 
-		box.SetContent(content_area);
+		content_height = Math::Clamp(content_height, min_height, max_height);
+		box.SetContent({box.GetSize().x, content_height});
 	}
 
 	// Check how big our floated area is.
@@ -287,53 +284,49 @@ BlockContainer::CloseResult BlockContainer::Close(BlockContainer* parent_block_c
 	if (parent_block_container)
 	{
 		RMLUI_ASSERTMSG(GetParent() == parent_block_container, "Mismatched parent box.");
-		const Vector2f margin_corner = {box.GetEdge(Box::MARGIN, Box::LEFT), box.GetEdge(Box::MARGIN, Box::TOP)};
-		const Vector2f margin_position = position - margin_corner;
 
 		// If this close fails, it means this block box has caused our parent block box to generate an automatic vertical scrollbar.
-		if (!parent_block_container->CloseChildBox(this, margin_position, margin_corner, box.GetSize(Box::MARGIN)))
+		if (!parent_block_container->CloseChildBox(this, position, box.GetSize(Box::BORDER), box.GetEdge(Box::MARGIN, Box::BOTTOM)))
 			return CloseResult::LayoutParent;
 	}
 
-	// If we represent a positioned element, then we can now (as we've been sized) format the absolutely positioned
-	// elements that this container acts as a containing block for.
+	// Now that we have been sized, we can proceed with formatting and placing positioned elements that this container
+	// acts as a containing block for.
 	ClosePositionedElements();
 
-	if (element)
+	// Find the element baseline which is the distance from the margin bottom of the element to its baseline.
+	float element_baseline = 0;
+
+	// For inline-blocks with visible overflow, this is the baseline of the last line of the element (see CSS2 10.8.1).
+	if (element->GetDisplay() == Style::Display::InlineBlock && !IsScrollContainer())
 	{
-		// Find the element baseline which is the distance from the margin bottom of the element to its baseline.
-		float element_baseline = 0;
+		float baseline = 0;
+		bool found_baseline = GetBaselineOfLastLine(baseline);
 
-		// For inline-blocks with visible overflow, this is the baseline of the last line of the element (see CSS2 10.8.1).
-		if (element->GetDisplay() == Style::Display::InlineBlock && !IsScrollContainer())
+		// The retrieved baseline is the vertical distance from the top of our root space (the coordinate system of our
+		// local block formatting context), convert it to the element's local coordinates.
+		if (found_baseline)
 		{
-			float baseline = 0;
-			bool found_baseline = GetBaselineOfLastLine(baseline);
-
-			// The retrieved baseline is the vertical distance from the top of our root space (the coordinate system of
-			// our local block formatting context), convert it to the element's local coordinates.
-			if (found_baseline)
-			{
-				const float bottom_position = position.y + box.GetSizeAcross(Box::VERTICAL, Box::BORDER) + box.GetEdge(Box::MARGIN, Box::BOTTOM);
-				element_baseline = bottom_position - baseline;
-			}
+			const float bottom_position = position.y + box.GetSizeAcross(Box::VERTICAL, Box::BORDER) + box.GetEdge(Box::MARGIN, Box::BOTTOM);
+			element_baseline = bottom_position - baseline;
 		}
-
-		element->SetBaseline(element_baseline);
 	}
+
+	element->SetBaseline(element_baseline);
 
 	ResetInterruptedLineBox();
 
 	return CloseResult::OK;
 }
 
-bool BlockContainer::CloseChildBox(LayoutBox* child, Vector2f child_position, Vector2f child_margin_corner, Vector2f child_size)
+bool BlockContainer::CloseChildBox(LayoutBox* child, Vector2f child_position, Vector2f child_size, float child_margin_bottom)
 {
 	child_position -= (box.GetPosition() + position);
-	box_cursor = child_position.y + child_size.y;
+
+	box_cursor = child_position.y + child_size.y + child_margin_bottom;
 
 	// Extend the inner content size. The vertical size can be larger than the box_cursor due to overflow.
-	inner_content_size = Math::Max(inner_content_size, child_position + child_margin_corner + child->GetVisibleOverflowSize());
+	inner_content_size = Math::Max(inner_content_size, child_position + child->GetVisibleOverflowSize());
 
 	const Vector2f content_size = Math::Max(Vector2f{box.GetSize().x, box_cursor}, inner_content_size);
 
@@ -354,10 +347,7 @@ BlockContainer* BlockContainer::AddBlockBox(Element* child_element, const Box& b
 	auto child_container_ptr = MakeUnique<BlockContainer>(this, space, child_element, box, min_height, max_height);
 	BlockContainer* child_container = child_container_ptr.get();
 
-	// child_container->space->ImportSpace(*space);
-
-	// Get the next position within our offset parent's containing block.
-	child_container->position = NextBlockBoxPosition(box, child_element->GetComputedValues().clear());
+	child_container->position = NextBoxPosition(box, child_element->GetComputedValues().clear());
 	child_element->SetOffset(child_container->position - position, element);
 
 	child_container->ResetScrollbars(box);
@@ -376,27 +366,23 @@ LayoutBox* BlockContainer::AddBlockLevelBox(UniquePtr<LayoutBox> block_level_box
 {
 	RMLUI_ASSERT(box.GetSize().y >= 0.f); // Assumes child element already formatted and sized.
 
+	// TODO: Most of this is essentially the same as above in 'AddBlockBox'.
 	if (!CloseOpenInlineContainer())
 		return nullptr;
 
-	Vector2f child_position = NextBlockBoxPosition(box, Style::Clear::Both); // TODO child_element->GetComputedValues().clear()
+	// Always clear any floats to avoid overlap here. In CSS, it is allowed to instead shrink the box and place it next
+	// to any floats, but we keep it simple here for now and just clear them.
+	Vector2f child_position = NextBoxPosition(box, Style::Clear::Both);
 
-	// TODO: Essentially the same as above in 'AddBlockBox'.
-	// Get the next position within our offset parent's containing block.
 	child_element->SetOffset(child_position - position, element);
 
-	// TODO Basically, almost copy/paste from above.
-	// Store relatively positioned elements with their containing block so that their offset can be updated after
-	// their containing block has been sized.
 	if (child_element->GetPosition() == Style::Position::Relative)
 		AddRelativeElement(child_element);
 
+	LayoutBox* block_level_box = block_level_box_ptr.get();
 	block_boxes.push_back(std::move(block_level_box_ptr));
-	LayoutBox* block_level_box = block_boxes.back().get();
 
-	const Vector2f margin_corner = {box.GetEdge(Box::MARGIN, Box::LEFT), box.GetEdge(Box::MARGIN, Box::TOP)};
-	const Vector2f margin_position = child_position - margin_corner;
-	if (!CloseChildBox(block_level_box, margin_position, margin_corner, box.GetSize(Box::MARGIN)))
+	if (!CloseChildBox(block_level_box, child_position, box.GetSize(Box::BORDER), box.GetEdge(Box::MARGIN, Box::BOTTOM)))
 		return nullptr;
 
 	return block_level_box;
@@ -414,26 +400,20 @@ BlockContainer::InlineBoxHandle BlockContainer::AddInlineElement(Element* elemen
 	if (element->GetPosition() == Style::Position::Relative)
 		AddRelativeElement(element);
 
-	return {inline_container, inline_box};
+	return {inline_box};
 }
 
 void BlockContainer::CloseInlineElement(InlineBoxHandle handle)
 {
 	// If the inline-level element did not generate an inline box, then there is no need to close anything.
-	if (!handle.inline_box || !handle.inline_container)
+	if (!handle.inline_box)
 		return;
 
-	// Check that the handle's inline container is still the open box, otherwise it has been closed already possibly
-	// by an intermediary block-level element. If we don't have an open inline container at all, open a new one,
-	// even if the sole purpose of the new line is to close this inline element.
-	InlineContainer* inline_container = EnsureOpenInlineContainer();
-	if (inline_container != handle.inline_container)
-	{
-		// TODO: Not needed once everything works as intended.
-		Log::Message(Log::LT_INFO, "Inline element was split across a block-level element.");
-	}
-
-	inline_container->CloseInlineElement(handle.inline_box);
+	// Usually the inline container the box was placed in is still the open box, and we can just close the inline
+	// element in it. However, it is possible that an intermediary block-level element was placed, thereby splitting the
+	// inline element into multiple inline containers around the block-level box. If we don't have an open inline
+	// container at all, open a new one, even if the sole purpose of the new line is to close this inline element.
+	EnsureOpenInlineContainer()->CloseInlineElement(handle.inline_box);
 }
 
 void BlockContainer::AddBreak()
@@ -457,9 +437,7 @@ void BlockContainer::AddFloatElement(Element* element)
 	{
 		// Try to add the float to our inline container, placing it next to any open line if possible. Otherwise, queue it for later.
 		if (!queued_float_elements.empty() || !inline_container->PlaceFloatElement(element, space))
-		{
 			queued_float_elements.push_back(element);
-		}
 	}
 	else
 	{
@@ -486,48 +464,46 @@ Vector2f BlockContainer::GetOpenStaticPosition(Style::Display display) const
 	return static_position;
 }
 
-Vector2f BlockContainer::NextBoxPosition(float top_margin, Style::Clear clear_property) const
+Vector2f BlockContainer::NextBoxPosition() const
 {
-	// TODO If our element is establishing a new offset hierarchy, then any children of ours don't inherit our offset.
 	Vector2f box_position = position + box.GetPosition();
 	box_position.y += box_cursor;
+	return box_position;
+}
 
-	float clear_margin = space->DetermineClearPosition(box_position.y + top_margin, clear_property) - (box_position.y + top_margin);
-	if (clear_margin > 0)
+Vector2f BlockContainer::NextBoxPosition(const Box& child_box, Style::Clear clear_property) const
+{
+	const float child_top_margin = child_box.GetEdge(Box::MARGIN, Box::TOP);
+
+	Vector2f box_position = NextBoxPosition();
+
+	box_position.x += child_box.GetEdge(Box::MARGIN, Box::LEFT);
+	box_position.y += child_top_margin;
+
+	float clear_margin = space->DetermineClearPosition(box_position.y, clear_property) - box_position.y;
+	if (clear_margin > 0.f)
+	{
 		box_position.y += clear_margin;
+	}
 	else if (const LayoutBox* block_box = GetOpenLayoutBox())
 	{
-		// Check for a collapsing vertical margin.
+		// Check for a collapsing vertical margin with our last child, which will be vertically adjacent to the new box.
 		if (const Box* open_box = block_box->GetBoxPtr())
 		{
-			const float bottom_margin = open_box->GetEdge(Box::MARGIN, Box::BOTTOM);
+			const float open_bottom_margin = open_box->GetEdge(Box::MARGIN, Box::BOTTOM);
+			const float margin_sum = open_bottom_margin + child_top_margin;
 
-			const int num_negative_margins = int(top_margin < 0.f) + int(bottom_margin < 0.f);
+			// Find and add the collapsed margin to the position, then subtract the sum of the margins which have already been added.
+			const int num_negative_margins = int(child_top_margin < 0.f) + int(open_bottom_margin < 0.f);
 			switch (num_negative_margins)
 			{
-			case 0:
-				// Use the largest margin by subtracting the smallest margin.
-				box_position.y -= Math::Min(top_margin, bottom_margin);
-				break;
-			case 1:
-				// Use the sum of the positive and negative margin, no special behavior needed here.
-				break;
-			case 2:
-				// Use the most negative margin by subtracting the least negative margin.
-				box_position.y -= Math::Max(top_margin, bottom_margin);
-				break;
+			case 0: box_position.y += Math::Max(child_top_margin, open_bottom_margin) - margin_sum; break; // Use the largest margin.
+			case 1: break; // Use the sum of the positive and negative margin. These are already added to the position, so do nothing.
+			case 2: box_position.y += Math::Min(child_top_margin, open_bottom_margin) - margin_sum; break; // Use the most negative margin.
 			}
 		}
 	}
 
-	return box_position;
-}
-
-Vector2f BlockContainer::NextBlockBoxPosition(const Box& box, Style::Clear clear_property) const
-{
-	Vector2f box_position = NextBoxPosition(box.GetEdge(Box::MARGIN, Box::TOP), clear_property);
-	box_position.x += box.GetEdge(Box::MARGIN, Box::LEFT);
-	box_position.y += box.GetEdge(Box::MARGIN, Box::TOP);
 	return box_position;
 }
 
@@ -573,29 +549,22 @@ float BlockContainer::GetShrinkToFitWidth() const
 
 	// Block boxes with definite sizes should use that size. Otherwise, find the maximum content width of our children.
 	//  Alternative solution: Add some 'intrinsic_width' property to every 'BlockContainer' and have that propagate up.
-	if (element)
-	{
-		auto& computed = element->GetComputedValues();
-		const float block_width = box.GetSize(Box::CONTENT).x;
+	auto& computed = element->GetComputedValues();
+	const float block_width = box.GetSize(Box::CONTENT).x;
 
-		if (computed.width().type == Style::Width::Auto)
-		{
-			get_content_width_from_children();
-		}
-		else
-		{
-			float width_value = ResolveValue(computed.width(), block_width);
-			content_width = Math::Max(content_width, width_value);
-		}
-
-		float min_width, max_width;
-		LayoutDetails::GetMinMaxWidth(min_width, max_width, computed, box, block_width);
-		content_width = Math::Clamp(content_width, min_width, max_width);
-	}
-	else
+	if (computed.width().type == Style::Width::Auto)
 	{
 		get_content_width_from_children();
 	}
+	else
+	{
+		float width_value = ResolveValue(computed.width(), block_width);
+		content_width = Math::Max(content_width, width_value);
+	}
+
+	float min_width, max_width;
+	LayoutDetails::GetMinMaxWidth(min_width, max_width, computed, box, block_width);
+	content_width = Math::Clamp(content_width, min_width, max_width);
 
 	// Can add the dimensions of floating elements here if we want to support that.
 

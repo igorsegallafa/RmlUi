@@ -239,12 +239,12 @@ public:
 
 	/// Called by a closing block box child. Increments the cursor.
 	/// @param[in] child The closing child block-level box.
-	/// @param[in] child_position The top-left position of the child, relative to this container.
-	/// @param[in] child_margin_corner The top-left margin of the child.
-	/// @param[in] child_size The margin size of the child.
+	/// @param[in] child_position The border position of the child, relative to the current block formatting context.
+	/// @param[in] child_size The border size of the child.
+	/// @param[in] child_margin_bottom The bottom margin width of the child.
 	/// @return False if the block box caused an automatic vertical scrollbar to appear, forcing an entire reformat of the block box.
 	/// TODO: Can we simplify this? Rename? This is more like increment box cursor and enlarge content size, and only needed for block-level boxes.
-	bool CloseChildBox(LayoutBox* child, Vector2f child_position, Vector2f child_margin_corner, Vector2f child_size);
+	bool CloseChildBox(LayoutBox* child, Vector2f child_position, Vector2f child_size, float child_margin_bottom);
 
 	/// Creates a new block box and adds it as a child of this one.
 	/// @param element[in] The new block element.
@@ -257,7 +257,6 @@ public:
 	LayoutBox* AddBlockLevelBox(UniquePtr<LayoutBox> block_level_box, Element* element, const Box& box);
 
 	struct InlineBoxHandle {
-		InlineContainer* inline_container;
 		InlineBox* inline_box;
 	};
 
@@ -278,19 +277,14 @@ public:
 	// Estimate the static position of a hypothetical next element to be placed.
 	Vector2f GetOpenStaticPosition(Style::Display display) const;
 
-	/// Returns the offset from the top-left corner of this box's offset element the next child box will be positioned at.
-	/// @param[in] top_margin The top margin of the box. This will be collapsed as appropriate against other block boxes.
+	/// Returns the offset of a new child box to be placed here.
+	/// @return The next box border position in the block formatting context space.
+	Vector2f NextBoxPosition() const;
+	/// Returns the offset of a new child box to be placed here. Collapses adjacent margins and optionally clears floats.
+	/// @param[in] child_box The dimensions of the new box.
 	/// @param[in] clear_property The value of the underlying element's clear property.
-	/// @return The box cursor position.
-	/// TODO/note: Returns the position in root-relative coordinates.
-	Vector2f NextBoxPosition(float top_margin = 0, Style::Clear clear_property = Style::Clear::None) const;
-	/// Returns the offset from the top-left corner of this box's offset element the next child block box, of the given dimensions,
-	/// will be positioned at. This will include the margins on the new block box.
-	/// @param[in] box The dimensions of the new box.
-	/// @param[in] clear_property The value of the underlying element's clear property.
-	/// @return The block box cursor position.
-	/// TODO/note: Returns the position in root-relative coordinates.
-	Vector2f NextBlockBoxPosition(const Box& box, Style::Clear clear_property) const;
+	/// @return The next border position in the block formatting context space.
+	Vector2f NextBoxPosition(const Box& child_box, Style::Clear clear_property) const;
 
 	// Places all queued floating elements.
 	void PlaceQueuedFloats(float vertical_offset);
