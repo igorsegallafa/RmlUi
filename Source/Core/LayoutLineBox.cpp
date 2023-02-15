@@ -71,7 +71,6 @@ bool LayoutLineBox::AddBox(InlineLevelBox* box, InlineLayoutMode layout_mode, La
 	}
 
 	FragmentConstructor constructor = box->CreateFragment(layout_mode, available_width, open_spacing_right, first_box, inout_overflow_handle);
-	inout_overflow_handle = {};
 
 	if (constructor.type == FragmentType::Invalid)
 	{
@@ -85,6 +84,7 @@ bool LayoutLineBox::AddBox(InlineLevelBox* box, InlineLayoutMode layout_mode, La
 	fragments.push_back(Fragment{box, constructor, box->GetVerticalAlign(), box_placement_cursor, open_fragments_leaf});
 	fragments.back().aligned_subtree_root = DetermineAlignedSubtreeRoot(fragment_index);
 
+	inout_overflow_handle = {};
 	bool continue_on_new_line = false;
 
 	switch (constructor.type)
