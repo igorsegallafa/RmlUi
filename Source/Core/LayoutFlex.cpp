@@ -68,7 +68,7 @@ void FlexFormattingContext::Format(FormatSettings format_settings)
 
 	for (int layout_iteration = 0; layout_iteration < 3; layout_iteration++)
 	{
-		// The scrollbars may be toggled on between iterations.
+		// One or both scrollbars can be enabled between iterations.
 		const Vector2f scrollbar_size = {
 			element_scroll->GetScrollbarSize(ElementScroll::VERTICAL),
 			element_scroll->GetScrollbarSize(ElementScroll::HORIZONTAL),

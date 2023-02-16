@@ -428,13 +428,39 @@ void BlockContainer::AddFloatElement(Element* element)
 	if (InlineContainer* inline_container = GetOpenInlineContainer())
 	{
 		// Try to add the float to our inline container, placing it next to any open line if possible. Otherwise, queue it for later.
-		if (!queued_float_elements.empty() || !inline_container->PlaceFloatElement(element, space))
+		bool float_placed = false;
+		float line_position_top = 0.f;
+		Vector2f line_size;
+		if (queued_float_elements.empty() && inline_container->GetOpenLineBoxDimensions(line_position_top, line_size))
+		{
+			const Vector2f margin_size = element->GetBox().GetSize(Box::MARGIN);
+			const Style::Float float_property = element->GetComputedValues().float_();
+			const Style::Clear clear_property = element->GetComputedValues().clear();
+
+			float available_width = 0.f;
+			const Vector2f float_position =
+				space->NextFloatPosition(this, available_width, line_position_top, margin_size, float_property, clear_property);
+
+			const float line_position_bottom = line_position_top + line_size.y;
+			const float line_and_element_width = margin_size.x + line_size.x;
+
+			// If the float can be positioned on the open line, and it can fit next to the line's contents, place it now.
+			if (float_position.y < line_position_bottom && line_and_element_width <= available_width)
+			{
+				PlaceFloat(element, line_position_top);
+				inline_container->UpdateOpenLineBoxPlacement();
+				float_placed = true;
+			}
+		}
+
+		if (!float_placed)
 			queued_float_elements.push_back(element);
 	}
 	else
 	{
-		// Nope ... just place it!
-		PlaceFloat(element);
+		// There is no inline container, so just place it!
+		const Vector2f box_position = NextBoxPosition();
+		PlaceFloat(element, box_position.y);
 	}
 
 	if (element->GetPosition() == Style::Position::Relative)
@@ -499,12 +525,12 @@ Vector2f BlockContainer::NextBoxPosition(const Box& child_box, Style::Clear clea
 	return box_position;
 }
 
-void BlockContainer::PlaceQueuedFloats(float vertical_offset)
+void BlockContainer::PlaceQueuedFloats(float vertical_position)
 {
 	if (!queued_float_elements.empty())
 	{
 		for (Element* float_element : queued_float_elements)
-			PlaceFloat(float_element, vertical_offset);
+			PlaceFloat(float_element, vertical_position);
 
 		queued_float_elements.clear();
 	}
@@ -561,12 +587,6 @@ float BlockContainer::GetShrinkToFitWidth() const
 	// Can add the dimensions of floating elements here if we want to support that.
 
 	return content_width;
-}
-
-void BlockContainer::ExtendInnerContentSize(Vector2f _inner_content_size)
-{
-	inner_content_size.x = Math::Max(inner_content_size.x, _inner_content_size.x);
-	inner_content_size.y = Math::Max(inner_content_size.y, _inner_content_size.y);
 }
 
 Element* BlockContainer::GetElement() const
@@ -722,10 +742,17 @@ void BlockContainer::ResetInterruptedLineBox()
 	}
 }
 
-void BlockContainer::PlaceFloat(Element* element, float offset)
+void BlockContainer::PlaceFloat(Element* element, float vertical_position)
 {
-	const Vector2f box_position = NextBoxPosition();
-	space->PlaceFloat(this, element, box_position.y + offset);
+	space->PlaceFloat(this, element, vertical_position);
+
+	// TODO
+	//// Extend the inner content size. The vertical size can be larger than the box_cursor due to overflow.
+	// inner_content_size = Math::Max(inner_content_size, child_position + child->GetVisibleOverflowSize());
+
+	// const Vector2f content_size = Math::Max(Vector2f{box.GetSize().x, box_cursor}, inner_content_size);
+
+	// const bool result = CatchOverflow(content_size, box, max_height);
 }
 
 bool BlockContainer::GetBaselineOfLastLine(float& out_baseline) const

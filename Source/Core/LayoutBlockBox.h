@@ -258,6 +258,9 @@ public:
 
 	LayoutBox* AddBlockLevelBox(UniquePtr<LayoutBox> block_level_box, Element* element, const Box& box);
 
+	/// Adds an element to this block box to be handled as a floating element.
+	void AddFloatElement(Element* element);
+
 	struct InlineBoxHandle {
 		InlineBox* inline_box;
 	};
@@ -273,9 +276,6 @@ public:
 	/// Adds a line-break to this block box.
 	void AddBreak();
 
-	/// Adds an element to this block box to be handled as a floating element.
-	void AddFloatElement(Element* element);
-
 	// Estimate the static position of a hypothetical next element to be placed.
 	Vector2f GetOpenStaticPosition(Style::Display display) const;
 
@@ -289,12 +289,10 @@ public:
 	Vector2f NextBoxPosition(const Box& child_box, Style::Clear clear_property) const;
 
 	// Places all queued floating elements.
-	void PlaceQueuedFloats(float vertical_offset);
+	void PlaceQueuedFloats(float vertical_position);
 
 	/// Calculate the dimensions of the box's internal content width; i.e. the size used to calculate the shrink-to-fit width.
 	float GetShrinkToFitWidth() const;
-	/// Set the inner content size if it is larger than the current value on each axis individually.
-	void ExtendInnerContentSize(Vector2f inner_content_size);
 
 	// Reset this box, so that it can be formatted again.
 	void ResetContents();
@@ -330,7 +328,7 @@ private:
 	void ResetInterruptedLineBox();
 
 	// Positions a floating element within this block box.
-	void PlaceFloat(Element* element, float offset = 0);
+	void PlaceFloat(Element* element, float vertical_position);
 
 	// Return the baseline of the last line box of this or any descendant inline-level boxes.
 	bool GetBaselineOfLastLine(float& out_baseline) const override;

@@ -137,40 +137,13 @@ void InlineContainer::AddChainedBox(UniquePtr<LayoutLineBox> open_line_box)
 	line_boxes.push_back(std::move(open_line_box));
 }
 
-bool InlineContainer::PlaceFloatElement(Element* element, LayoutBlockBoxSpace* space)
-{
-	if (LayoutLineBox* line_box = GetOpenLineBox())
-	{
-		const Vector2f margin_size = element->GetBox().GetSize(Box::MARGIN);
-		const Style::Float float_property = element->GetComputedValues().float_();
-		const Style::Clear clear_property = element->GetComputedValues().clear();
-
-		const float line_box_top = position.y + box_cursor;
-		float available_width = 0.f;
-		const Vector2f float_position = space->NextFloatPosition(parent, available_width, line_box_top, margin_size, float_property, clear_property);
-
-		const float line_box_bottom = line_box_top + element_line_height;
-		const float line_box_and_element_width = margin_size.x + line_box->GetBoxCursor();
-
-		// If the float can be positioned on this line, and it can fit next to the line's contents, place it now.
-		if (float_position.y < line_box_bottom && line_box_and_element_width <= available_width)
-		{
-			space->PlaceFloat(parent, element, position.y + box_cursor);
-			UpdateLineBoxPlacement(line_box, 0.f, element_line_height);
-			return true;
-		}
-	}
-
-	return false;
-}
-
 bool InlineContainer::Close(UniquePtr<LayoutLineBox>* out_open_line_box)
 {
 	// The parent container may need the open line box to be split and resumed.
 	CloseOpenLineBox(true, out_open_line_box);
 
 	// It is possible that floats were queued between the last line close and this container close, if so place them now.
-	parent->PlaceQueuedFloats(box_cursor);
+	parent->PlaceQueuedFloats(position.y + box_cursor);
 
 	// Expand our content area if any line boxes had to push themselves out.
 	// TODO
@@ -221,7 +194,7 @@ void InlineContainer::CloseOpenLineBox(bool split_all_open_boxes, UniquePtr<Layo
 			box_cursor = (line_box->GetPosition().y - position.y) + height_of_line;
 
 		// If we have any pending floating elements for our parent, then this would be an ideal time to place them.
-		parent->PlaceQueuedFloats(box_cursor);
+		parent->PlaceQueuedFloats(position.y + box_cursor);
 
 		if (split_line_box)
 		{
@@ -231,6 +204,23 @@ void InlineContainer::CloseOpenLineBox(bool split_all_open_boxes, UniquePtr<Layo
 				line_boxes.push_back(std::move(split_line_box));
 		}
 	}
+}
+
+bool InlineContainer::GetOpenLineBoxDimensions(float& out_vertical_position, Vector2f& out_tentative_size) const
+{
+	if (LayoutLineBox* line_box = GetOpenLineBox())
+	{
+		out_vertical_position = position.y + box_cursor;
+		out_tentative_size = {line_box->GetBoxCursor(), line_box->GetLineMinimumHeight()};
+		return true;
+	}
+	return false;
+}
+
+void InlineContainer::UpdateOpenLineBoxPlacement()
+{
+	if (LayoutLineBox* line_box = GetOpenLineBox())
+		UpdateLineBoxPlacement(line_box, 0.f, element_line_height);
 }
 
 void InlineContainer::UpdateLineBoxPlacement(LayoutLineBox* line_box, float minimum_width, float minimum_height)

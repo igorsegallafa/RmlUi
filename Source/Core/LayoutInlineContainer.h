@@ -68,22 +68,22 @@ public:
 	/// Adds a line box for resuming one that was previously split.
 	/// @param[in] open_line_box The line box overflowing from a previous inline container.
 	void AddChainedBox(UniquePtr<LayoutLineBox> open_line_box);
-	/// Place a float element next to our open line box, if possible.
-	/// @param space The space for the float to be placed inside.
-	/// @param element The float element to be placed.
-	/// @return True if the element was placed, otherwise false.
-	bool PlaceFloatElement(Element* element, LayoutBlockBoxSpace* space);
 
 	/// Closes the box. This will determine the element's height (if it was unspecified).
 	/// @param[out] Optionally, output the open inline box.
 	/// @return True if the element was closed, false if our formatting context needs to be reformatted.
 	bool Close(UniquePtr<LayoutLineBox>* out_open_line_box);
 
-	/// Calculate the dimensions of the box's internal content width; i.e. the size used to calculate the shrink-to-fit width.
-	float GetShrinkToFitWidth() const;
+	/// Update the placement of the open line box, e.g. to account for newly placed floats.
+	void UpdateOpenLineBoxPlacement();
 
+	/// Returns the position and tentative size of the currently open line box, if any.
+	bool GetOpenLineBoxDimensions(float& out_vertical_position, Vector2f& out_tentative_size) const;
 	/// Returns an estimate for the position of a hypothetical next box to be placed, relative to the content box of this container.
 	Vector2f GetStaticPositionEstimate(bool inline_level_box) const;
+
+	/// Calculate the dimensions of the box's internal content width; i.e. the size used to calculate the shrink-to-fit width.
+	float GetShrinkToFitWidth() const;
 
 	/// Get the baseline of the last line.
 	/// @return True if the baseline was found.
