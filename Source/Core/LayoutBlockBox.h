@@ -100,6 +100,7 @@ public:
 	ContainerBox* GetParent() { return parent_container; }
 	Element* GetElement() { return element; }
 	Style::Position GetPositionProperty() const { return position_property; }
+	bool HasLocalTransformOrPerspective() const { return has_local_transform_or_perspective; }
 
 protected:
 	ContainerBox(Type type, Element* element, ContainerBox* parent_container) : LayoutBox(type), element(element), parent_container(parent_container)
@@ -110,6 +111,7 @@ protected:
 			overflow_x = computed.overflow_x();
 			overflow_y = computed.overflow_y();
 			position_property = computed.position();
+			has_local_transform_or_perspective = (computed.has_local_transform() || computed.has_local_perspective());
 		}
 	}
 
@@ -140,6 +142,7 @@ private:
 	Style::Overflow overflow_x = Style::Overflow::Visible;
 	Style::Overflow overflow_y = Style::Overflow::Visible;
 	Style::Position position_property = Style::Position::Static;
+	bool has_local_transform_or_perspective = false;
 
 	ContainerBox* parent_container = nullptr;
 };

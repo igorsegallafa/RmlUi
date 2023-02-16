@@ -178,14 +178,18 @@ ContainingBlock LayoutDetails::GetContainingBlock(ContainerBox* parent_container
 	Box::Area area = Box::CONTENT;
 
 	// For absolutely positioned boxes we look for the first positioned ancestor. We deviate from the CSS specs by using
-	// the same rules for fixed boxes, as that is particularly helpful for handles and other widgets that should not
-	// scroll with the window. This is a common design pattern in target applications for this library, but may be
-	// reconsidered in the future.
+	// the same rules for fixed boxes, as that is particularly helpful on handles and other widgets that should not
+	// scroll with the window. This is a common design pattern in target applications for this library, although this
+	// behavior may be reconsidered in the future.
 	if (position == Position::Absolute || position == Position::Fixed)
 	{
-		while (container && container->GetParent() && container->GetPositionProperty() == Position::Static)
-			container = container->GetParent();
 		area = Box::PADDING;
+
+		auto EstablishesAbsoluteContainingBlock = [](ContainerBox* container) -> bool {
+			return container->GetPositionProperty() != Position::Static || container->HasLocalTransformOrPerspective();
+		};
+		while (container && container->GetParent() && !EstablishesAbsoluteContainingBlock(container))
+			container = container->GetParent();
 	}
 
 	const Box* box = container->GetBoxPtr();
