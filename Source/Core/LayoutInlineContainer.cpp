@@ -91,7 +91,7 @@ InlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
 		InlineLayoutMode layout_mode = InlineLayoutMode::Nowrap;
 		if (wrap_content)
 		{
-			const bool line_shrinked_by_floats = (line_box->GetLineWidth() < box_size.x);
+			const bool line_shrinked_by_floats = (line_box->GetLineWidth() + 0.5f < box_size.x && minimum_width_next < box_size.x);
 			const bool can_wrap_any = (line_shrinked_by_floats || line_box->HasContent());
 			layout_mode = (can_wrap_any ? InlineLayoutMode::WrapAny : InlineLayoutMode::WrapAfterContent);
 		}
