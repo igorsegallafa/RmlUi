@@ -11,6 +11,7 @@
 		}
 		div > div { background: #bbf; }
 		.float { float: left; }
+		.overflow { overflow: auto; }
 		.height { height: 100px; }
 	</style>
 </head>
@@ -53,24 +54,9 @@ In consectetur, neque dignissim tincidunt dapibus,<br/> leo metus molestie erat.
 <hr/>
 
 <div class="float">
-In consectetur, neque dignissim tincidunt dapibus, leo metus molestie erat, eu pharetra velit nunc in ipsum. Donec aliquet malesuada iaculis. Quisque maximus urna in congue placerat. In hac habitasse platea dictumst. Mauris a fringilla augue. Donec posuere ante at orci efficitur porttitor vitae ac tellus.<br/>Nunc nec sapien orci. Sed rhoncus et dui sed sagittis. Nullam venenatis quis elit vel mattis. In mattis erat et blandit aliquam. Aliquam erat volutpat.
+In consectetur, neque dignissim tincidunt dapibus, leo metus molestie erat, eu pharetra velit nunc in ipsum. Donec aliquet malesuada iaculis. Quisque maximus urna in congue placerat. In hac habitasse platea dictumst. Mauris a fringilla augue. Donec posuere ante at orci efficitur porttitor vitae ac tellus. Nunc nec sapien orci.<br/> Sed rhoncus et dui sed sagittis. Nullam venenatis quis elit vel mattis. In mattis erat et blandit aliquam. Aliquam erat volutpat.
 </div>
 
-<hr/>
-
-Definite height seems to not catch overflow? (Try removing .height from next div)
-
-<div class="height float" style="width: 10%" id="x">
-In consectetur, neque dignissim tincidunt dapibus, leo metus molestie erat, eu pharetra velit nunc in ipsum. Donec aliquet malesuada iaculis. Quisque maximus urna in congue placerat. In hac habitasse platea dictumst. Mauris a fringilla augue. Donec posuere ante at orci efficitur porttitor vitae ac tellus.<br/>Nunc nec sapien orci. Sed rhoncus et dui sed sagittis. Nullam venenatis quis elit vel mattis. In mattis erat et blandit aliquam. Aliquam erat volutpat.
-</div>
-
-<!--
-<div class="float height"> 
-<div class="float">
-In consectetur, neque dignissim tincidunt dapibus, leo metus molestie erat, eu pharetra velit nunc in ipsum. Donec aliquet malesuada iaculis. Quisque maximus urna in congue placerat. In hac habitasse platea dictumst. Mauris a fringilla augue. Donec posuere ante at orci efficitur porttitor vitae ac tellus.<br/>Nunc nec sapien orci. Sed rhoncus et dui sed sagittis. Nullam venenatis quis elit vel mattis. In mattis erat et blandit aliquam. Aliquam erat volutpat.
-</div>
-</div>
--->
 <handle size_target="#document"/>
 </body>
 </rml>

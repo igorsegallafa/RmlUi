@@ -176,7 +176,7 @@ bool ContainerBox::CatchOverflow(const Vector2f content_size, const Box& box, co
 	return !scrollbar_size_changed;
 }
 
-bool ContainerBox::SubmitBox(const Vector2f content_box, const Box& box, const float max_height)
+bool ContainerBox::SubmitBox(const Vector2f content_overflow_size, const Box& box, const float max_height)
 {
 	// TODO: Properly compute the visible overflow size / scrollable overflow rectangle.
 	//       https://www.w3.org/TR/css-overflow-3/#scrollable
@@ -196,7 +196,7 @@ bool ContainerBox::SubmitBox(const Vector2f content_box, const Box& box, const f
 
 		// If our content is larger than our padding box, we can add scrollbars if we're set to auto-scrollbars. If
 		// we're set to always use scrollbars, then the scrollbars have already been enabled.
-		if (!CatchOverflow(content_box, box, max_height))
+		if (!CatchOverflow(content_overflow_size, box, max_height))
 			return false;
 
 		const Vector2f padding_top_left = {box.GetEdge(Box::PADDING, Box::LEFT), box.GetEdge(Box::PADDING, Box::TOP)};
@@ -208,7 +208,7 @@ bool ContainerBox::SubmitBox(const Vector2f content_box, const Box& box, const f
 			is_scroll_container ? element->GetElementScroll()->GetScrollbarSize(ElementScroll::VERTICAL) : 0.f,
 			is_scroll_container ? element->GetElementScroll()->GetScrollbarSize(ElementScroll::HORIZONTAL) : 0.f,
 		};
-		const Vector2f scrollable_overflow_size = Math::Max(padding_size - scrollbar_size, padding_top_left + content_box);
+		const Vector2f scrollable_overflow_size = Math::Max(padding_size - scrollbar_size, padding_top_left + content_overflow_size);
 
 		element->SetBox(box);
 		element->SetScrollableOverflowRectangle(scrollable_overflow_size);
@@ -228,7 +228,7 @@ bool ContainerBox::SubmitBox(const Vector2f content_box, const Box& box, const f
 		else
 		{
 			const Vector2f border_top_left = {box.GetEdge(Box::BORDER, Box::LEFT), box.GetEdge(Box::BORDER, Box::TOP)};
-			visible_overflow_size = Math::Max(border_size, content_box + border_top_left + padding_top_left);
+			visible_overflow_size = Math::Max(border_size, content_overflow_size + border_top_left + padding_top_left);
 		}
 	}
 
@@ -251,7 +251,7 @@ BlockContainer::~BlockContainer() {}
 bool BlockContainer::Close(BlockContainer* parent_block_container)
 {
 	// If the last child of this block box is an inline box, then we haven't closed it; close it now!
-	if (!CloseInlineBlockBox())
+	if (!CloseOpenInlineContainer())
 		return false;
 
 	// Set this box's height, if necessary.
@@ -267,7 +267,7 @@ bool BlockContainer::Close(BlockContainer* parent_block_container)
 	}
 
 	// Check how big our floated area is.
-	const Vector2f space_box = space->GetDimensions(LayoutFloatBoxEdge::Border) - (position + box.GetPosition());
+	const Vector2f space_box = space->GetDimensions(LayoutFloatBoxEdge::Overflow) - (position + box.GetPosition());
 
 	// Start with the inner content size, as set by the child block boxes or external formatting contexts.
 	Vector2f content_box = Math::Max(inner_content_size, space_box);
@@ -423,7 +423,7 @@ void BlockContainer::AddBreak()
 	box_cursor += line_height;
 }
 
-void BlockContainer::AddFloatElement(Element* element)
+void BlockContainer::AddFloatElement(Element* element, Vector2f visible_overflow_size)
 {
 	if (InlineContainer* inline_container = GetOpenInlineContainer())
 	{
@@ -447,20 +447,20 @@ void BlockContainer::AddFloatElement(Element* element)
 			// If the float can be positioned on the open line, and it can fit next to the line's contents, place it now.
 			if (float_position.y < line_position_bottom && line_and_element_width <= available_width)
 			{
-				PlaceFloat(element, line_position_top);
+				PlaceFloat(element, line_position_top, visible_overflow_size);
 				inline_container->UpdateOpenLineBoxPlacement();
 				float_placed = true;
 			}
 		}
 
 		if (!float_placed)
-			queued_float_elements.push_back(element);
+			queued_float_elements.push_back({element, visible_overflow_size});
 	}
 	else
 	{
 		// There is no inline container, so just place it!
 		const Vector2f box_position = NextBoxPosition();
-		PlaceFloat(element, box_position.y);
+		PlaceFloat(element, box_position.y, visible_overflow_size);
 	}
 
 	if (element->GetPosition() == Style::Position::Relative)
@@ -529,8 +529,8 @@ void BlockContainer::PlaceQueuedFloats(float vertical_position)
 {
 	if (!queued_float_elements.empty())
 	{
-		for (Element* float_element : queued_float_elements)
-			PlaceFloat(float_element, vertical_position);
+		for (QueuedFloat entry : queued_float_elements)
+			PlaceFloat(entry.element, vertical_position, entry.visible_overflow_size);
 
 		queued_float_elements.clear();
 	}
@@ -651,9 +651,6 @@ const InlineContainer* BlockContainer::GetOpenInlineContainer() const
 
 InlineContainer* BlockContainer::EnsureOpenInlineContainer()
 {
-	// TODO: What if we already have an open block container, do we need to close it first?
-	// RMLUI_ASSERT(!GetOpenBlockContainer());
-
 	// First check to see if we already have an open inline container.
 	InlineContainer* inline_container = GetOpenInlineContainer();
 
@@ -678,13 +675,6 @@ InlineContainer* BlockContainer::EnsureOpenInlineContainer()
 	return inline_container;
 }
 
-const BlockContainer* BlockContainer::GetOpenBlockContainer() const
-{
-	if (!block_boxes.empty() && block_boxes.back()->GetType() == Type::BlockContainer)
-		return static_cast<BlockContainer*>(block_boxes.back().get());
-	return nullptr;
-}
-
 const LayoutBox* BlockContainer::GetOpenLayoutBox() const
 {
 	if (!block_boxes.empty())
@@ -692,42 +682,12 @@ const LayoutBox* BlockContainer::GetOpenLayoutBox() const
 	return nullptr;
 }
 
-bool BlockContainer::CloseInlineBlockBox()
+bool BlockContainer::CloseOpenInlineContainer()
 {
 	if (InlineContainer* inline_container = GetOpenInlineContainer())
 	{
 		ResetInterruptedLineBox();
 		return inline_container->Close(&interrupted_line_box);
-	}
-
-	return true;
-}
-
-bool BlockContainer::CloseOpenInlineContainer()
-{
-	RMLUI_ZoneScoped;
-
-	if (InlineContainer* inline_container = GetOpenInlineContainer())
-	{
-		UniquePtr<LayoutLineBox> open_line_box;
-
-		if (!inline_container->Close(&open_line_box))
-			return false;
-
-		if (open_line_box)
-		{
-			// TODO: Is comment still valid?
-			// There's an open inline box chain, which means this block element is parented to it. The chain needs to
-			// be positioned (if it hasn't already), closed and duplicated after this block box closes. Also, this
-			// block needs to be aware of its parentage, so it can correctly compute its relative position. First of
-			// all, we need to close the inline box; this will position the last line if necessary, but it will also
-			// create a new line in the inline block box; we want this line to be in an inline box after our block
-			// element.
-
-			ResetInterruptedLineBox();
-
-			interrupted_line_box = std::move(open_line_box);
-		}
 	}
 
 	return true;
@@ -742,17 +702,28 @@ void BlockContainer::ResetInterruptedLineBox()
 	}
 }
 
-void BlockContainer::PlaceFloat(Element* element, float vertical_position)
+void BlockContainer::PlaceFloat(Element* element, float vertical_position, Vector2f visible_overflow_size)
 {
-	space->PlaceFloat(this, element, vertical_position);
+	const Box& element_box = element->GetBox();
 
-	// TODO
-	//// Extend the inner content size. The vertical size can be larger than the box_cursor due to overflow.
-	// inner_content_size = Math::Max(inner_content_size, child_position + child->GetVisibleOverflowSize());
+	const Vector2f border_size = element_box.GetSize(Box::BORDER);
+	visible_overflow_size = Math::Max(border_size, visible_overflow_size);
 
-	// const Vector2f content_size = Math::Max(Vector2f{box.GetSize().x, box_cursor}, inner_content_size);
+	const Vector2f margin_top_left = {element_box.GetEdge(Box::MARGIN, Box::LEFT), element_box.GetEdge(Box::MARGIN, Box::TOP)};
+	const Vector2f margin_bottom_right = {element_box.GetEdge(Box::MARGIN, Box::RIGHT), element_box.GetEdge(Box::MARGIN, Box::BOTTOM)};
+	const Vector2f margin_size = border_size + margin_top_left + margin_bottom_right;
 
-	// const bool result = CatchOverflow(content_size, box, max_height);
+	Style::Float float_property = element->GetComputedValues().float_();
+	Style::Clear clear_property = element->GetComputedValues().clear();
+
+	float unused_box_width = 0.f;
+	const Vector2f margin_position = space->NextFloatPosition(this, unused_box_width, vertical_position, margin_size, float_property, clear_property);
+	const Vector2f border_position = margin_position + margin_top_left;
+
+	space->PlaceFloat(float_property, margin_position, margin_size, border_position, visible_overflow_size);
+
+	// Shift the offset into this container's space, which acts as the float element's containing block.
+	element->SetOffset(border_position - position, GetElement());
 }
 
 bool BlockContainer::GetBaselineOfLastLine(float& out_baseline) const

@@ -12,14 +12,14 @@
 		div.overflow { overflow: auto; }
 		div.outer {
 			width: 200dp;
-			height: 200dp;
+			height: 150dp;
 			border: 1dp #fff;
 			margin-bottom: 30dp;
 		}
 		div.inner {
 			border: 1dp black;
 			width: 150dp;
-			height: 150dp;
+			height: 100dp;
 		}
 		div.wide {
 			width: 300dp;
@@ -28,6 +28,12 @@
 			border: 1dp #0a0;
 			margin: 5dp;
 			background-color: #eee;
+		}
+		div.float {
+			float: left;
+			width: 40dp;
+			height: 70%;
+			border: 1dp black;
 		}
 	</style>
 </head>
@@ -44,6 +50,12 @@
 <div class="outer overflow">
 	<div class="inner">
 		<div class="wide">Wide element</div>
+	</div>
+</div>
+
+<div class="outer overflow">
+	<div class="float">
+		The text in this box should overflow its scroll container, thereby producing a scrollbar inside the white border.
 	</div>
 </div>
 </body>

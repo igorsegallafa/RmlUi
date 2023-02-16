@@ -40,20 +40,6 @@ LayoutBlockBoxSpace::LayoutBlockBoxSpace() {}
 
 LayoutBlockBoxSpace::~LayoutBlockBoxSpace() {}
 
-void LayoutBlockBoxSpace::ImportSpace(const LayoutBlockBoxSpace& space)
-{
-	RMLUI_ASSERT(&space != this);
-
-	// Copy all the boxes from the parent into this space. Could do some optimisation here!
-	for (int i = 0; i < NUM_ANCHOR_EDGES; ++i)
-	{
-		for (size_t j = 0; j < space.boxes[i].size(); ++j)
-			boxes[i].push_back(space.boxes[i][j]);
-	}
-
-	// TODO: Copy extents from the other space too?
-}
-
 Vector2f LayoutBlockBoxSpace::NextBoxPosition(const BlockContainer* parent, float& box_width, float cursor, const Vector2f dimensions,
 	bool nowrap) const
 {
@@ -80,35 +66,15 @@ Vector2f LayoutBlockBoxSpace::NextFloatPosition(const BlockContainer* parent, fl
 	return margin_offset;
 }
 
-float LayoutBlockBoxSpace::PlaceFloat(const BlockContainer* parent, Element* element, float cursor)
+void LayoutBlockBoxSpace::PlaceFloat(Style::Float float_property, Vector2f margin_position, Vector2f margin_size, Vector2f overflow_position,
+	Vector2f overflow_size)
 {
-	const Box& element_box = element->GetBox();
-	const Vector2f element_margin_top_left = {element_box.GetEdge(Box::MARGIN, Box::LEFT), element_box.GetEdge(Box::MARGIN, Box::TOP)};
-	const Vector2f element_margin_bottom_right = {element_box.GetEdge(Box::MARGIN, Box::RIGHT), element_box.GetEdge(Box::MARGIN, Box::BOTTOM)};
-
-	const Vector2f element_border_size = element_box.GetSize(Box::BORDER);
-	const Vector2f element_margin_size = element_border_size + element_margin_top_left + element_margin_bottom_right;
-
-	Style::Float float_property = element->GetComputedValues().float_();
-	Style::Clear clear_property = element->GetComputedValues().clear();
-
-	float unused_box_width = 0.f;
-	const Vector2f element_margin_offset = NextFloatPosition(parent, unused_box_width, cursor, element_margin_size, float_property, clear_property);
-	const Vector2f element_border_offset = element_margin_offset + element_margin_top_left;
-
-	// It's been placed, so we can now add it to our list of floating boxes.
-	boxes[float_property == Style::Float::Left ? LEFT : RIGHT].push_back(SpaceBox{element_margin_offset, element_margin_size});
+	boxes[float_property == Style::Float::Left ? LEFT : RIGHT].push_back(SpaceBox{margin_position, margin_size});
 
 	// Set our extents so they enclose the new box.
-	extent_top_left_border = Math::Min(extent_top_left_border, element_border_offset);
-	extent_bottom_right_margin = Math::Max(extent_bottom_right_margin, element_margin_offset + element_margin_size);
-	extent_bottom_right_border = Math::Max(extent_bottom_right_border, element_border_offset + element_border_size);
-
-	// Shift the offset into our parent's space, which acts as the element's containing block.
-	// TODO: Move this outside function?
-	element->SetOffset(element_border_offset - parent->GetPosition(), parent->GetElement());
-
-	return element_margin_offset.y + element_margin_size.y;
+	extent_top_left_overflow = Math::Min(extent_top_left_overflow, overflow_position);
+	extent_bottom_right_overflow = Math::Max(extent_bottom_right_overflow, overflow_position + overflow_size);
+	extent_bottom_right_margin = Math::Max(extent_bottom_right_margin, margin_position + margin_size);
 }
 
 float LayoutBlockBoxSpace::DetermineClearPosition(float cursor, Style::Clear clear_property) const
@@ -269,7 +235,7 @@ Vector2f LayoutBlockBoxSpace::GetDimensions(LayoutFloatBoxEdge edge) const
 	// to the top or left, and thus we have no use for it currently. We could use it later to help detect overflow on
 	// the top-left sides. For example so we can hide parts of floats pushing outside the top-left sides of its parent
 	// which is set to 'overflow: auto'.
-	return edge == LayoutFloatBoxEdge::Border ? extent_bottom_right_border : extent_bottom_right_margin;
+	return edge == LayoutFloatBoxEdge::Margin ? extent_bottom_right_margin : extent_bottom_right_overflow;
 }
 
 void* LayoutBlockBoxSpace::operator new(size_t size)

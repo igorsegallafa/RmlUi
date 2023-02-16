@@ -117,11 +117,15 @@ protected:
 
 	// Checks if we have a new overflow on an auto-scrolling element. If so, our vertical scrollbar will be enabled and
 	// our block boxes will be destroyed. All content will need to re-formatted.
-	// @returns Returns true if no overflow occured, false if it did.
+	// @returns True if no overflow occured, false if it did.
 	bool CatchOverflow(const Vector2f content_size, const Box& box, const float max_height) const;
 
-	// TODO: content_box -> content_overflow_size ?
-	bool SubmitBox(const Vector2f content_box, const Box& box, const float max_height);
+	/// Set the box and scrollable area on our element, possibly catch any overflow.
+	/// @param content_overflow_size The size of the visible content, relative to our content area.
+	/// @param box The box to be set on the element.
+	/// @param max_height Maximum height of the content area, if any.
+	/// @returns True if no overflow occured, false if it did. 
+	bool SubmitBox(const Vector2f content_overflow_size, const Box& box, const float max_height);
 
 	Element* const element;
 
@@ -259,7 +263,7 @@ public:
 	LayoutBox* AddBlockLevelBox(UniquePtr<LayoutBox> block_level_box, Element* element, const Box& box);
 
 	/// Adds an element to this block box to be handled as a floating element.
-	void AddFloatElement(Element* element);
+	void AddFloatElement(Element* element, Vector2f visible_overflow_size);
 
 	struct InlineBoxHandle {
 		InlineBox* inline_box;
@@ -317,18 +321,15 @@ private:
 	InlineContainer* GetOpenInlineContainer();
 	const InlineContainer* GetOpenInlineContainer() const;
 
-	const BlockContainer* GetOpenBlockContainer() const;
 	const LayoutBox* GetOpenLayoutBox() const;
 
-	// Closes our last block box, if it is an open inline block box. Returns false if our formatting context needs to be reformatted.
-	bool CloseInlineBlockBox();
-	// Closes the inline container if there is one open.
+	// Closes the inline container if there is one open. Returns false if our formatting context needs to be reformatted.
 	bool CloseOpenInlineContainer();
 
 	void ResetInterruptedLineBox();
 
 	// Positions a floating element within this block box.
-	void PlaceFloat(Element* element, float vertical_position);
+	void PlaceFloat(Element* element, float vertical_position, Vector2f visible_overflow_size);
 
 	// Return the baseline of the last line box of this or any descendant inline-level boxes.
 	bool GetBaselineOfLastLine(float& out_baseline) const override;
@@ -337,6 +338,11 @@ private:
 	String DebugDumpTree(int depth) const override;
 
 	using BlockBoxList = Vector<UniquePtr<LayoutBox>>;
+	struct QueuedFloat {
+		Element* element;
+		Vector2f visible_overflow_size;
+	};
+	using QueuedFloatList = Vector<QueuedFloat>;
 
 	// The block box's position.
 	Vector2f position;
@@ -358,7 +364,7 @@ private:
 	// Used by block contexts only; stores the list of block boxes under this box.
 	BlockBoxList block_boxes;
 	// Stores any floating elements that are waiting for a line break to be positioned.
-	ElementList queued_float_elements;
+	QueuedFloatList queued_float_elements;
 	// Used by block contexts only; stores an inline element hierarchy that was interrupted by a child block box.
 	// The hierarchy will be resumed in an inline-context box once the intervening block box is completed.
 	UniquePtr<LayoutLineBox> interrupted_line_box;

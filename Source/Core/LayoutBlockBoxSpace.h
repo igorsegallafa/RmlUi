@@ -37,7 +37,7 @@ namespace Rml {
 class Element;
 class BlockContainer;
 
-enum class LayoutFloatBoxEdge { Border, Margin };
+enum class LayoutFloatBoxEdge { Margin, Overflow };
 
 /**
     Each block box has a space object for managing the space occupied by its floating elements, and those of its
@@ -50,10 +50,6 @@ class LayoutBlockBoxSpace {
 public:
 	LayoutBlockBoxSpace();
 	~LayoutBlockBoxSpace();
-
-	/// Imports boxes from another block into this space.
-	/// @param[in] space The space to import boxes from.
-	void ImportSpace(const LayoutBlockBoxSpace& space);
 
 	/// Generates the position for a box of a given size within our block box.
 	/// @param[out] box_width The available width for the box.
@@ -73,12 +69,8 @@ public:
 	Vector2f NextFloatPosition(const BlockContainer* parent, float& box_width, float cursor, Vector2f dimensions, Style::Float float_property,
 		Style::Clear clear_property) const;
 
-	/// Generates and sets the position for a floating box of a given size within our block box. The element's box
-	/// is then added into our list of floating boxes.
-	/// @param[in] element The element to position.
-	/// @param[in] cursor The ideal vertical position for the box.
-	/// @return The offset of the bottom outer edge of the element.
-	float PlaceFloat(const BlockContainer* parent, Element* element, float cursor);
+	/// Add a new entry into our list of floated boxes.
+	void PlaceFloat(Style::Float float_property, Vector2f margin_position, Vector2f margin_size, Vector2f overflow_position, Vector2f overflow_size);
 
 	/// Determines the appropriate vertical position for an object that is choosing to clear floating elements to
 	/// the left or right (or both).
@@ -87,9 +79,9 @@ public:
 	/// @return The appropriate vertical position for the clearing object.
 	float DetermineClearPosition(float cursor, Style::Clear clear_property) const;
 
-	/// Returns the size of the rectangle encompassing all boxes within the space, relative to the parent's content box.
+	/// Returns the size of the rectangle encompassing all boxes within the space, relative to the block formatting context space.
 	/// @param[in] edges Which edge of the boxes to encompass.
-	/// @note Generally, the border box is used when determining overflow, while the margin box is used for layout sizing.
+	/// @note Generally, the margin box is used for layout sizing, while the overflow size is the border box unless it has visible overflow,
 	Vector2f GetDimensions(LayoutFloatBoxEdge edge) const;
 
 	/// Clear all floating boxes placed in this space.
@@ -97,8 +89,8 @@ public:
 	{
 		for (auto& box_list : boxes)
 			box_list.clear();
-		extent_bottom_right_border = {};
-		extent_bottom_right_border = {};
+		extent_bottom_right_overflow = {};
+		extent_bottom_right_overflow = {};
 		extent_bottom_right_margin = {};
 	}
 
@@ -122,9 +114,9 @@ private:
 	// The boxes floating in our space.
 	SpaceBoxList boxes[NUM_ANCHOR_EDGES];
 
-	// The rectangle encompassing all boxes added specifically into this space, relative to our parent's content box.
-	Vector2f extent_top_left_border;
-	Vector2f extent_bottom_right_border;
+	// The rectangle encompassing all boxes added specifically into this space, relative to our block formatting context space.
+	Vector2f extent_top_left_overflow;
+	Vector2f extent_bottom_right_overflow;
 	Vector2f extent_bottom_right_margin;
 };
 

@@ -163,7 +163,7 @@ void BlockFormattingContext::Format(FormatSettings format_settings)
 
 	BlockContainer* container = root_block_container.get();
 	DebugDumpLayoutTree debug_dump_tree(element, container);
-	
+
 	container->ResetScrollbars(box);
 
 	// Format the element's children. In rare cases, it is possible that we need three iterations: Once to enable the
@@ -298,7 +298,7 @@ bool BlockFormattingContext::FormatBlockContainerChild(BlockContainer* parent_co
 		// If the element is floating, we remove it from the flow.
 		if (computed.float_() != Style::Float::None)
 		{
-			parent_container->AddFloatElement(element);
+			parent_container->AddFloatElement(element, layout_box->GetVisibleOverflowSize());
 		}
 		// Otherwise, check if we have a sized block-level box.
 		else if (layout_box && outer_display == OuterDisplayType::BlockLevel)

@@ -139,24 +139,20 @@ void InlineContainer::AddChainedBox(UniquePtr<LayoutLineBox> open_line_box)
 
 bool InlineContainer::Close(UniquePtr<LayoutLineBox>* out_open_line_box)
 {
+	RMLUI_ZoneScoped;
+
 	// The parent container may need the open line box to be split and resumed.
 	CloseOpenLineBox(true, out_open_line_box);
 
-	// It is possible that floats were queued between the last line close and this container close, if so place them now.
+	// It is possible that floats were queued between closing the last line and closing this container, if so place them now.
 	parent->PlaceQueuedFloats(position.y + box_cursor);
-
-	// Expand our content area if any line boxes had to push themselves out.
-	// TODO
-	// for (size_t i = 0; i < line_boxes.size(); i++)
-	//	box_size.x = Math::Max(box_size.x, line_boxes[i]->GetDimensions().x);
 
 	// Set this box's height.
 	box_size.y = Math::Max(box_cursor, 0.f);
 
-	// TODO: Specify which coordinate system is used for overflow size.
+	// Find the overflow size for our content, relative to our local space.
 	Vector2f visible_overflow_size = {0.f, box_size.y};
 
-	// Find the largest line in this layout block
 	for (const auto& line_box : line_boxes)
 	{
 		visible_overflow_size.x = Math::Max(visible_overflow_size.x, line_box->GetPosition().x - position.x + line_box->GetExtentRight());
@@ -165,8 +161,7 @@ bool InlineContainer::Close(UniquePtr<LayoutLineBox>* out_open_line_box)
 	visible_overflow_size.x = Math::RoundDownFloat(visible_overflow_size.x);
 	SetVisibleOverflowSize(visible_overflow_size);
 
-	// Increment the parent's cursor.
-	// If this close fails, it means this block box has caused our parent block box to generate an automatic vertical scrollbar.
+	// Increment our block container's cursor. If this close fails, it means our parent container generated an automatic scrollbar.
 	if (!parent->CloseChildBox(this, position, box_size, 0.f))
 		return false;
 
