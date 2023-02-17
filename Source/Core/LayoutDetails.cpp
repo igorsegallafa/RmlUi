@@ -251,23 +251,25 @@ float LayoutDetails::GetShrinkToFitWidth(Element* element, Vector2f containing_b
 	Box box;
 	float min_height, max_height;
 
-	// Currently we fix the element's width to its containing block so that any content is wrapped at this width.
-	// We can consider to instead set this to infinity and clamp it to the available width later after formatting,
-	// but right now the formatting procedure doesn't work well with such numbers.
-	LayoutDetails::BuildBox(box, containing_block, element, BoxContext::Block, containing_block.x);
+	// Use a large size for the box content width, so that it is practically unconstrained. This makes the formatting
+	// procedure act as if under a maximum content constraint.
+	const float max_content_constraint_width = containing_block.x + 5000.f;
+
+	LayoutDetails::BuildBox(box, containing_block, element, BoxContext::Block, max_content_constraint_width);
 	LayoutDetails::GetDefiniteMinMaxHeight(min_height, max_height, element->GetComputedValues(), box, containing_block.y);
 
 	// First we need to format the element, then we get the shrink-to-fit width based on the largest line or box.
 	// @performance. Some formatting can be simplified, eg. absolute elements do not contribute to the shrink-to-fit
-	// width. Also, children of elements with a fixed width and height don't need to be formatted further. Further, we
-	// might get away with not closing the boxes during formatting.
+	// width. Also, children of elements with a fixed width and height don't need to be formatted further.
 	// TODO: Only considers block formatting contexts, however, we just as well might have flex or table formatting contexts.
 	RootBox root(Math::Max(containing_block, Vector2f(0.f)));
 	auto formatting_context = MakeUnique<BlockFormattingContext>(&root, element);
 
 	formatting_context->Format(FormatSettings{&box, nullptr});
 
-	return Math::Min(containing_block.x, formatting_context->GetShrinkToFitWidth());
+	const float available_width = Math::Max(0.f, containing_block.x - box.GetSizeAcross(Box::HORIZONTAL, Box::MARGIN, Box::PADDING));
+
+	return Math::Min(available_width, formatting_context->GetShrinkToFitWidth());
 }
 
 ComputedAxisSize LayoutDetails::BuildComputedHorizontalSize(const ComputedValues& computed)
