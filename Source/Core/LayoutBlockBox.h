@@ -124,7 +124,7 @@ protected:
 	/// @param content_overflow_size The size of the visible content, relative to our content area.
 	/// @param box The box to be set on the element.
 	/// @param max_height Maximum height of the content area, if any.
-	/// @returns True if no overflow occured, false if it did. 
+	/// @returns True if no overflow occured, false if it did.
 	bool SubmitBox(const Vector2f content_overflow_size, const Box& box, const float max_height);
 
 	Element* const element;
@@ -296,7 +296,9 @@ public:
 	void PlaceQueuedFloats(float vertical_position);
 
 	/// Calculate the dimensions of the box's internal content width; i.e. the size used to calculate the shrink-to-fit width.
-	float GetShrinkToFitWidth() const;
+	/// @parameter[in] is_bfc_root True if this box is the root of its block formatting context.
+	/// @return The inner shrink-to-fit width of this box.
+	float GetShrinkToFitWidth(bool is_bfc_root) const;
 
 	// Reset this box, so that it can be formatted again.
 	void ResetContents();

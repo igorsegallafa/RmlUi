@@ -239,18 +239,11 @@ void InlineContainer::UpdateLineBoxPlacement(LayoutLineBox* line_box, float mini
 
 float InlineContainer::GetShrinkToFitWidth() const
 {
-	// TODO: This is basically the same as visible overflow size?
 	float content_width = 0.0f;
 
-	// Find the largest line in this layout block
-	for (size_t i = 0; i < line_boxes.size(); i++)
-	{
-		// Perhaps a more robust solution is to modify how we set the line box dimension on 'line_box->close()'
-		// and use that, or add another value in the line_box ... but seems to work for now.
-		LayoutLineBox* line_box = line_boxes[i].get();
-		content_width = Math::Max(content_width, line_box->GetPosition().x - position.x + line_box->GetBoxCursor());
-	}
-	content_width = Math::Min(content_width, box_size.x);
+	// Simply find our widest line.
+	for (const auto& line_box : line_boxes)
+		content_width = Math::Max(content_width, line_box->GetBoxCursor());
 
 	return content_width;
 }

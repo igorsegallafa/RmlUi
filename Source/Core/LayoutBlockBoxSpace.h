@@ -84,6 +84,9 @@ public:
 	/// @note Generally, the margin box is used for layout sizing, while the overflow size is the border box unless it has visible overflow,
 	Vector2f GetDimensions(LayoutFloatBoxEdge edge) const;
 
+	/// Get the width of the floated boxes for calculating the shrink-to-fit width.
+	float GetShrinkToFitWidth(float edge_left, float edge_right) const;
+
 	/// Clear all floating boxes placed in this space.
 	void Reset()
 	{

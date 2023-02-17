@@ -238,6 +238,21 @@ Vector2f LayoutBlockBoxSpace::GetDimensions(LayoutFloatBoxEdge edge) const
 	return edge == LayoutFloatBoxEdge::Margin ? extent_bottom_right_margin : extent_bottom_right_overflow;
 }
 
+float LayoutBlockBoxSpace::GetShrinkToFitWidth(float edge_left, float edge_right) const
+{
+	// For the left-anchored boxes: Find the right-most edge of the boxes, relative to our parent's left edge.
+	float left_shrink_width = 0.f;
+	for (const SpaceBox& box : boxes[LEFT])
+		left_shrink_width = Math::Max(left_shrink_width, box.offset.x - edge_left + box.dimensions.x);
+
+	// Conversely, for the right-anchored boxes: Find the left-most edge, relative to our parent's right edge.
+	float right_shrink_width = 0.f;
+	for (const SpaceBox& box : boxes[RIGHT])
+		right_shrink_width = Math::Max(right_shrink_width, edge_right - box.offset.x);
+
+	return left_shrink_width + right_shrink_width;
+}
+
 void* LayoutBlockBoxSpace::operator new(size_t size)
 {
 	return LayoutEngine::AllocateLayoutChunk(size);

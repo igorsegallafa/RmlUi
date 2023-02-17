@@ -276,12 +276,12 @@ bool BlockContainer::Close(BlockContainer* parent_block_container)
 	if (!SubmitBox(content_box, box, max_height))
 		return false;
 
-	// Increment the parent's cursor.
+	// If we are the root of our block formatting context, this will be null. Otherwise increment our parent's cursor to account for this box.
 	if (parent_block_container)
 	{
 		RMLUI_ASSERTMSG(GetParent() == parent_block_container, "Mismatched parent box.");
 
-		// If this close fails, it means this block box has caused our parent block box to generate an automatic vertical scrollbar.
+		// If this close fails, it means this block box has caused our parent box to generate an automatic vertical scrollbar.
 		if (!parent_block_container->CloseChildBox(this, position, box.GetSize(Box::BORDER), box.GetEdge(Box::MARGIN, Box::BOTTOM)))
 			return false;
 	}
@@ -536,55 +536,55 @@ void BlockContainer::PlaceQueuedFloats(float vertical_position)
 	}
 }
 
-float BlockContainer::GetShrinkToFitWidth() const
+float BlockContainer::GetShrinkToFitWidth(bool is_bfc_root) const
 {
-	float content_width = 0.0f;
-
-	auto get_content_width_from_children = [this, &content_width]() {
-		for (size_t i = 0; i < block_boxes.size(); i++)
-		{
-			// TODO: Bad design. Doesn't account for all types. Use virtual?
-			if (block_boxes[i]->GetType() == Type::BlockContainer)
-			{
-				BlockContainer* block_child = static_cast<BlockContainer*>(block_boxes[i].get());
-				const Box& box = block_child->GetBox();
-				const float edge_size = box.GetSizeAcross(Box::HORIZONTAL, Box::MARGIN, Box::PADDING);
-				content_width = Math::Max(content_width, block_child->GetShrinkToFitWidth() + edge_size);
-			}
-			else if (block_boxes[i]->GetType() == Type::InlineContainer)
-			{
-				InlineContainer* block_child = static_cast<InlineContainer*>(block_boxes[i].get());
-				content_width = Math::Max(content_width, block_child->GetShrinkToFitWidth());
-			}
-			else if (const Box* box = block_boxes[i]->GetBoxPtr())
-			{
-				// TODO: For unknown types (e.g. tables, flexboxes), we add spacing for the edges at least, but can be improved.
-				const float edge_size = box->GetSizeAcross(Box::HORIZONTAL, Box::MARGIN, Box::PADDING);
-				content_width = Math::Max(content_width, edge_size);
-			}
-		}
-	};
-
-	// Block boxes with definite sizes should use that size. Otherwise, find the maximum content width of our children.
-	//  Alternative solution: Add some 'intrinsic_width' property to every 'BlockContainer' and have that propagate up.
 	auto& computed = element->GetComputedValues();
-	const float block_width = box.GetSize(Box::CONTENT).x;
 
-	if (computed.width().type == Style::Width::Auto)
+	float content_width = 0.0f;
+	if (computed.width().type != Style::Width::Auto)
 	{
-		get_content_width_from_children();
+		// We have a definite width, so use that size. Any sizes that are relative to our containing-block-width are resolved to zero.
+		content_width = ResolveValue(computed.width(), 0.f);
 	}
 	else
 	{
-		float width_value = ResolveValue(computed.width(), block_width);
-		content_width = Math::Max(content_width, width_value);
+		// Nope, then use the largest outer shrink-to-fit width of our children.
+		for (const auto& block_box : block_boxes)
+		{
+			// TODO: Bad design. Doesn't account for all types. Use virtual?
+			if (block_box->GetType() == Type::BlockContainer)
+			{
+				BlockContainer* child = static_cast<BlockContainer*>(block_box.get());
+				const float child_edge_size = child->GetBox().GetSizeAcross(Box::HORIZONTAL, Box::MARGIN, Box::PADDING);
+				const float child_inner_width = child->GetShrinkToFitWidth(false);
+				content_width = Math::Max(content_width, child_inner_width + child_edge_size);
+			}
+			else if (block_box->GetType() == Type::InlineContainer)
+			{
+				InlineContainer* child = static_cast<InlineContainer*>(block_box.get());
+				content_width = Math::Max(content_width, child->GetShrinkToFitWidth());
+			}
+			else if (const Box* child_box = block_box->GetBoxPtr())
+			{
+				// TODO: For unknown types (e.g. tables, flexboxes), we add spacing for the edges at least, but can be improved.
+				const float edge_size = child_box->GetSizeAcross(Box::HORIZONTAL, Box::MARGIN, Box::PADDING);
+				content_width = Math::Max(content_width, edge_size);
+			}
+		}
+	}
+
+	if (is_bfc_root)
+	{
+		// Add the widths of the floated boxes in this block formatting context. This simplistic approach may produce an
+		// overestimate, since floats may not be located next to the rest of the content.
+		const float edge_left = box.GetPosition().x;
+		const float edge_right = edge_left + box.GetSize().x;
+		content_width += space->GetShrinkToFitWidth(edge_left, edge_right);
 	}
 
 	float min_width, max_width;
-	LayoutDetails::GetMinMaxWidth(min_width, max_width, computed, box, block_width);
+	LayoutDetails::GetMinMaxWidth(min_width, max_width, computed, box, 0.f);
 	content_width = Math::Clamp(content_width, min_width, max_width);
-
-	// Can add the dimensions of floating elements here if we want to support that.
 
 	return content_width;
 }

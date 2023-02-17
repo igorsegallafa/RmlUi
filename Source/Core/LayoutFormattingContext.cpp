@@ -194,7 +194,7 @@ void BlockFormattingContext::Format(FormatSettings format_settings)
 
 float BlockFormattingContext::GetShrinkToFitWidth() const
 {
-	return root_block_container ? root_block_container->GetShrinkToFitWidth() : 0.f;
+	return root_block_container ? root_block_container->GetShrinkToFitWidth(true) : 0.f;
 }
 
 bool BlockFormattingContext::FormatBlockBox(BlockContainer* parent_container, Element* element)
