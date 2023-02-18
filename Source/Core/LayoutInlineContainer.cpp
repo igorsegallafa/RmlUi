@@ -162,7 +162,7 @@ bool InlineContainer::Close(UniquePtr<LayoutLineBox>* out_open_line_box)
 	SetVisibleOverflowSize(visible_overflow_size);
 
 	// Increment our block container's cursor. If this close fails, it means our parent container generated an automatic scrollbar.
-	if (!parent->CloseChildBox(this, position, box_size, 0.f))
+	if (!parent->CloseChildBox(this, position, box_size.y, 0.f))
 		return false;
 
 	return true;

@@ -139,7 +139,7 @@ bool ContainerBox::CatchOverflow(const Vector2f content_size, const Box& box, co
 	if (available_space.y < 0.f)
 		available_space.y = max_height;
 	if (available_space.y < 0.f)
-		available_space.y = INFINITY;
+		available_space.y = HUGE_VALF;
 
 	RMLUI_ASSERT(available_space.x >= 0.f && available_space.y >= 0.f);
 
@@ -282,7 +282,8 @@ bool BlockContainer::Close(BlockContainer* parent_block_container)
 		RMLUI_ASSERTMSG(GetParent() == parent_block_container, "Mismatched parent box.");
 
 		// If this close fails, it means this block box has caused our parent box to generate an automatic vertical scrollbar.
-		if (!parent_block_container->CloseChildBox(this, position, box.GetSize(Box::BORDER), box.GetEdge(Box::MARGIN, Box::BOTTOM)))
+		if (!parent_block_container->CloseChildBox(this, position, box.GetSizeAcross(Box::VERTICAL, Box::BORDER),
+				box.GetEdge(Box::MARGIN, Box::BOTTOM)))
 			return false;
 	}
 
@@ -315,11 +316,11 @@ bool BlockContainer::Close(BlockContainer* parent_block_container)
 	return true;
 }
 
-bool BlockContainer::CloseChildBox(LayoutBox* child, Vector2f child_position, Vector2f child_size, float child_margin_bottom)
+bool BlockContainer::CloseChildBox(LayoutBox* child, Vector2f child_position, float child_height, float child_margin_bottom)
 {
 	child_position -= (box.GetPosition() + position);
 
-	box_cursor = child_position.y + child_size.y + child_margin_bottom;
+	box_cursor = child_position.y + child_height + child_margin_bottom;
 
 	// Extend the inner content size. The vertical size can be larger than the box_cursor due to overflow.
 	inner_content_size = Math::Max(inner_content_size, child_position + child->GetVisibleOverflowSize());
@@ -374,7 +375,7 @@ LayoutBox* BlockContainer::AddBlockLevelBox(UniquePtr<LayoutBox> block_level_box
 	LayoutBox* block_level_box = block_level_box_ptr.get();
 	block_boxes.push_back(std::move(block_level_box_ptr));
 
-	if (!CloseChildBox(block_level_box, child_position, box.GetSize(Box::BORDER), box.GetEdge(Box::MARGIN, Box::BOTTOM)))
+	if (!CloseChildBox(block_level_box, child_position, box.GetSizeAcross(Box::VERTICAL, Box::BORDER), box.GetEdge(Box::MARGIN, Box::BOTTOM)))
 		return nullptr;
 
 	return block_level_box;
@@ -541,27 +542,28 @@ float BlockContainer::GetShrinkToFitWidth(bool is_bfc_root) const
 	auto& computed = element->GetComputedValues();
 
 	float content_width = 0.0f;
-	if (computed.width().type != Style::Width::Auto)
+	if (computed.width().type == Style::Width::Length)
 	{
-		// We have a definite width, so use that size. Any sizes that are relative to our containing-block-width are resolved to zero.
-		content_width = ResolveValue(computed.width(), 0.f);
+		// We have a definite width, so use that size.
+		content_width = computed.width().value;
 	}
 	else
 	{
-		// Nope, then use the largest outer shrink-to-fit width of our children.
+		// Nope, then use the largest outer shrink-to-fit width of our children. Percentage sizing would be relative to
+		// our containing block width and is treated just like 'auto' in this context.
 		for (const auto& block_box : block_boxes)
 		{
 			// TODO: Bad design. Doesn't account for all types. Use virtual?
 			if (block_box->GetType() == Type::BlockContainer)
 			{
-				BlockContainer* child = static_cast<BlockContainer*>(block_box.get());
+				auto child = static_cast<const BlockContainer*>(block_box.get());
 				const float child_edge_size = child->GetBox().GetSizeAcross(Box::HORIZONTAL, Box::MARGIN, Box::PADDING);
 				const float child_inner_width = child->GetShrinkToFitWidth(false);
 				content_width = Math::Max(content_width, child_inner_width + child_edge_size);
 			}
 			else if (block_box->GetType() == Type::InlineContainer)
 			{
-				InlineContainer* child = static_cast<InlineContainer*>(block_box.get());
+				auto child = static_cast<const InlineContainer*>(block_box.get());
 				content_width = Math::Max(content_width, child->GetShrinkToFitWidth());
 			}
 			else if (const Box* child_box = block_box->GetBoxPtr())

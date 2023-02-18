@@ -233,7 +233,7 @@ bool BlockFormattingContext::FormatInlineBox(BlockContainer* parent_container, E
 	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent_container, element->GetPosition()).size;
 
 	Box box;
-	LayoutDetails::BuildBox(box, containing_block, element, BoxContext::Inline);
+	LayoutDetails::BuildBox(box, containing_block, element, BuildBoxMode::Inline);
 	auto inline_box_handle = parent_container->AddInlineElement(element, box);
 
 	// Format the element's children.

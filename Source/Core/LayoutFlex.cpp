@@ -53,7 +53,7 @@ void FlexFormattingContext::Format(FormatSettings format_settings)
 
 	// Build the initial box as specified by the flex's style, as if it was a normal block element.
 	Box& box = flex_container_box->GetBox();
-	LayoutDetails::BuildBox(box, containing_block, element, BoxContext::Block);
+	LayoutDetails::BuildBox(box, containing_block, element, BuildBoxMode::Block);
 
 	// Start with any auto-scrollbars off.
 	flex_container_box->ResetScrollbars(box);
@@ -259,7 +259,7 @@ void FlexFormattingContext::Format(Vector2f& flex_resulting_content_size, Vector
 
 		FlexItem item = {};
 		item.element = element;
-		LayoutDetails::BuildBox(item.box, flex_content_containing_block, element, BoxContext::FlexOrTable, 0.0f);
+		LayoutDetails::BuildBox(item.box, flex_content_containing_block, element, BuildBoxMode::UnalignedBlock);
 
 		Style::LengthPercentageAuto item_main_size;
 

@@ -56,7 +56,11 @@ struct ContainingBlock {
 	Vector2f size;
 };
 
-enum class BoxContext { Block, Inline, FlexOrTable };
+enum class BuildBoxMode {
+	Block,          // Sets edges and size if available, auto width can result in shrink-to-fit width, auto margins are used for alignment.
+	Inline,         // Sets edges, ignores width, height, and auto margins.
+	UnalignedBlock, // Like block, but auto width returns -1, and auto margins are resolved to zero.
+};
 
 /**
     Layout functions for sizing elements.
@@ -72,8 +76,7 @@ public:
 	/// @param[in] box_context The formatting context in which the box is generated.
 	/// @param[in] override_shrink_to_fit_width Provide a fixed shrink-to-fit width instead of formatting the element when its properties allow
 	/// shrinking.
-	static void BuildBox(Box& box, Vector2f containing_block, Element* element, BoxContext box_context = BoxContext::Block,
-		float override_shrink_to_fit_width = -1);
+	static void BuildBox(Box& box, Vector2f containing_block, Element* element, BuildBoxMode box_context = BuildBoxMode::Block);
 
 	// Retrieves the minimum and maximum width from an element's computed values.
 	static void GetMinMaxWidth(float& min_width, float& max_width, const ComputedValues& computed, const Box& box, float containing_block_width);
@@ -102,10 +105,8 @@ public:
 	/// @param[in] element The element the box is being generated for.
 	/// @param[in] box_context The formatting context in which the box is generated.
 	/// @param[in] replaced_element True when the element is a replaced element.
-	/// @param[in] override_shrink_to_fit_width Provide a fixed shrink-to-fit width instead of formatting the element when its properties allow
-	/// shrinking.
 	static void BuildBoxSizeAndMargins(Box& box, Vector2f min_size, Vector2f max_size, Vector2f containing_block, Element* element,
-		BoxContext box_context, bool replaced_element, float override_shrink_to_fit_width = -1);
+		BuildBoxMode box_context, bool replaced_element);
 
 	/// Formats the element and returns the width of its contents.
 	static float GetShrinkToFitWidth(Element* element, Vector2f containing_block);

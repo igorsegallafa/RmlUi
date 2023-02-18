@@ -85,6 +85,7 @@ public:
 	BlockFormattingContext(ContainerBox* parent_box, Element* element);
 	~BlockFormattingContext();
 
+	// TODO: Format returns the layout box?
 	void Format(FormatSettings format_settings) override;
 
 	float GetShrinkToFitWidth() const;

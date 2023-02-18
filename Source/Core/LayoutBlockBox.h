@@ -250,7 +250,7 @@ public:
 	/// @param[in] child_margin_bottom The bottom margin width of the child.
 	/// @return False if the block box caused an automatic vertical scrollbar to appear, forcing a reformat of the current block formatting context.
 	/// TODO: Can we simplify this? Rename? This is more like increment box cursor and enlarge content size, and only needed for block-level boxes.
-	bool CloseChildBox(LayoutBox* child, Vector2f child_position, Vector2f child_size, float child_margin_bottom);
+	bool CloseChildBox(LayoutBox* child, Vector2f child_position, float child_height, float child_margin_bottom);
 
 	/// Creates a new block box and adds it as a child of this one.
 	/// @param element[in] The new block element.

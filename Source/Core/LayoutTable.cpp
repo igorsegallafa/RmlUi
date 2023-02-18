@@ -54,7 +54,7 @@ void TableFormattingContext::Format(FormatSettings format_settings)
 
 	// Build the initial box as specified by the table's style, as if it was a normal block element.
 	Box& box = table_wrapper_box->GetBox();
-	LayoutDetails::BuildBox(box, containing_block, element_table, BoxContext::Block);
+	LayoutDetails::BuildBox(box, containing_block, element_table, BuildBoxMode::Block);
 
 	LayoutDetails::GetMinMaxWidth(table_min_size.x, table_max_size.x, computed_table, box, containing_block.x);
 	LayoutDetails::GetMinMaxHeight(table_min_size.y, table_max_size.y, computed_table, box, containing_block.y);
@@ -91,7 +91,7 @@ void TableFormattingContext::Format(FormatSettings format_settings)
 	if (table_content_size != initial_content_size)
 	{
 		// Perform this step to re-evaluate any auto margins.
-		LayoutDetails::BuildBoxSizeAndMargins(box, table_min_size, table_max_size, containing_block, element_table, BoxContext::Block, true);
+		LayoutDetails::BuildBoxSizeAndMargins(box, table_min_size, table_max_size, containing_block, element_table, BuildBoxMode::Block, true);
 	}
 
 	table_wrapper_box->Close(table_overflow_size, box);
@@ -199,7 +199,7 @@ void TableFormattingContext::InitializeCellBoxes(BoxList& cells, const TrackBoxL
 		Box& box = cells[i];
 
 		// Determine the cell's box for formatting later, we may get an indefinite (-1) vertical content size.
-		LayoutDetails::BuildBox(box, table_initial_content_size, grid.cells[i].element_cell, BoxContext::FlexOrTable, 0.f);
+		LayoutDetails::BuildBox(box, table_initial_content_size, grid.cells[i].element_cell, BuildBoxMode::UnalignedBlock);
 
 		// Determine the cell's content width. Include any spanning columns in the cell width.
 		const float cell_border_width = GetSpanningCellBorderSize(columns, grid.cells[i].column_begin, grid.cells[i].column_last);
@@ -336,8 +336,8 @@ void TableFormattingContext::FormatRows(const TrackBoxList& rows, float table_co
 	// Size and position the row and row group elements.
 	auto FormatRow = [this, table_content_width](Element* element, float content_height, float offset_y) {
 		Box box;
-		// We use inline context here because we only care about padding, border, and (non-auto) margin.
-		LayoutDetails::BuildBox(box, table_initial_content_size, element, BoxContext::Inline, 0.0f);
+		// We use inline build mode here because we only care about padding, border, and (non-auto) margin.
+		LayoutDetails::BuildBox(box, table_initial_content_size, element, BuildBoxMode::Inline);
 		const Vector2f content_size(table_content_width - box.GetSizeAcross(Box::HORIZONTAL, Box::MARGIN, Box::PADDING), content_height);
 		box.SetContent(content_size);
 		element->SetBox(box);
@@ -365,8 +365,8 @@ void TableFormattingContext::FormatColumns(const TrackBoxList& columns, float ta
 	// Size and position the column and column group elements.
 	auto FormatColumn = [this, table_content_height](Element* element, float content_width, float offset_x) {
 		Box box;
-		// We use inline context here because we only care about padding, border, and (non-auto) margin.
-		LayoutDetails::BuildBox(box, table_initial_content_size, element, BoxContext::Inline, 0.0f);
+		// We use inline build mode here because we only care about padding, border, and (non-auto) margin.
+		LayoutDetails::BuildBox(box, table_initial_content_size, element, BuildBoxMode::Inline);
 		const Vector2f content_size(content_width, table_content_height - box.GetSizeAcross(Box::VERTICAL, Box::MARGIN, Box::PADDING));
 		box.SetContent(content_size);
 		element->SetBox(box);
