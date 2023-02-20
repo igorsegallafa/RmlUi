@@ -67,7 +67,8 @@ void ContainerBox::ResetScrollbars(const Box& box)
 
 void ContainerBox::AddAbsoluteElement(Element* element, Vector2f static_position, Element* static_relative_offset_parent)
 {
-	absolute_elements.push_back(AbsoluteElement{element, static_position, static_relative_offset_parent});
+	// We may possibly be adding the same element from a previous layout iteration. If so, this ensures it is updated with the latest static position.
+	absolute_elements[element] = AbsoluteElement{static_position, static_relative_offset_parent};
 }
 
 void ContainerBox::AddRelativeElement(Element* element)
@@ -77,18 +78,13 @@ void ContainerBox::AddRelativeElement(Element* element)
 
 void ContainerBox::ClosePositionedElements()
 {
-	// TODO: It is possible that we have duplicate absolute and relative elements, due to re-iterated layouts, even when
-	// they have been cleared in the current formatting context. This is because absolute elements may be added to boxes
-	// above our formatting context, and these won't be cleared. Mayube just get rid of the clear function and use
-	// sort+unique to remove them?
-
 	// Note: Indexed iteration must be used here, as new absolute elements may be added to this box during each
 	// iteration while the element is formatted, thereby invalidating references and iterators of 'absolute_elements'.
-	for (int i = 0; i < (int)absolute_elements.size(); i++)
+	for (const auto& absolute_element_pair : absolute_elements)
 	{
-		Element* absolute_element = absolute_elements[i].element;
-		const Vector2f static_position = absolute_elements[i].static_position;
-		Element* static_position_offset_parent = absolute_elements[i].static_position_offset_parent;
+		Element* absolute_element = absolute_element_pair.first;
+		const Vector2f static_position = absolute_element_pair.second.static_position;
+		Element* static_position_offset_parent = absolute_element_pair.second.static_position_offset_parent;
 
 		// Find the static position relative to this containing block. First, calculate the offset from ourself to the
 		// static position's offset parent. Assumes (1) that this container box is part of the containing block chain of
@@ -115,18 +111,16 @@ void ContainerBox::ClosePositionedElements()
 
 	absolute_elements.clear();
 
+	// The same relative elements may have been added multiple times during repeated layout iterations, remove any duplicates.
+	std::sort(relative_elements.begin(), relative_elements.end());
+	relative_elements.erase(std::unique(relative_elements.begin(), relative_elements.end()), relative_elements.end());
+
 	// Any relatively positioned elements that we act as containing block for may also need to be have their positions
 	// updated to reflect changes to the size of this block box.
 	// TODO: Maybe do this first, in case the static position of absolutely positioned elements depends on any of these relative positions.
 	for (Element* child : relative_elements)
 		child->UpdateOffset();
 
-	relative_elements.clear();
-}
-
-void ContainerBox::ClearPositionedElements()
-{
-	absolute_elements.clear();
 	relative_elements.clear();
 }
 

@@ -88,18 +88,10 @@ public:
 	// Determine if this element should have scrollbars or not, and create them if so.
 	void ResetScrollbars(const Box& box);
 
-	/// Adds an element to this block box to be handled as an absolutely-positioned element. This element will be
-	/// laid out, sized and positioned appropriately once this box is finished. This should only be called on boxes
-	/// rendering in a block-context.
-	/// @param element[in] The element to be positioned absolutely within this block box.
+	/// Adds an absolutely positioned element, to be formatted and positioned when closing this container, see 'ClosePositionedElements'.
 	void AddAbsoluteElement(Element* element, Vector2f static_position, Element* static_relative_offset_parent);
 	/// Adds a relatively positioned descendent which we act as a containing block for.
 	void AddRelativeElement(Element* element);
-
-	/// Formats, sizes, and positions all absolute elements in this block.
-	void ClosePositionedElements();
-	// Clears the list of absolutely and relatively positioned elements, without formatting them.
-	void ClearPositionedElements();
 
 	ContainerBox* GetParent() { return parent_container; }
 	Element* GetElement() { return element; }
@@ -131,19 +123,20 @@ protected:
 	/// @returns True if no overflow occured, false if it did.
 	bool SubmitBox(const Vector2f content_overflow_size, const Box& box, const float max_height);
 
+	/// Formats, sizes, and positions all absolute elements whose containing block is this, and offsets relative elements.
+	void ClosePositionedElements();
+
 	Element* const element;
 
 private:
 	struct AbsoluteElement {
-		Element* element;
 		Vector2f static_position;               // The hypothetical position of the element as if it was placed in normal flow.
 		Element* static_position_offset_parent; // The element for which the static position is offset from.
 	};
-
-	using AbsoluteElementList = Vector<AbsoluteElement>;
+	using AbsoluteElementMap = SmallUnorderedMap<Element*, AbsoluteElement>;
 
 	// Used by block contexts only; stores any elements that are to be absolutely positioned within this block box.
-	AbsoluteElementList absolute_elements;
+	AbsoluteElementMap absolute_elements;
 	// Used by block contexts only; stores any elements that are relatively positioned and whose containing block is this.
 	ElementList relative_elements;
 
@@ -179,10 +172,7 @@ public:
 	bool Close(const Vector2f content_overflow_size, const Box& box)
 	{
 		if (!SubmitBox(content_overflow_size, box, -1.f))
-		{
-			ClearPositionedElements();
 			return false;
-		}
 
 		ClosePositionedElements();
 		return true;
