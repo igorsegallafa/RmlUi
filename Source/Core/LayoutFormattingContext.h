@@ -36,70 +36,35 @@ namespace Rml {
 
 class Box;
 
-struct FormatSettings {
-	const Box* override_initial_box = nullptr;
-	Vector2f* out_visible_overflow_size = nullptr;
+enum class FormattingContextType {
+	Block,
+	Table,
+	Flex,
+	None,
 };
 
 class FormattingContext {
 public:
-	enum class Type {
-		Block,
-		Inline,
-		Table,
-		Flex,
-	};
-	enum class SizingMode {
-		StretchFit,
-		MinContent,
-		MaxContent,
-	};
-
-	static UniquePtr<FormattingContext> ConditionallyCreateIndependentFormattingContext(ContainerBox* parent_container, Element* element);
-
-	// TODO: Consider working directly with the final types instead of using a virtual destructor.
-	virtual ~FormattingContext() = default;
-
-	// TODO: Instead of (output) format settings, use function calls (virtual if necessary) as needed.
-	virtual void Format(FormatSettings format_settings) = 0;
-
-	virtual UniquePtr<LayoutBox> ExtractRootBox() { return nullptr; }
+	// Format the element in an independent formatting context.
+	static UniquePtr<LayoutBox> FormatIndependent(ContainerBox* parent_container, Element* element, const Box* override_initial_box,
+		FormattingContextType backup_context);
 
 protected:
-	FormattingContext(Type type, ContainerBox* parent_box, Element* root_element) : type(type), parent_box(parent_box), root_element(root_element) {}
-
-	Element* GetRootElement() const { return root_element; }
-
-	ContainerBox* GetParentBoxOfContext() const { return parent_box; }
-
 	static void SubmitElementLayout(Element* element) { element->OnLayout(); }
 
-private:
-	Type type;
-	ContainerBox* parent_box;
-	Element* root_element;
+	FormattingContext() = default;
+	~FormattingContext() = default;
 };
 
 class BlockFormattingContext final : public FormattingContext {
 public:
-	BlockFormattingContext(ContainerBox* parent_box, Element* element);
-	~BlockFormattingContext();
-
-	// TODO: Format returns the layout box?
-	void Format(FormatSettings format_settings) override;
-
-	float GetShrinkToFitWidth() const;
-
-	UniquePtr<LayoutBox> ExtractRootBox() override { return std::move(root_block_container); }
+	static UniquePtr<LayoutBox> Format(ContainerBox* parent_container, Element* element, const Box* override_initial_box);
 
 private:
-	bool FormatBlockBox(BlockContainer* parent_container, Element* element);
-	bool FormatInlineBox(BlockContainer* parent_container, Element* element);
+	static bool FormatBlockBox(BlockContainer* parent_container, Element* element);
+	static bool FormatInlineBox(BlockContainer* parent_container, Element* element);
 
-	bool FormatBlockContainerChild(BlockContainer* parent_container, Element* element);
-
-	UniquePtr<LayoutBlockBoxSpace> float_space;
-	UniquePtr<BlockContainer> root_block_container;
+	static bool FormatBlockContainerChild(BlockContainer* parent_container, Element* element);
 };
 
 } // namespace Rml

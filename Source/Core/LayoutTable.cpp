@@ -38,50 +38,57 @@
 
 namespace Rml {
 
-void TableFormattingContext::Format(FormatSettings format_settings)
+UniquePtr<LayoutBox> TableFormattingContext::Format(ContainerBox* parent_container, Element* element_table, const Box* override_initial_box)
 {
-	table_wrapper_box = MakeUnique<TableWrapper>(element_table, GetParentBoxOfContext());
+	auto table_wrapper_box = MakeUnique<TableWrapper>(element_table, parent_container);
 	if (table_wrapper_box->IsScrollContainer())
 	{
 		Log::Message(Log::LT_WARNING, "Table elements can only have 'overflow' property values of 'visible'. Table will not be formatted: %s.",
 			element_table->GetAddress().c_str());
-		return;
+		return table_wrapper_box;
 	}
 
-	const Vector2f containing_block = LayoutDetails::GetContainingBlock(GetParentBoxOfContext(), element_table->GetPosition()).size;
+	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent_container, element_table->GetPosition()).size;
 	RMLUI_ASSERT(containing_block.x >= 0.f);
 	const ComputedValues& computed_table = element_table->GetComputedValues();
 
 	// Build the initial box as specified by the table's style, as if it was a normal block element.
 	Box& box = table_wrapper_box->GetBox();
-	LayoutDetails::BuildBox(box, containing_block, element_table, BuildBoxMode::Block);
+	if (override_initial_box)
+		box = *override_initial_box;
+	else
+		LayoutDetails::BuildBox(box, containing_block, element_table, BuildBoxMode::Block);
 
-	LayoutDetails::GetMinMaxWidth(table_min_size.x, table_max_size.x, computed_table, box, containing_block.x);
-	LayoutDetails::GetMinMaxHeight(table_min_size.y, table_max_size.y, computed_table, box, containing_block.y);
+	TableFormattingContext context;
+	context.element_table = element_table;
+	context.table_wrapper_box = table_wrapper_box.get();
+
+	LayoutDetails::GetMinMaxWidth(context.table_min_size.x, context.table_max_size.x, computed_table, box, containing_block.x);
+	LayoutDetails::GetMinMaxHeight(context.table_min_size.y, context.table_max_size.y, computed_table, box, containing_block.y);
 
 	// Format the table, this may adjust the box content size.
 	const Vector2f initial_content_size = box.GetSize();
-	table_auto_height = (initial_content_size.y < 0.0f);
+	context.table_auto_height = (initial_content_size.y < 0.0f);
 
-	table_content_offset = box.GetPosition();
-	table_initial_content_size = Vector2f(initial_content_size.x, Math::Max(0.0f, initial_content_size.y));
-	Math::SnapToPixelGrid(table_content_offset, table_initial_content_size);
+	context.table_content_offset = box.GetPosition();
+	context.table_initial_content_size = Vector2f(initial_content_size.x, Math::Max(0.0f, initial_content_size.y));
+	Math::SnapToPixelGrid(context.table_content_offset, context.table_initial_content_size);
 
 	// When width or height is set, they act as minimum width or height, just as in CSS.
 	if (computed_table.width().type != Style::Width::Auto)
-		table_min_size.x = Math::Max(table_min_size.x, table_initial_content_size.x);
+		context.table_min_size.x = Math::Max(context.table_min_size.x, context.table_initial_content_size.x);
 	if (computed_table.height().type != Style::Height::Auto)
-		table_min_size.y = Math::Max(table_min_size.y, table_initial_content_size.y);
+		context.table_min_size.y = Math::Max(context.table_min_size.y, context.table_initial_content_size.y);
 
-	table_gap = Vector2f(ResolveValue(computed_table.column_gap(), table_initial_content_size.x),
-		ResolveValue(computed_table.row_gap(), table_initial_content_size.y));
+	context.table_gap = Vector2f(ResolveValue(computed_table.column_gap(), context.table_initial_content_size.x),
+		ResolveValue(computed_table.row_gap(), context.table_initial_content_size.y));
 
-	grid.Build(element_table, *table_wrapper_box);
+	context.grid.Build(element_table, *table_wrapper_box);
 
 	Vector2f table_content_size, table_overflow_size;
 
 	// Format the table and its children.
-	FormatTable(table_content_size, table_overflow_size);
+	context.FormatTable(table_content_size, table_overflow_size);
 
 	RMLUI_ASSERT(table_content_size.y >= 0);
 
@@ -91,13 +98,13 @@ void TableFormattingContext::Format(FormatSettings format_settings)
 	if (table_content_size != initial_content_size)
 	{
 		// Perform this step to re-evaluate any auto margins.
-		LayoutDetails::BuildBoxSizeAndMargins(box, table_min_size, table_max_size, containing_block, element_table, BuildBoxMode::Block, true);
+		LayoutDetails::BuildBoxSizeAndMargins(box, context.table_min_size, context.table_max_size, containing_block, element_table,
+			BuildBoxMode::Block, true);
 	}
 
 	table_wrapper_box->Close(table_overflow_size, box);
 
-	if (format_settings.out_visible_overflow_size)
-		*format_settings.out_visible_overflow_size = table_overflow_size;
+	return table_wrapper_box;
 }
 
 void TableFormattingContext::FormatTable(Vector2f& table_content_size, Vector2f& table_overflow_size) const
@@ -292,7 +299,7 @@ void TableFormattingContext::DetermineRowHeights(TrackBoxList& rows, BoxList& ce
 				// If both the row and the cell heights are 'auto', we need to format the cell to get its height.
 				if (box.GetSize().y < 0)
 				{
-					FormatCell(element_cell, &box);
+					FormattingContext::FormatIndependent(table_wrapper_box, element_cell, &box, FormattingContextType::Block);
 					box.SetContent(element_cell->GetBox().GetSize());
 				}
 
@@ -410,7 +417,7 @@ void TableFormattingContext::FormatCells(BoxList& cells, Vector2f& table_overflo
 			if (is_aligned)
 			{
 				// We need to format the cell to know how much padding to add.
-				FormatCell(element_cell, &box);
+				FormattingContext::FormatIndependent(table_wrapper_box, element_cell, &box, FormattingContextType::Block);
 				box.SetContent(element_cell->GetBox().GetSize());
 			}
 			else
@@ -454,8 +461,9 @@ void TableFormattingContext::FormatCells(BoxList& cells, Vector2f& table_overflo
 		// @performance: We may have already formatted the element during the above procedures without the extra padding. In that case, we may
 		//   instead set the new box and offset all descending elements whose offset parent is the cell, to account for the new padding box.
 		//   That should be faster than formatting the element again, but there may be edge-cases not accounted for.
-		Vector2f cell_visible_overflow_size;
-		FormatCell(element_cell, &box, &cell_visible_overflow_size);
+		auto cell_box = FormattingContext::FormatIndependent(table_wrapper_box, element_cell, &box, FormattingContextType::Block);
+		Vector2f cell_visible_overflow_size = cell_box->GetVisibleOverflowSize();
+
 
 		// Set the position of the element within the the table container
 		element_cell->SetOffset(cell_offset, element_table);
@@ -464,14 +472,6 @@ void TableFormattingContext::FormatCells(BoxList& cells, Vector2f& table_overflo
 		table_overflow_size.x = Math::Max(table_overflow_size.x, cell_offset.x - table_content_offset.x + cell_visible_overflow_size.x);
 		table_overflow_size.y = Math::Max(table_overflow_size.y, cell_offset.y - table_content_offset.y + cell_visible_overflow_size.y);
 	}
-}
-
-void TableFormattingContext::FormatCell(Element* element_cell, const Box* override_initial_box, Vector2f* out_cell_visible_overflow_size) const
-{
-	auto formatting_context = ConditionallyCreateIndependentFormattingContext(table_wrapper_box.get(), element_cell);
-	RMLUI_ASSERTMSG(formatting_context, "Table cells should always generate an independent formatting context");
-
-	formatting_context->Format(FormatSettings{override_initial_box, out_cell_visible_overflow_size});
 }
 
 } // namespace Rml

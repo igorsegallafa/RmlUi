@@ -83,7 +83,7 @@ public:
 	Vector2f GetStaticPositionEstimate(bool inline_level_box) const;
 
 	/// Calculate the dimensions of the box's internal content width; i.e. the size used to calculate the shrink-to-fit width.
-	float GetShrinkToFitWidth() const;
+	float GetShrinkToFitWidth() const override;
 
 	/// Get the baseline of the last line.
 	/// @return True if the baseline was found.

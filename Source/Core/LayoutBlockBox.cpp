@@ -77,6 +77,11 @@ void ContainerBox::AddRelativeElement(Element* element)
 
 void ContainerBox::ClosePositionedElements()
 {
+	// TODO: It is possible that we have duplicate absolute and relative elements, due to re-iterated layouts, even when
+	// they have been cleared in the current formatting context. This is because absolute elements may be added to boxes
+	// above our formatting context, and these won't be cleared. Mayube just get rid of the clear function and use
+	// sort+unique to remove them?
+
 	// Note: Indexed iteration must be used here, as new absolute elements may be added to this box during each
 	// iteration while the element is formatted, thereby invalidating references and iterators of 'absolute_elements'.
 	for (int i = 0; i < (int)absolute_elements.size(); i++)
@@ -96,9 +101,7 @@ void ContainerBox::ClosePositionedElements()
 		Vector2f offset = relative_position + static_position;
 
 		// Lay out the element.
-		auto formatting_context = FormattingContext::ConditionallyCreateIndependentFormattingContext(this, absolute_element);
-		RMLUI_ASSERTMSG(formatting_context, "Absolutely positioned elements should always generate an independent formatting context");
-		formatting_context->Format({});
+		FormattingContext::FormatIndependent(this, absolute_element, nullptr, FormattingContextType::Block);
 
 		// Now that the element's box has been built, we can offset the position we determined was appropriate for it by
 		// the element's margin. This is necessary because the coordinate system for the box begins at the border, not
@@ -237,12 +240,20 @@ bool ContainerBox::SubmitBox(const Vector2f content_overflow_size, const Box& bo
 	return true;
 }
 
-BlockContainer::BlockContainer(ContainerBox* _parent_container, LayoutBlockBoxSpace* space, Element* _element, const Box& _box, float _min_height,
+BlockContainer::BlockContainer(ContainerBox* _parent_container, LayoutBlockBoxSpace* _space, Element* _element, const Box& _box, float _min_height,
 	float _max_height) :
 	ContainerBox(Type::BlockContainer, _element, _parent_container),
-	box(_box), min_height(_min_height), max_height(_max_height), space(space)
+	box(_box), min_height(_min_height), max_height(_max_height), space(_space)
 {
 	RMLUI_ASSERT(element);
+
+	if (!space)
+	{
+		// We are the root of the formatting context, establish a new space for floated boxes.
+		root_space = MakeUnique<LayoutBlockBoxSpace>();
+		space = root_space.get();
+	}
+
 	wrap_content = (element->GetComputedValues().white_space() != Style::WhiteSpace::Nowrap);
 }
 
@@ -537,7 +548,7 @@ void BlockContainer::PlaceQueuedFloats(float vertical_position)
 	}
 }
 
-float BlockContainer::GetShrinkToFitWidth(bool is_bfc_root) const
+float BlockContainer::GetShrinkToFitWidth() const
 {
 	auto& computed = element->GetComputedValues();
 
@@ -553,32 +564,20 @@ float BlockContainer::GetShrinkToFitWidth(bool is_bfc_root) const
 		// our containing block width and is treated just like 'auto' in this context.
 		for (const auto& block_box : block_boxes)
 		{
-			// TODO: Bad design. Doesn't account for all types. Use virtual?
-			if (block_box->GetType() == Type::BlockContainer)
-			{
-				auto child = static_cast<const BlockContainer*>(block_box.get());
-				const float child_edge_size = child->GetBox().GetSizeAcross(Box::HORIZONTAL, Box::MARGIN, Box::PADDING);
-				const float child_inner_width = child->GetShrinkToFitWidth(false);
-				content_width = Math::Max(content_width, child_inner_width + child_edge_size);
-			}
-			else if (block_box->GetType() == Type::InlineContainer)
-			{
-				auto child = static_cast<const InlineContainer*>(block_box.get());
-				content_width = Math::Max(content_width, child->GetShrinkToFitWidth());
-			}
-			else if (const Box* child_box = block_box->GetBoxPtr())
-			{
-				// TODO: For unknown types (e.g. tables, flexboxes), we add spacing for the edges at least, but can be improved.
-				const float edge_size = child_box->GetSizeAcross(Box::HORIZONTAL, Box::MARGIN, Box::PADDING);
-				content_width = Math::Max(content_width, edge_size);
-			}
+			const float child_inner_width = block_box->GetShrinkToFitWidth();
+			float child_edges_width = 0.f;
+			if (const Box* child_box = block_box->GetBoxPtr())
+				child_edges_width = child_box->GetSizeAcross(Box::HORIZONTAL, Box::MARGIN, Box::PADDING);
+
+			content_width = Math::Max(content_width, child_edges_width + child_inner_width);
 		}
 	}
 
-	if (is_bfc_root)
+	if (root_space)
 	{
-		// Add the widths of the floated boxes in this block formatting context. This simplistic approach may produce an
-		// overestimate, since floats may not be located next to the rest of the content.
+		// Since we are the root of the block formatting context, add the width contributions of the floated boxes in
+		// our context. The basic algorithm used can produce overestimates, since floats may not be located next to the
+		// rest of the content.
 		const float edge_left = box.GetPosition().x;
 		const float edge_right = edge_left + box.GetSize().x;
 		content_width += space->GetShrinkToFitWidth(edge_left, edge_right);
@@ -619,6 +618,9 @@ const Box& BlockContainer::GetBox() const
 void BlockContainer::ResetContents()
 {
 	RMLUI_ZoneScopedC(0xDD3322);
+
+	if (root_space)
+		root_space->Reset();
 
 	block_boxes.clear();
 	queued_float_elements.clear();

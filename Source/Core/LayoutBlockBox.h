@@ -55,6 +55,10 @@ public:
 	virtual const Box* GetBoxPtr() const { return nullptr; }
 	virtual bool GetBaselineOfLastLine(float& /*out_baseline*/) const { return false; }
 
+	/// Calculate the dimensions of the box's internal content width; i.e. the size used to calculate the shrink-to-fit width.
+	/// @return The inner shrink-to-fit width of this box.
+	virtual float GetShrinkToFitWidth() const { return 0.f; }
+
 	// Debug dump layout tree.
 	String DumpLayoutTree(int depth = 0) const { return DebugDumpTree(depth); }
 
@@ -175,10 +179,12 @@ public:
 	bool Close(const Vector2f content_overflow_size, const Box& box)
 	{
 		if (!SubmitBox(content_overflow_size, box, -1.f))
+		{
+			ClearPositionedElements();
 			return false;
+		}
 
 		ClosePositionedElements();
-
 		return true;
 	}
 
@@ -295,10 +301,7 @@ public:
 	// Places all queued floating elements.
 	void PlaceQueuedFloats(float vertical_position);
 
-	/// Calculate the dimensions of the box's internal content width; i.e. the size used to calculate the shrink-to-fit width.
-	/// @parameter[in] is_bfc_root True if this box is the root of its block formatting context.
-	/// @return The inner shrink-to-fit width of this box.
-	float GetShrinkToFitWidth(bool is_bfc_root) const;
+	float GetShrinkToFitWidth() const override;
 
 	// Reset this box, so that it can be formatted again.
 	void ResetContents();
@@ -361,6 +364,7 @@ private:
 
 	// TODO: All comments in the following.
 
+	UniquePtr<LayoutBlockBoxSpace> root_space;
 	// Used by block contexts only; stores the block box space managing our space, as occupied by floating elements of this box and our ancestors.
 	LayoutBlockBoxSpace* space;
 	// Used by block contexts only; stores the list of block boxes under this box.

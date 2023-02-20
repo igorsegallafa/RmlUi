@@ -105,41 +105,45 @@ static OuterDisplayType GetOuterDisplayType(Style::Display display)
 	return OuterDisplayType::Invalid;
 }
 
-UniquePtr<FormattingContext> FormattingContext::ConditionallyCreateIndependentFormattingContext(ContainerBox* parent_container, Element* element)
+UniquePtr<LayoutBox> FormattingContext::FormatIndependent(ContainerBox* parent_container, Element* element, const Box* override_initial_box,
+	FormattingContextType backup_context)
 {
 	using namespace Style;
 	auto& computed = element->GetComputedValues();
 
 	const Display display = computed.display();
 
+	FormattingContextType type = backup_context;
+
 	if (display == Display::Flex)
-		return MakeUnique<FlexFormattingContext>(parent_container, element);
+	{
+		type = FormattingContextType::Flex;
+	}
+	else if (display == Display::Table)
+	{
+		type = FormattingContextType::Table;
+	}
+	else if (computed.float_() != Float::None || computed.position() == Position::Absolute || computed.position() == Position::Fixed ||
+		computed.display() == Display::InlineBlock || computed.display() == Display::TableCell || computed.overflow_x() != Overflow::Visible ||
+		computed.overflow_y() != Overflow::Visible || !element->GetParentNode() || element->GetParentNode()->GetDisplay() == Display::Flex)
+	{
+		type = FormattingContextType::Block;
+	}
 
-	if (display == Display::Table)
-		return MakeUnique<TableFormattingContext>(parent_container, element);
-
-	const bool establishes_bfc =
-		(computed.float_() != Float::None || computed.position() == Position::Absolute || computed.position() == Position::Fixed ||
-			computed.display() == Display::InlineBlock || computed.display() == Display::TableCell || computed.overflow_x() != Overflow::Visible ||
-			computed.overflow_y() != Overflow::Visible || !element->GetParentNode() || element->GetParentNode()->GetDisplay() == Display::Flex);
-
-	if (establishes_bfc)
-		return MakeUnique<BlockFormattingContext>(parent_container, element);
+	switch (type)
+	{
+	case FormattingContextType::Block: return BlockFormattingContext::Format(parent_container, element, override_initial_box);
+	case FormattingContextType::Table: return TableFormattingContext::Format(parent_container, element, override_initial_box);
+	case FormattingContextType::Flex: return FlexFormattingContext::Format(parent_container, element, override_initial_box);
+	case FormattingContextType::None: break;
+	}
 
 	return nullptr;
 }
 
-BlockFormattingContext::BlockFormattingContext(ContainerBox* parent_box, Element* element) : FormattingContext(Type::Block, parent_box, element)
+UniquePtr<LayoutBox> BlockFormattingContext::Format(ContainerBox* parent_container, Element* element, const Box* override_initial_box)
 {
-	RMLUI_ASSERT(element);
-}
-
-BlockFormattingContext::~BlockFormattingContext() {}
-
-void BlockFormattingContext::Format(FormatSettings format_settings)
-{
-	Element* element = GetRootElement();
-	RMLUI_ASSERT(element && !root_block_container && !float_space);
+	RMLUI_ASSERT(parent_container && element);
 
 #ifdef RMLUI_ENABLE_PROFILING
 	RMLUI_ZoneScopedC(0xB22222);
@@ -147,19 +151,18 @@ void BlockFormattingContext::Format(FormatSettings format_settings)
 	RMLUI_ZoneName(name.c_str(), name.size());
 #endif
 
-	const Vector2f containing_block = LayoutDetails::GetContainingBlock(GetParentBoxOfContext(), element->GetPosition()).size;
+	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent_container, element->GetPosition()).size;
 
 	Box box;
-	if (format_settings.override_initial_box)
-		box = *format_settings.override_initial_box;
+	if (override_initial_box)
+		box = *override_initial_box;
 	else
 		LayoutDetails::BuildBox(box, containing_block, element);
 
 	float min_height, max_height;
 	LayoutDetails::GetDefiniteMinMaxHeight(min_height, max_height, element->GetComputedValues(), box, containing_block.y);
 
-	float_space = MakeUnique<LayoutBlockBoxSpace>();
-	root_block_container = MakeUnique<BlockContainer>(GetParentBoxOfContext(), float_space.get(), element, box, min_height, max_height);
+	UniquePtr<BlockContainer> root_block_container = MakeUnique<BlockContainer>(parent_container, nullptr, element, box, min_height, max_height);
 
 	BlockContainer* container = root_block_container.get();
 	DebugDumpLayoutTree debug_dump_tree(element, container);
@@ -182,19 +185,13 @@ void BlockFormattingContext::Format(FormatSettings format_settings)
 			break;
 
 		// Otherwise, restart formatting now that one or both scrollbars have been enabled.
-		float_space->Reset();
 		root_block_container->ResetContents();
 	}
 
 	SubmitElementLayout(element);
 
-	if (format_settings.out_visible_overflow_size)
-		*format_settings.out_visible_overflow_size = root_block_container->GetVisibleOverflowSize();
-}
-
-float BlockFormattingContext::GetShrinkToFitWidth() const
-{
-	return root_block_container ? root_block_container->GetShrinkToFitWidth(true) : 0.f;
+	// TODO Store float space in root container
+	return root_block_container;
 }
 
 bool BlockFormattingContext::FormatBlockBox(BlockContainer* parent_container, Element* element)
@@ -289,12 +286,8 @@ bool BlockFormattingContext::FormatBlockContainerChild(BlockContainer* parent_co
 		return true;
 	}
 
-	if (auto formatting_context = ConditionallyCreateIndependentFormattingContext(parent_container, element))
+	if (UniquePtr<LayoutBox> layout_box = FormattingContext::FormatIndependent(parent_container, element, nullptr, FormattingContextType::None))
 	{
-		formatting_context->Format({});
-
-		UniquePtr<LayoutBox> layout_box = formatting_context->ExtractRootBox();
-
 		// If the element is floating, we remove it from the flow.
 		if (computed.float_() != Style::Float::None)
 		{

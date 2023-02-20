@@ -246,13 +246,18 @@ float LayoutDetails::GetShrinkToFitWidth(Element* element, Vector2f containing_b
 {
 	RMLUI_ASSERT(element);
 
-	// TODO: Can we lay out the elements directly using a fit-content size mode, instead of fetching the shrink-to-fit width first?
-	//       Use a non-definite placeholder for the box content width, and available width as a maximum constraint.
+	// @performance Can we lay out the elements directly using a fit-content size mode, instead of fetching the
+	// shrink-to-fit width first? Use a non-definite placeholder for the box content width, and available width as a
+	// maximum constraint.
 	Box box;
 	float min_height, max_height;
-
 	LayoutDetails::BuildBox(box, containing_block, element, BuildBoxMode::UnalignedBlock);
 	LayoutDetails::GetDefiniteMinMaxHeight(min_height, max_height, element->GetComputedValues(), box, containing_block.y);
+
+	// Currently we don't support shrink-to-fit width for flexboxes or tables. Just return a zero-sized width.
+	const Style::Display display = element->GetDisplay();
+	if (display == Style::Display::Flex || display == Style::Display::Table)
+		return 0.f;
 
 	// Use a large size for the box content width, so that it is practically unconstrained. This makes the formatting
 	// procedure act as if under a maximum content constraint. Children with percentage sizing values may be scaled
@@ -260,18 +265,16 @@ float LayoutDetails::GetShrinkToFitWidth(Element* element, Vector2f containing_b
 	const float max_content_constraint_width = containing_block.x + 1000.f;
 	box.SetContent({max_content_constraint_width, box.GetSize().y});
 
-	// First we need to format the element, then we get the shrink-to-fit width based on the largest line or box.
-	// @performance. Some formatting can be simplified, eg. absolute elements do not contribute to the shrink-to-fit
+	// First, format the element under the above generated box. Then we ask the resulting box for its shrink-to-fit
+	// width. For block containers, this is essentially its largest line or child box.
+	// @performance. Some formatting can be simplified, e.g. absolute elements do not contribute to the shrink-to-fit
 	// width. Also, children of elements with a fixed width and height don't need to be formatted further.
-	// TODO: Only considers block formatting contexts, however, we just as well might have flex or table formatting contexts.
 	RootBox root(Math::Max(containing_block, Vector2f(0.f)));
-	auto formatting_context = MakeUnique<BlockFormattingContext>(&root, element);
-
-	formatting_context->Format(FormatSettings{&box, nullptr});
+	UniquePtr<LayoutBox> layout_box = FormattingContext::FormatIndependent(&root, element, &box, FormattingContextType::Block);
 
 	const float available_width = Math::Max(0.f, containing_block.x - box.GetSizeAcross(Box::HORIZONTAL, Box::MARGIN, Box::PADDING));
 
-	return Math::Min(available_width, formatting_context->GetShrinkToFitWidth());
+	return Math::Min(available_width, layout_box->GetShrinkToFitWidth());
 }
 
 ComputedAxisSize LayoutDetails::BuildComputedHorizontalSize(const ComputedValues& computed)

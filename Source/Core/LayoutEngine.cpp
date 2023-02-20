@@ -100,21 +100,11 @@ void LayoutEngine::FormatElement(Element* element, Vector2f containing_block)
 
 	RootBox root(containing_block);
 
-	auto formatting_context = FormattingContext::ConditionallyCreateIndependentFormattingContext(&root, element);
-
-	if (!formatting_context)
+	auto layout_box = FormattingContext::FormatIndependent(&root, element, nullptr, FormattingContextType::Block);
+	if (!layout_box)
 	{
-		Log::Message(Log::LT_ERROR, "Element does not create an independent formatting context and cannot be formatted: %s",
-			element->GetAddress().c_str());
-		RMLUI_ERROR;
-		return;
+		Log::Message(Log::LT_ERROR, "Error while formatting element: %s", element->GetAddress().c_str());
 	}
-
-	// TODO: Can we get rid of the containing block from the below call? Instead, we could make a root containing block
-	// here as a separate layout box. 
-	// All other calls to this function in principle use LayoutDetails::GetContainingBlock, so it would be nice if we
-	// could move that to inside the function.
-	formatting_context->Format({});
 }
 
 } // namespace Rml

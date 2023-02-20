@@ -39,32 +39,37 @@
 
 namespace Rml {
 
-void FlexFormattingContext::Format(FormatSettings format_settings)
+UniquePtr<LayoutBox> FlexFormattingContext::Format(ContainerBox* parent_container, Element* element, const Box* override_initial_box)
 {
-	Element* element = GetRootElement();
+	auto flex_container_box = MakeUnique<FlexContainer>(element, parent_container);
+
 	ElementScroll* element_scroll = element->GetElementScroll();
 	const ComputedValues& computed = element->GetComputedValues();
 
-	const Vector2f containing_block = LayoutDetails::GetContainingBlock(GetParentBoxOfContext(), element->GetPosition()).size;
+	const Vector2f containing_block = LayoutDetails::GetContainingBlock(parent_container, element->GetPosition()).size;
 	RMLUI_ASSERT(containing_block.x >= 0.f);
-	RMLUI_ASSERT(!flex_container_box);
-
-	flex_container_box = MakeUnique<FlexContainer>(element, GetParentBoxOfContext());
 
 	// Build the initial box as specified by the flex's style, as if it was a normal block element.
 	Box& box = flex_container_box->GetBox();
-	LayoutDetails::BuildBox(box, containing_block, element, BuildBoxMode::Block);
+	if (override_initial_box)
+		box = *override_initial_box;
+	else
+		LayoutDetails::BuildBox(box, containing_block, element, BuildBoxMode::Block);
 
 	// Start with any auto-scrollbars off.
 	flex_container_box->ResetScrollbars(box);
 
-	LayoutDetails::GetMinMaxWidth(flex_min_size.x, flex_max_size.x, computed, box, containing_block.x);
-	LayoutDetails::GetMinMaxHeight(flex_min_size.y, flex_max_size.y, computed, box, containing_block.y);
+	FlexFormattingContext context;
+	context.flex_container_box = flex_container_box.get();
+	context.element_flex = element;
+
+	LayoutDetails::GetMinMaxWidth(context.flex_min_size.x, context.flex_max_size.x, computed, box, containing_block.x);
+	LayoutDetails::GetMinMaxHeight(context.flex_min_size.y, context.flex_max_size.y, computed, box, containing_block.y);
 
 	const Vector2f box_content_size = box.GetSize();
 	const bool auto_height = (box_content_size.y < 0.0f);
 
-	flex_content_offset = box.GetPosition();
+	context.flex_content_offset = box.GetPosition();
 
 	for (int layout_iteration = 0; layout_iteration < 3; layout_iteration++)
 	{
@@ -74,20 +79,20 @@ void FlexFormattingContext::Format(FormatSettings format_settings)
 			element_scroll->GetScrollbarSize(ElementScroll::HORIZONTAL),
 		};
 
-		flex_available_content_size = Math::Max(box_content_size - scrollbar_size, Vector2f(0.f));
-		flex_content_containing_block = flex_available_content_size;
+		context.flex_available_content_size = Math::Max(box_content_size - scrollbar_size, Vector2f(0.f));
+		context.flex_content_containing_block = context.flex_available_content_size;
 
 		if (auto_height)
 		{
-			flex_available_content_size.y = -1.f; // Negative means infinite space
-			flex_content_containing_block.y = containing_block.y;
+			context.flex_available_content_size.y = -1.f; // Negative means infinite space
+			context.flex_content_containing_block.y = containing_block.y;
 		}
 
-		Math::SnapToPixelGrid(flex_content_offset, flex_available_content_size);
+		Math::SnapToPixelGrid(context.flex_content_offset, context.flex_available_content_size);
 
 		// Format the flexbox and all its children.
 		Vector2f flex_resulting_content_size, content_overflow_size;
-		Format(flex_resulting_content_size, content_overflow_size);
+		context.Format(flex_resulting_content_size, content_overflow_size);
 
 		// Output the size of the formatted flexbox. The width is determined as a normal block box so we don't need to change that.
 		Vector2f formatted_content_size = box_content_size;
@@ -96,24 +101,13 @@ void FlexFormattingContext::Format(FormatSettings format_settings)
 
 		Box sized_box = box;
 		sized_box.SetContent(formatted_content_size);
+
+		// Close the box, and break out of the loop if it did not produce any new scrollbars, otherwise continue to format the flexbox again.
 		if (flex_container_box->Close(content_overflow_size, sized_box))
-		{
-			// box.SetContent(formatted_content_size);
-
-			// Set the inner content size so that any overflow can be caught.
-			// TODO: Inner content size replaced by visible overflow size... Is this correct?
-			// TODO: This is now done by Close() above.
-			// flex_container_box->SetVisibleOverflowSize(content_overflow_size);
-			// element->SetBox(box);
-			if (format_settings.out_visible_overflow_size)
-				*format_settings.out_visible_overflow_size = content_overflow_size;
-
 			break;
-		}
-
-		// TODO: Maybe do this as part of Close?
-		flex_container_box->ClearPositionedElements();
 	}
+
+	return flex_container_box;
 }
 
 struct FlexItem {
@@ -210,7 +204,6 @@ void FlexFormattingContext::Format(Vector2f& flex_resulting_content_size, Vector
 	// The following procedure is based on the CSS flexible box layout algorithm.
 	// For details, see https://drafts.csswg.org/css-flexbox/#layout-algorithm
 
-	Element* const element_flex = GetRootElement();
 	const ComputedValues& computed_flex = element_flex->GetComputedValues();
 	const Style::FlexDirection direction = computed_flex.flex_direction();
 
@@ -249,7 +242,8 @@ void FlexFormattingContext::Format(Vector2f& flex_resulting_content_size, Vector
 		}
 		else if (computed.position() == Style::Position::Absolute || computed.position() == Style::Position::Fixed)
 		{
-			flex_container_box->AddAbsoluteElement(element, {}, element_flex);
+			ContainerBox* absolute_containing_block = LayoutDetails::GetContainingBlock(flex_container_box, computed.position()).container;
+			absolute_containing_block->AddAbsoluteElement(element, {}, element_flex);
 			continue;
 		}
 		else if (computed.position() == Style::Position::Relative)
@@ -315,7 +309,7 @@ void FlexFormattingContext::Format(Vector2f& flex_resulting_content_size, Vector
 			if (initial_box_size.x < 0.f)
 				format_box.SetContent(Vector2f(flex_available_content_size.x - item.cross.sum_edges, initial_box_size.y));
 
-			FormatFlexItem(element, &format_box);
+			FormattingContext::FormatIndependent(flex_container_box, element, &format_box, FormattingContextType::Block);
 			item.inner_flex_base_size = element->GetBox().GetSize().y;
 		}
 
@@ -597,7 +591,7 @@ void FlexFormattingContext::Format(Vector2f& flex_resulting_content_size, Vector
 				if (content_size.y < 0.0f)
 				{
 					item.box.SetContent(Vector2f(used_main_size_inner, content_size.y));
-					FormatFlexItem(item.element, &item.box);
+					FormattingContext::FormatIndependent(flex_container_box, item.element, &item.box, FormattingContextType::Block);
 					item.hypothetical_cross_size = item.element->GetBox().GetSize().y + item.cross.sum_edges;
 				}
 				else
@@ -853,14 +847,14 @@ void FlexFormattingContext::Format(Vector2f& flex_resulting_content_size, Vector
 
 			item.box.SetContent(item_size);
 
-			Vector2f cell_visible_overflow_size;
-			FormatFlexItem(item.element, &item.box, &cell_visible_overflow_size);
+			UniquePtr<LayoutBox> item_layout_box =
+				FormattingContext::FormatIndependent(flex_container_box, item.element, &item.box, FormattingContextType::Block);
 
 			// Set the position of the element within the the flex container
 			item.element->SetOffset(flex_content_offset + item_offset, element_flex);
 
 			// The cell contents may overflow, propagate this to the flex container.
-			const Vector2f overflow_size = item_offset + cell_visible_overflow_size;
+			const Vector2f overflow_size = item_offset + item_layout_box->GetVisibleOverflowSize();
 
 			flex_content_overflow_size.x = Math::Max(flex_content_overflow_size.x, overflow_size.x);
 			flex_content_overflow_size.y = Math::Max(flex_content_overflow_size.y, overflow_size.y);
@@ -868,14 +862,6 @@ void FlexFormattingContext::Format(Vector2f& flex_resulting_content_size, Vector
 	}
 
 	flex_resulting_content_size = MainCrossToVec2(used_main_size, used_cross_size);
-}
-
-void FlexFormattingContext::FormatFlexItem(Element* element, const Box* override_initial_box, Vector2f* out_cell_visible_overflow_size) const
-{
-	auto formatting_context = ConditionallyCreateIndependentFormattingContext(flex_container_box.get(), element);
-	RMLUI_ASSERTMSG(formatting_context, "Flex items should always generate an independent formatting context");
-
-	formatting_context->Format(FormatSettings{override_initial_box, out_cell_visible_overflow_size});
 }
 
 } // namespace Rml

@@ -74,8 +74,6 @@ bool TableGrid::Build(Element* element_table, TableWrapper& table_wrapper)
 
 			for (int j = 0; j < num_row_group_children; j++)
 			{
-				using Display = Style::Display;
-
 				Element* element_row = element->GetChild(j);
 				const Display display_row = element_row->GetDisplay();
 

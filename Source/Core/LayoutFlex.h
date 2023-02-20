@@ -36,23 +36,15 @@ namespace Rml {
 
 class FlexFormattingContext final : public FormattingContext {
 public:
-	FlexFormattingContext(ContainerBox* parent_box, Element* element) : FormattingContext(Type::Flex, parent_box, element) {}
-
-	FlexContainer* GetContainer() { return flex_container_box.get(); }
-
-	UniquePtr<LayoutBox> ExtractRootBox() override { return std::move(flex_container_box); }
-	UniquePtr<FlexContainer> ExtractContainer() { return std::move(flex_container_box); }
-
-	void Format(FormatSettings format_settings) override;
+	static UniquePtr<LayoutBox> Format(ContainerBox* parent_container, Element* element, const Box* override_initial_box);
 
 private:
+	FlexFormattingContext() = default;
+
 	/// Format the flexbox and its children.
 	/// @param[out] flex_resulting_content_size The final content size of the flex container.
 	/// @param[out] flex_content_overflow_size Overflow size in case flex items or their contents overflow the container.
 	void Format(Vector2f& flex_resulting_content_size, Vector2f& flex_content_overflow_size) const;
-
-	// Format a flex item in an independent formatting context.
-	void FormatFlexItem(Element* element, const Box* override_initial_box, Vector2f* out_cell_visible_overflow_size = nullptr) const;
 
 	Vector2f flex_available_content_size;
 	Vector2f flex_content_containing_block;
@@ -60,7 +52,8 @@ private:
 	Vector2f flex_min_size;
 	Vector2f flex_max_size;
 
-	UniquePtr<FlexContainer> flex_container_box;
+	Element* element_flex = nullptr;
+	FlexContainer* flex_container_box = nullptr;
 };
 
 } // namespace Rml
