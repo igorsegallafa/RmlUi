@@ -158,7 +158,6 @@ UniquePtr<LayoutBox> BlockFormattingContext::Format(ContainerBox* parent_contain
 
 	SubmitElementLayout(element);
 
-	// TODO Store float space in root container
 	return root_block_container;
 }
 

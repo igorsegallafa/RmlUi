@@ -38,6 +38,9 @@ class FloatedBoxSpace;
 class LineBox;
 class InlineBox;
 class InlineContainer;
+struct InlineBoxHandle {
+	InlineBox* inline_box;
+};
 
 /**
     A container for block-level boxes.
@@ -80,25 +83,23 @@ public:
 	/// @param max_height[in] The maximum height of the content box.
 	/// @return The block box representing the element. Once the element's children have been positioned, Close() must be called on it.
 	BlockContainer* AddBlockBox(Element* element, const Box& box, float min_height, float max_height);
-
+	// TODO
 	LayoutBox* AddBlockLevelBox(UniquePtr<LayoutBox> block_level_box, Element* element, const Box& box);
 
-	/// Adds an element to this block box to be handled as a floating element.
+	// Adds an element to this block box to be handled as a floating element.
 	void AddFloatElement(Element* element, Vector2f visible_overflow_size);
 
-	struct InlineBoxHandle {
-		InlineBox* inline_box;
-	};
-
-	/// Adds a new inline element to this inline-context box.
-	/// @param element[in] The new inline element.
-	/// @param box[in] The box defining the element's bounds.
-	/// @return The inline box representing the element. Once the element's children have been positioned, Close() must be called on it.
+	/// Adds a new inline-level element to this block container.
+	/// @param[in] element The new inline element.
+	/// @param[in] box The box defining the element's bounds.
+	/// @return A handle for the inline element, which must later be submitted to 'CloseInlineElement()'.
+	/// @note Adds a new inline container to this box if needed, which starts a new inline formatting context.
 	InlineBoxHandle AddInlineElement(Element* element, const Box& box);
-	// TODO
+	/// Closes a previously added inline element. This must be called after all its children have been added.
+	/// @param[in] handle A handle previously returned from 'AddInlineElement()'.
 	void CloseInlineElement(InlineBoxHandle handle);
 
-	/// Adds a line-break to this block box.
+	// Adds a line-break to this block box.
 	void AddBreak();
 
 	// Estimate the static position of a hypothetical next element to be placed.
@@ -109,31 +110,31 @@ public:
 	Vector2f NextBoxPosition() const;
 	/// Returns the offset of a new child box to be placed here. Collapses adjacent margins and optionally clears floats.
 	/// @param[in] child_box The dimensions of the new box.
-	/// @param[in] clear_property The value of the underlying element's clear property.
+	/// @param[in] clear_property Specifies any floated boxes to be cleared (vertically skipped).
 	/// @return The next border position in the block formatting context space.
 	Vector2f NextBoxPosition(const Box& child_box, Style::Clear clear_property) const;
 
 	// Places all queued floating elements.
 	void PlaceQueuedFloats(float vertical_position);
 
-	float GetShrinkToFitWidth() const override;
-
 	// Reset this box, so that it can be formatted again.
 	void ResetContents();
 
-	/// Returns the block box's element.
+	// Returns the block box's element.
 	Element* GetElement() const;
 
-	/// Returns the block box space.
+	// Returns the block box space.
 	const FloatedBoxSpace* GetBlockBoxSpace() const;
 
-	/// Returns the position of the block box, relative to its parent's content area.
-	/// @return The relative position of the block box.
+	// Returns the position box, relative to the border box of the root of our block formatting context.
 	Vector2f GetPosition() const;
 
 	Box& GetBox();
 	const Box& GetBox() const;
 
+	// -- Inherited from LayoutBox --
+
+	float GetShrinkToFitWidth() const override;
 	const Box* GetBoxPtr() const override { return &box; }
 
 private:
@@ -146,7 +147,8 @@ private:
 	// Closes the inline container if there is one open. Returns false if our formatting context needs to be reformatted.
 	bool CloseOpenInlineContainer();
 
-	void ResetInterruptedLineBox();
+	// Ensure that the interrupted line box is empty, otherwise produce a debug error.
+	void EnsureEmptyInterruptedLineBox();
 
 	// Positions a floating element within this block box.
 	void PlaceFloat(Element* element, float vertical_position, Vector2f visible_overflow_size);
@@ -157,37 +159,35 @@ private:
 	// Debug dump layout tree.
 	String DebugDumpTree(int depth) const override;
 
-	using BlockBoxList = Vector<UniquePtr<LayoutBox>>;
+	using LayoutBoxList = Vector<UniquePtr<LayoutBox>>;
 	struct QueuedFloat {
 		Element* element;
 		Vector2f visible_overflow_size;
 	};
 	using QueuedFloatList = Vector<QueuedFloat>;
 
-	// The block box's position.
+	// Position of this box, relative to the border box of the root of our block formatting context.
 	Vector2f position;
-	// The block box's size.
+
 	Box box;
 	float min_height = 0.f;
 	float max_height = -1.f;
 
-	// Used by inline contexts only; set to true if the block box's line boxes should stretch to fit their inline content instead of wrapping.
+	// True if any inline formatting contexts started inside this box should wrap their content instead of overflowing.
 	bool wrap_content = true;
 
-	// The vertical position of the next block box to be added to this box, relative to the top of our content box.
+	// The vertical position of the next block box to be added to this box, relative to our box's top content edge.
 	float box_cursor = 0.f;
 
-	// TODO: All comments in the following.
-
+	// Stores the floated boxes in the current block formatting context, if we are the root of the formatting context.
 	UniquePtr<FloatedBoxSpace> root_space;
-	// Used by block contexts only; stores the block box space managing our space, as occupied by floating elements of this box and our ancestors.
+	// Pointer to the floated box space of the current block formatting context. [not-null]
 	FloatedBoxSpace* space;
-	// Used by block contexts only; stores the list of block boxes under this box.
-	BlockBoxList block_boxes;
-	// Stores any floating elements that are waiting for a line break to be positioned.
+	// List of block-level boxes contained in this box.
+	LayoutBoxList child_boxes;
+	// Stores floated elements that are waiting for a line break to be positioned.
 	QueuedFloatList queued_float_elements;
-	// Used by block contexts only; stores an inline element hierarchy that was interrupted by a child block box.
-	// The hierarchy will be resumed in an inline-context box once the intervening block box is completed.
+	// Stores the unplaced part of a line box that was split by a block-level box.
 	UniquePtr<LineBox> interrupted_line_box;
 
 	// The inner content size (excluding any padding/border/margins).

@@ -36,7 +36,7 @@ namespace Rml {
 
 class LayoutBox {
 public:
-	enum class Type { Root, BlockContainer, InlineContainer, FlexContainer, TableWrapper, Replaced };
+	enum class Type { Root, BlockContainer, InlineContainer, FlexContainer, TableWrapper };
 
 	Type GetType() const { return type; }
 
@@ -71,7 +71,6 @@ protected:
 
 private:
 	Type type;
-
 	Vector2f visible_overflow_size;
 };
 

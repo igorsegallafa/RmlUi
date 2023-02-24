@@ -120,7 +120,7 @@ bool BlockContainer::Close(BlockContainer* parent_block_container)
 
 	element->SetBaseline(element_baseline);
 
-	ResetInterruptedLineBox();
+	EnsureEmptyInterruptedLineBox();
 
 	return true;
 }
@@ -159,7 +159,7 @@ BlockContainer* BlockContainer::AddBlockBox(Element* child_element, const Box& b
 	if (child_element->GetPosition() == Style::Position::Relative)
 		AddRelativeElement(child_element);
 
-	block_boxes.push_back(std::move(child_container_ptr));
+	child_boxes.push_back(std::move(child_container_ptr));
 
 	return child_container;
 }
@@ -172,8 +172,8 @@ LayoutBox* BlockContainer::AddBlockLevelBox(UniquePtr<LayoutBox> block_level_box
 	if (!CloseOpenInlineContainer())
 		return nullptr;
 
-	// Always clear any floats to avoid overlap here. In CSS, it is allowed to instead shrink the box and place it next
-	// to any floats, but we keep it simple here for now and just clear them.
+	// Clear any floats to avoid overlapping them. In CSS, it is allowed to instead shrink the box and place it next to
+	// any floats, but we keep it simple here for now and just clear them.
 	Vector2f child_position = NextBoxPosition(box, Style::Clear::Both);
 
 	child_element->SetOffset(child_position - position, element);
@@ -182,7 +182,7 @@ LayoutBox* BlockContainer::AddBlockLevelBox(UniquePtr<LayoutBox> block_level_box
 		AddRelativeElement(child_element);
 
 	LayoutBox* block_level_box = block_level_box_ptr.get();
-	block_boxes.push_back(std::move(block_level_box_ptr));
+	child_boxes.push_back(std::move(block_level_box_ptr));
 
 	if (!CloseChildBox(block_level_box, child_position, box.GetSizeAcross(Box::VERTICAL, Box::BORDER), box.GetEdge(Box::MARGIN, Box::BOTTOM)))
 		return nullptr;
@@ -190,7 +190,7 @@ LayoutBox* BlockContainer::AddBlockLevelBox(UniquePtr<LayoutBox> block_level_box
 	return block_level_box;
 }
 
-BlockContainer::InlineBoxHandle BlockContainer::AddInlineElement(Element* element, const Box& box)
+InlineBoxHandle BlockContainer::AddInlineElement(Element* element, const Box& box)
 {
 	RMLUI_ZoneScoped;
 
@@ -321,13 +321,22 @@ Vector2f BlockContainer::NextBoxPosition(const Box& child_box, Style::Clear clea
 			const float open_bottom_margin = open_box->GetEdge(Box::MARGIN, Box::BOTTOM);
 			const float margin_sum = open_bottom_margin + child_top_margin;
 
-			// Find and add the collapsed margin to the position, then subtract the sum of the margins which have already been added.
+			// The collapsed margin size depends on the sign of each margin, according to CSS behavior. The margins have
+			// already been added to the 'box_position', so subtract their sum as needed.
 			const int num_negative_margins = int(child_top_margin < 0.f) + int(open_bottom_margin < 0.f);
 			switch (num_negative_margins)
 			{
-			case 0: box_position.y += Math::Max(child_top_margin, open_bottom_margin) - margin_sum; break; // Use the largest margin.
-			case 1: break; // Use the sum of the positive and negative margin. These are already added to the position, so do nothing.
-			case 2: box_position.y += Math::Min(child_top_margin, open_bottom_margin) - margin_sum; break; // Use the most negative margin.
+			case 0:
+				// Use the largest margin.
+				box_position.y += Math::Max(child_top_margin, open_bottom_margin) - margin_sum;
+				break;
+			case 1:
+				// Use the sum of the positive and negative margin. These are already added to the position, so do nothing.
+				break;
+			case 2:
+				// Use the most negative margin.
+				box_position.y += Math::Min(child_top_margin, open_bottom_margin) - margin_sum;
+				break;
 			}
 		}
 	}
@@ -360,7 +369,7 @@ float BlockContainer::GetShrinkToFitWidth() const
 	{
 		// Nope, then use the largest outer shrink-to-fit width of our children. Percentage sizing would be relative to
 		// our containing block width and is treated just like 'auto' in this context.
-		for (const auto& block_box : block_boxes)
+		for (const auto& block_box : child_boxes)
 		{
 			const float child_inner_width = block_box->GetShrinkToFitWidth();
 			float child_edges_width = 0.f;
@@ -420,7 +429,7 @@ void BlockContainer::ResetContents()
 	if (root_space)
 		root_space->Reset();
 
-	block_boxes.clear();
+	child_boxes.clear();
 	queued_float_elements.clear();
 
 	box_cursor = 0;
@@ -433,7 +442,7 @@ String BlockContainer::DebugDumpTree(int depth) const
 {
 	String value = String(depth * 2, ' ') + "BlockContainer" + " | " + LayoutDetails::GetDebugElementName(element) + '\n';
 
-	for (auto&& block_box : block_boxes)
+	for (auto&& block_box : child_boxes)
 		value += block_box->DumpLayoutTree(depth + 1);
 
 	return value;
@@ -446,8 +455,8 @@ InlineContainer* BlockContainer::GetOpenInlineContainer()
 
 const InlineContainer* BlockContainer::GetOpenInlineContainer() const
 {
-	if (!block_boxes.empty() && block_boxes.back()->GetType() == Type::InlineContainer)
-		return static_cast<InlineContainer*>(block_boxes.back().get());
+	if (!child_boxes.empty() && child_boxes.back()->GetType() == Type::InlineContainer)
+		return static_cast<InlineContainer*>(child_boxes.back().get());
 	return nullptr;
 }
 
@@ -465,7 +474,7 @@ InlineContainer* BlockContainer::EnsureOpenInlineContainer()
 
 		auto inline_container_ptr = MakeUnique<InlineContainer>(this, available_width, line_height, wrap_content);
 		inline_container = inline_container_ptr.get();
-		block_boxes.push_back(std::move(inline_container_ptr));
+		child_boxes.push_back(std::move(inline_container_ptr));
 
 		if (interrupted_line_box)
 		{
@@ -479,8 +488,8 @@ InlineContainer* BlockContainer::EnsureOpenInlineContainer()
 
 const LayoutBox* BlockContainer::GetOpenLayoutBox() const
 {
-	if (!block_boxes.empty())
-		return block_boxes.back().get();
+	if (!child_boxes.empty())
+		return child_boxes.back().get();
 	return nullptr;
 }
 
@@ -488,14 +497,14 @@ bool BlockContainer::CloseOpenInlineContainer()
 {
 	if (InlineContainer* inline_container = GetOpenInlineContainer())
 	{
-		ResetInterruptedLineBox();
+		EnsureEmptyInterruptedLineBox();
 		return inline_container->Close(&interrupted_line_box);
 	}
 
 	return true;
 }
 
-void BlockContainer::ResetInterruptedLineBox()
+void BlockContainer::EnsureEmptyInterruptedLineBox()
 {
 	if (interrupted_line_box)
 	{
@@ -530,9 +539,9 @@ void BlockContainer::PlaceFloat(Element* element, float vertical_position, Vecto
 
 bool BlockContainer::GetBaselineOfLastLine(float& out_baseline) const
 {
-	for (int i = (int)block_boxes.size() - 1; i >= 0; i--)
+	for (int i = (int)child_boxes.size() - 1; i >= 0; i--)
 	{
-		if (block_boxes[i]->GetBaselineOfLastLine(out_baseline))
+		if (child_boxes[i]->GetBaselineOfLastLine(out_baseline))
 			return true;
 	}
 
