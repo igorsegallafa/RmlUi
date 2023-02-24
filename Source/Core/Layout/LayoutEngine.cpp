@@ -27,24 +27,15 @@
  */
 
 #include "LayoutEngine.h"
-#include "../../../Include/RmlUi/Core/ComputedValues.h"
 #include "../../../Include/RmlUi/Core/Element.h"
-#include "../../../Include/RmlUi/Core/Profiling.h"
-#include "../../../Include/RmlUi/Core/PropertyDefinition.h"
-#include "../../../Include/RmlUi/Core/PropertySpecification.h"
-#include "../../../Include/RmlUi/Core/StyleSheetSpecification.h"
-#include "../../../Include/RmlUi/Core/SystemInterface.h"
-#include "../../../Include/RmlUi/Core/Types.h"
 #include "../Pool.h"
-#include "LayoutBlockBoxSpace.h"
-#include "LayoutDetails.h"
-#include "LayoutFlex.h"
-#include "LayoutFormattingContext.h"
-#include "LayoutInlineContainer.h"
-#include "LayoutTable.h"
+#include "BlockContainer.h"
+#include "FloatedBoxSpace.h"
+#include "FormattingContext.h"
+#include "InlineBox.h"
+#include "InlineContainer.h"
+#include "LineBox.h"
 #include <algorithm>
-#include <cstddef>
-#include <float.h>
 
 namespace Rml {
 
@@ -57,7 +48,7 @@ struct LayoutChunk {
 static constexpr std::size_t ChunkSizeBig = std::max({sizeof(BlockContainer), sizeof(InlineContainer)});
 static constexpr std::size_t ChunkSizeMedium = std::max({sizeof(InlineBox), sizeof(FlexContainer), sizeof(TableWrapper)});
 static constexpr std::size_t ChunkSizeSmall =
-	std::max({sizeof(InlineLevelBox_Text), sizeof(InlineLevelBox_Atomic), sizeof(LayoutLineBox), sizeof(LayoutBlockBoxSpace)});
+	std::max({sizeof(InlineLevelBox_Text), sizeof(InlineLevelBox_Atomic), sizeof(LineBox), sizeof(FloatedBoxSpace)});
 
 static Pool<LayoutChunk<ChunkSizeBig>> layout_chunk_pool_big(50, true);
 static Pool<LayoutChunk<ChunkSizeMedium>> layout_chunk_pool_medium(50, true);

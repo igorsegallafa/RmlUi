@@ -26,26 +26,26 @@
  *
  */
 
-#include "LayoutLineBox.h"
+#include "LineBox.h"
 #include "../../../Include/RmlUi/Core/Element.h"
 #include "../../../Include/RmlUi/Core/StyleTypes.h"
+#include "InlineBox.h"
+#include "InlineLevelBox.h"
 #include "LayoutEngine.h"
-#include "LayoutInlineBox.h"
-#include "LayoutInlineLevelBox.h"
 #include <numeric>
 
 namespace Rml {
 
-LayoutLineBox::~LayoutLineBox() {}
+LineBox::~LineBox() {}
 
-void LayoutLineBox::SetLineBox(Vector2f _line_position, float _line_width, float _line_minimum_height)
+void LineBox::SetLineBox(Vector2f _line_position, float _line_width, float _line_minimum_height)
 {
 	line_position = _line_position;
 	line_width = _line_width;
 	line_minimum_height = _line_minimum_height;
 }
 
-bool LayoutLineBox::AddBox(InlineLevelBox* box, InlineLayoutMode layout_mode, LayoutOverflowHandle& inout_overflow_handle)
+bool LineBox::AddBox(InlineLevelBox* box, InlineLayoutMode layout_mode, LayoutOverflowHandle& inout_overflow_handle)
 {
 	RMLUI_ASSERT(!is_closed);
 	const bool first_box = !HasContent();
@@ -125,7 +125,7 @@ bool LayoutLineBox::AddBox(InlineLevelBox* box, InlineLayoutMode layout_mode, La
 	return continue_on_new_line;
 }
 
-void LayoutLineBox::CloseFragment(Fragment& open_fragment, float right_inner_edge_position)
+void LineBox::CloseFragment(Fragment& open_fragment, float right_inner_edge_position)
 {
 	RMLUI_ASSERT(open_fragment.type == FragmentType::InlineBox);
 
@@ -134,7 +134,7 @@ void LayoutLineBox::CloseFragment(Fragment& open_fragment, float right_inner_edg
 	open_fragment.layout_width = Math::Max(right_inner_edge_position - open_fragment.position.x - spacing_left, 0.f);
 }
 
-void LayoutLineBox::CloseInlineBox(InlineBox* inline_box)
+void LineBox::CloseInlineBox(InlineBox* inline_box)
 {
 	if (open_fragments_leaf == RootFragmentIndex || fragments[open_fragments_leaf].box != inline_box)
 	{
@@ -152,7 +152,7 @@ void LayoutLineBox::CloseInlineBox(InlineBox* inline_box)
 	open_fragments_leaf = fragment.parent;
 }
 
-UniquePtr<LayoutLineBox> LayoutLineBox::SplitLine(bool split_all_open_boxes)
+UniquePtr<LineBox> LineBox::SplitLine(bool split_all_open_boxes)
 {
 	if (open_fragments_leaf == RootFragmentIndex)
 		return nullptr;
@@ -165,7 +165,7 @@ UniquePtr<LayoutLineBox> LayoutLineBox::SplitLine(bool split_all_open_boxes)
 	open_spacing_left = 0.f;
 
 	// Make a new line with the open fragments.
-	auto new_line = MakeUnique<LayoutLineBox>();
+	auto new_line = MakeUnique<LineBox>();
 	new_line->fragments.resize(num_open_fragments);
 
 	// Copy all open fragments to the next line. Do it in reverse order of iteration, since we iterate from back to front.
@@ -222,18 +222,17 @@ UniquePtr<LayoutLineBox> LayoutLineBox::SplitLine(bool split_all_open_boxes)
 	return new_line;
 }
 
-UniquePtr<LayoutLineBox> LayoutLineBox::DetermineVerticalPositioning(const InlineBoxRoot* root_inline_box, bool split_all_open_boxes,
-	float& out_height_of_line)
+UniquePtr<LineBox> LineBox::DetermineVerticalPositioning(const InlineBoxRoot* root_inline_box, bool split_all_open_boxes, float& out_height_of_line)
 {
 	RMLUI_ASSERT(!is_closed && !is_vertically_positioned);
 
-	UniquePtr<LayoutLineBox> new_line_box = SplitLine(split_all_open_boxes);
+	UniquePtr<LineBox> new_line_box = SplitLine(split_all_open_boxes);
 
 	RMLUI_ASSERT(open_fragments_leaf == RootFragmentIndex); // Ensure all open fragments are either closed or split.
 
 	// Vertical alignment and sizing.
 	//
-	// Aligned subtree (CSS definition): "The aligned subtree of an inline element contains that element and the aligned
+	// Aligned subtree CSS definition: "The aligned subtree of an inline element contains that element and the aligned
 	// subtrees of all children inline elements whose computed vertical-align value is not 'top' or 'bottom'."
 	//
 	// We have already determined each box's offset relative to its parent baseline, and its layout size above and below
@@ -307,7 +306,7 @@ UniquePtr<LayoutLineBox> LayoutLineBox::DetermineVerticalPositioning(const Inlin
 	return new_line_box;
 }
 
-void LayoutLineBox::Close(Element* offset_parent, Vector2f offset_parent_position, Style::TextAlign text_align)
+void LineBox::Close(Element* offset_parent, Vector2f offset_parent_position, Style::TextAlign text_align)
 {
 	RMLUI_ASSERT(is_vertically_positioned && !is_closed);
 
@@ -347,7 +346,7 @@ void LayoutLineBox::Close(Element* offset_parent, Vector2f offset_parent_positio
 	is_closed = true;
 }
 
-void LayoutLineBox::VerticallyAlignSubtree(const int subtree_root_index, const int children_end_index, float& max_ascent, float& max_descent)
+void LineBox::VerticallyAlignSubtree(const int subtree_root_index, const int children_end_index, float& max_ascent, float& max_descent)
 {
 	const int children_begin_index = subtree_root_index + 1;
 
@@ -371,7 +370,7 @@ void LayoutLineBox::VerticallyAlignSubtree(const int subtree_root_index, const i
 	}
 }
 
-InlineBox* LayoutLineBox::GetOpenInlineBox()
+InlineBox* LineBox::GetOpenInlineBox()
 {
 	if (open_fragments_leaf == RootFragmentIndex)
 		return nullptr;
@@ -379,7 +378,7 @@ InlineBox* LayoutLineBox::GetOpenInlineBox()
 	return static_cast<InlineBox*>(fragments[open_fragments_leaf].box);
 }
 
-bool LayoutLineBox::CanCollapseLine() const
+bool LineBox::CanCollapseLine() const
 {
 	// Roughly, collapse lines with only empty text fragments or inline boxes not taking up any width or spacing.
 	for (const Fragment& fragment : fragments)
@@ -399,32 +398,31 @@ bool LayoutLineBox::CanCollapseLine() const
 	return true;
 }
 
-float LayoutLineBox::GetExtentRight() const
+float LineBox::GetExtentRight() const
 {
 	RMLUI_ASSERT(is_closed);
 	return box_cursor + offset_horizontal_alignment;
 }
 
-float LayoutLineBox::GetBaseline() const
+float LineBox::GetBaseline() const
 {
 	RMLUI_ASSERT(is_closed);
 	return total_height_above_baseline;
 }
 
-String LayoutLineBox::DebugDumpTree(int depth) const
+String LineBox::DebugDumpTree(int depth) const
 {
-	const String value =
-		String(depth * 2, ' ') + "LayoutLineBox (" + ToString(fragments.size()) + " fragment" + (fragments.size() == 1 ? "" : "s") + ")\n";
+	const String value = String(depth * 2, ' ') + "LineBox (" + ToString(fragments.size()) + " fragment" + (fragments.size() == 1 ? "" : "s") + ")\n";
 
 	return value;
 }
 
-void* LayoutLineBox::operator new(size_t size)
+void* LineBox::operator new(size_t size)
 {
 	return LayoutEngine::AllocateLayoutChunk(size);
 }
 
-void LayoutLineBox::operator delete(void* chunk, size_t size)
+void LineBox::operator delete(void* chunk, size_t size)
 {
 	LayoutEngine::DeallocateLayoutChunk(chunk, size);
 }

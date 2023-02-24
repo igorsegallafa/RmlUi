@@ -26,15 +26,16 @@
  *
  */
 
-#ifndef RMLUI_CORE_LAYOUTFORMATTINGCONTEXT_H
-#define RMLUI_CORE_LAYOUTFORMATTINGCONTEXT_H
+#ifndef RMLUI_CORE_LAYOUT_FORMATTINGCONTEXT_H
+#define RMLUI_CORE_LAYOUT_FORMATTINGCONTEXT_H
 
 #include "../../../Include/RmlUi/Core/Types.h"
-#include "LayoutBlockBox.h"
 
 namespace Rml {
 
 class Box;
+class ContainerBox;
+class LayoutBox;
 
 enum class FormattingContextType {
 	Block,
@@ -50,21 +51,10 @@ public:
 		FormattingContextType backup_context);
 
 protected:
-	static void SubmitElementLayout(Element* element) { element->OnLayout(); }
+	static void SubmitElementLayout(Element* element);
 
 	FormattingContext() = default;
 	~FormattingContext() = default;
-};
-
-class BlockFormattingContext final : public FormattingContext {
-public:
-	static UniquePtr<LayoutBox> Format(ContainerBox* parent_container, Element* element, const Box* override_initial_box);
-
-private:
-	static bool FormatBlockBox(BlockContainer* parent_container, Element* element);
-	static bool FormatInlineBox(BlockContainer* parent_container, Element* element);
-
-	static bool FormatBlockContainerChild(BlockContainer* parent_container, Element* element);
 };
 
 } // namespace Rml

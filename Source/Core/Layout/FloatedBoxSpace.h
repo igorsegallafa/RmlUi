@@ -26,8 +26,8 @@
  *
  */
 
-#ifndef RMLUI_CORE_LAYOUTBLOCKBOXSPACE_H
-#define RMLUI_CORE_LAYOUTBLOCKBOXSPACE_H
+#ifndef RMLUI_CORE_LAYOUT_FLOATEDBOXSPACE_H
+#define RMLUI_CORE_LAYOUT_FLOATEDBOXSPACE_H
 
 #include "../../../Include/RmlUi/Core/StyleTypes.h"
 #include "../../../Include/RmlUi/Core/Types.h"
@@ -46,10 +46,10 @@ enum class LayoutFloatBoxEdge { Margin, Overflow };
     @author Peter Curry
  */
 
-class LayoutBlockBoxSpace {
+class FloatedBoxSpace {
 public:
-	LayoutBlockBoxSpace();
-	~LayoutBlockBoxSpace();
+	FloatedBoxSpace();
+	~FloatedBoxSpace();
 
 	/// Generates the position for a box of a given size within our block box.
 	/// @param[out] box_width The available width for the box.
@@ -107,15 +107,15 @@ private:
 	Vector2f NextBoxPosition(const BlockContainer* parent, float& maximum_box_width, float cursor, Vector2f dimensions, bool nowrap,
 		Style::Float float_property) const;
 
-	struct SpaceBox {
+	struct FloatedBox {
 		Vector2f offset;
 		Vector2f dimensions;
 	};
 
-	using SpaceBoxList = Vector<SpaceBox>;
+	using FloatedBoxList = Vector<FloatedBox>;
 
 	// The boxes floating in our space.
-	SpaceBoxList boxes[NUM_ANCHOR_EDGES];
+	FloatedBoxList boxes[NUM_ANCHOR_EDGES];
 
 	// The rectangle encompassing all boxes added specifically into this space, relative to our block formatting context space.
 	Vector2f extent_top_left_overflow;

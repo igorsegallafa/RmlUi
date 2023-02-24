@@ -26,13 +26,14 @@
  *
  */
 
-#include "LayoutTable.h"
+#include "TableFormattingContext.h"
 #include "../../../Include/RmlUi/Core/ComputedValues.h"
 #include "../../../Include/RmlUi/Core/Element.h"
 #include "../../../Include/RmlUi/Core/Types.h"
+#include "ContainerBox.h"
 #include "LayoutDetails.h"
 #include "LayoutEngine.h"
-#include "LayoutTableDetails.h"
+#include "TableFormattingDetails.h"
 #include <algorithm>
 #include <numeric>
 
@@ -463,7 +464,6 @@ void TableFormattingContext::FormatCells(BoxList& cells, Vector2f& table_overflo
 		//   That should be faster than formatting the element again, but there may be edge-cases not accounted for.
 		auto cell_box = FormattingContext::FormatIndependent(table_wrapper_box, element_cell, &box, FormattingContextType::Block);
 		Vector2f cell_visible_overflow_size = cell_box->GetVisibleOverflowSize();
-
 
 		// Set the position of the element within the the table container
 		element_cell->SetOffset(cell_offset, element_table);

@@ -26,11 +26,11 @@
  *
  */
 
-#ifndef RMLUI_CORE_LAYOUTLINEBOX_H
-#define RMLUI_CORE_LAYOUTLINEBOX_H
+#ifndef RMLUI_CORE_LAYOUT_LINEBOX_H
+#define RMLUI_CORE_LAYOUT_LINEBOX_H
 
 #include "../../../Include/RmlUi/Core/StyleTypes.h"
-#include "LayoutInlineTypes.h"
+#include "InlineTypes.h"
 
 namespace Rml {
 
@@ -38,10 +38,10 @@ class InlineBox;
 class InlineBoxRoot;
 class InlineLevelBox;
 
-class LayoutLineBox final {
+class LineBox final {
 public:
-	LayoutLineBox() = default;
-	~LayoutLineBox();
+	LineBox() = default;
+	~LineBox();
 
 	// Set the line box position and dimensions.
 	void SetLineBox(Vector2f line_position, float line_width, float line_minimum_height);
@@ -57,7 +57,7 @@ public:
 	// Vertically positions each fragment and sizes the line, after splitting any open inline boxes to be placed on a new line.
 	// @param[out] out_height_of_line Resulting height of line. This can be different from the element's computed line-height property.
 	// @return The next line if any open fragments had to be split or wrapped down.
-	UniquePtr<LayoutLineBox> DetermineVerticalPositioning(const InlineBoxRoot* root_inline_box, bool split_all_open_boxes, float& out_height_of_line);
+	UniquePtr<LineBox> DetermineVerticalPositioning(const InlineBoxRoot* root_inline_box, bool split_all_open_boxes, float& out_height_of_line);
 
 	// Closes the line and submits all fragments. Thereby positioning, sizing, and placing their corresponding boxes.
 	// @note The line must have been vertically positioned before closing.
@@ -133,7 +133,7 @@ private:
 	void CloseFragment(Fragment& open_fragment, float right_inner_edge_position);
 
 	// Splits the line, returning a new line if there are any open fragments.
-	UniquePtr<LayoutLineBox> SplitLine(bool split_all_open_boxes);
+	UniquePtr<LineBox> SplitLine(bool split_all_open_boxes);
 
 	// Vertically align all descendants of the subtree. Returns the ascent of the top-most box, and descent of the bottom-most box.
 	void VerticallyAlignSubtree(int subtree_root_index, int children_end_index, float& max_ascent, float& max_descent);

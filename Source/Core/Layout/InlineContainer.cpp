@@ -26,7 +26,7 @@
  *
  */
 
-#include "LayoutInlineContainer.h"
+#include "InlineContainer.h"
 #include "../../../Include/RmlUi/Core/ComputedValues.h"
 #include "../../../Include/RmlUi/Core/Element.h"
 #include "../../../Include/RmlUi/Core/ElementScroll.h"
@@ -34,10 +34,11 @@
 #include "../../../Include/RmlUi/Core/ElementUtilities.h"
 #include "../../../Include/RmlUi/Core/Profiling.h"
 #include "../../../Include/RmlUi/Core/Property.h"
-#include "LayoutBlockBox.h"
-#include "LayoutBlockBoxSpace.h"
+#include "BlockContainer.h"
+#include "FloatedBoxSpace.h"
+#include "InlineLevelBox.h"
 #include "LayoutDetails.h"
-#include "LayoutInlineLevelBox.h"
+#include "LineBox.h"
 
 namespace Rml {
 
@@ -84,7 +85,7 @@ InlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
 
 	while (true)
 	{
-		LayoutLineBox* line_box = EnsureOpenLineBox();
+		LineBox* line_box = EnsureOpenLineBox();
 
 		UpdateLineBoxPlacement(line_box, minimum_width_next, minimum_line_height);
 
@@ -111,7 +112,7 @@ InlineBox* InlineContainer::AddInlineElement(Element* element, const Box& box)
 
 void InlineContainer::CloseInlineElement(InlineBox* inline_box)
 {
-	if (LayoutLineBox* line_box = GetOpenLineBox())
+	if (LineBox* line_box = GetOpenLineBox())
 	{
 		line_box->CloseInlineBox(inline_box);
 	}
@@ -124,20 +125,20 @@ void InlineContainer::CloseInlineElement(InlineBox* inline_box)
 void InlineContainer::AddBreak(float line_height)
 {
 	// Simply end the line if one is open, otherwise increment by the line height.
-	if (LayoutLineBox* line_box = GetOpenLineBox())
+	if (LineBox* line_box = GetOpenLineBox())
 		CloseOpenLineBox(true);
 	else
 		box_cursor += line_height;
 }
 
-void InlineContainer::AddChainedBox(UniquePtr<LayoutLineBox> open_line_box)
+void InlineContainer::AddChainedBox(UniquePtr<LineBox> open_line_box)
 {
 	RMLUI_ASSERT(line_boxes.empty());
 	RMLUI_ASSERT(open_line_box && !open_line_box->IsClosed());
 	line_boxes.push_back(std::move(open_line_box));
 }
 
-bool InlineContainer::Close(UniquePtr<LayoutLineBox>* out_open_line_box)
+bool InlineContainer::Close(UniquePtr<LineBox>* out_open_line_box)
 {
 	RMLUI_ZoneScoped;
 
@@ -168,12 +169,12 @@ bool InlineContainer::Close(UniquePtr<LayoutLineBox>* out_open_line_box)
 	return true;
 }
 
-void InlineContainer::CloseOpenLineBox(bool split_all_open_boxes, UniquePtr<LayoutLineBox>* out_split_line)
+void InlineContainer::CloseOpenLineBox(bool split_all_open_boxes, UniquePtr<LineBox>* out_split_line)
 {
-	if (LayoutLineBox* line_box = GetOpenLineBox())
+	if (LineBox* line_box = GetOpenLineBox())
 	{
 		float height_of_line = 0.f;
-		UniquePtr<LayoutLineBox> split_line_box = line_box->DetermineVerticalPositioning(&root_inline_box, split_all_open_boxes, height_of_line);
+		UniquePtr<LineBox> split_line_box = line_box->DetermineVerticalPositioning(&root_inline_box, split_all_open_boxes, height_of_line);
 
 		// If the final height of the line is larger than previously considered, we might need to push the line down to
 		// clear overlapping floats.
@@ -203,7 +204,7 @@ void InlineContainer::CloseOpenLineBox(bool split_all_open_boxes, UniquePtr<Layo
 
 bool InlineContainer::GetOpenLineBoxDimensions(float& out_vertical_position, Vector2f& out_tentative_size) const
 {
-	if (LayoutLineBox* line_box = GetOpenLineBox())
+	if (LineBox* line_box = GetOpenLineBox())
 	{
 		out_vertical_position = position.y + box_cursor;
 		out_tentative_size = {line_box->GetBoxCursor(), line_box->GetLineMinimumHeight()};
@@ -214,11 +215,11 @@ bool InlineContainer::GetOpenLineBoxDimensions(float& out_vertical_position, Vec
 
 void InlineContainer::UpdateOpenLineBoxPlacement()
 {
-	if (LayoutLineBox* line_box = GetOpenLineBox())
+	if (LineBox* line_box = GetOpenLineBox())
 		UpdateLineBoxPlacement(line_box, 0.f, element_line_height);
 }
 
-void InlineContainer::UpdateLineBoxPlacement(LayoutLineBox* line_box, float minimum_width, float minimum_height)
+void InlineContainer::UpdateLineBoxPlacement(LineBox* line_box, float minimum_width, float minimum_height)
 {
 	RMLUI_ASSERT(line_box);
 
@@ -252,7 +253,7 @@ Vector2f InlineContainer::GetStaticPositionEstimate(bool inline_level_box) const
 {
 	Vector2f result = {0.f, box_cursor};
 
-	if (const LayoutLineBox* line_box = GetOpenLineBox())
+	if (const LineBox* line_box = GetOpenLineBox())
 	{
 		if (inline_level_box)
 			result.x += line_box->GetBoxCursor();
@@ -273,16 +274,16 @@ bool InlineContainer::GetBaselineOfLastLine(float& out_baseline) const
 	return false;
 }
 
-LayoutLineBox* InlineContainer::EnsureOpenLineBox()
+LineBox* InlineContainer::EnsureOpenLineBox()
 {
 	if (line_boxes.empty() || line_boxes.back()->IsClosed())
 	{
-		line_boxes.push_back(MakeUnique<LayoutLineBox>());
+		line_boxes.push_back(MakeUnique<LineBox>());
 	}
 	return line_boxes.back().get();
 }
 
-LayoutLineBox* InlineContainer::GetOpenLineBox() const
+LineBox* InlineContainer::GetOpenLineBox() const
 {
 	if (line_boxes.empty() || line_boxes.back()->IsClosed())
 		return nullptr;
@@ -291,7 +292,7 @@ LayoutLineBox* InlineContainer::GetOpenLineBox() const
 
 InlineBoxBase* InlineContainer::GetOpenInlineBox()
 {
-	if (LayoutLineBox* line_box = GetOpenLineBox())
+	if (LineBox* line_box = GetOpenLineBox())
 	{
 		if (InlineBox* inline_box = line_box->GetOpenInlineBox())
 			return inline_box;

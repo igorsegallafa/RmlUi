@@ -26,12 +26,16 @@
  *
  */
 
-#include "LayoutFormattingContext.h"
+#include "BlockFormattingContext.h"
+#include "../../../Include/RmlUi/Core/ComputedValues.h"
 #include "../../../Include/RmlUi/Core/Element.h"
-#include "LayoutBlockBoxSpace.h"
+#include "../../../Include/RmlUi/Core/Profiling.h"
+#include "../../../Include/RmlUi/Core/PropertyDefinition.h"
+#include "../../../Include/RmlUi/Core/StyleSheetSpecification.h"
+#include "../../../Include/RmlUi/Core/SystemInterface.h"
+#include "BlockContainer.h"
+#include "FloatedBoxSpace.h"
 #include "LayoutDetails.h"
-#include "LayoutFlex.h"
-#include "LayoutTable.h"
 
 namespace Rml {
 
@@ -103,42 +107,6 @@ static OuterDisplayType GetOuterDisplayType(Style::Display display)
 	}
 
 	return OuterDisplayType::Invalid;
-}
-
-UniquePtr<LayoutBox> FormattingContext::FormatIndependent(ContainerBox* parent_container, Element* element, const Box* override_initial_box,
-	FormattingContextType backup_context)
-{
-	using namespace Style;
-	auto& computed = element->GetComputedValues();
-
-	const Display display = computed.display();
-
-	FormattingContextType type = backup_context;
-
-	if (display == Display::Flex)
-	{
-		type = FormattingContextType::Flex;
-	}
-	else if (display == Display::Table)
-	{
-		type = FormattingContextType::Table;
-	}
-	else if (computed.float_() != Float::None || computed.position() == Position::Absolute || computed.position() == Position::Fixed ||
-		computed.display() == Display::InlineBlock || computed.display() == Display::TableCell || computed.overflow_x() != Overflow::Visible ||
-		computed.overflow_y() != Overflow::Visible || !element->GetParentNode() || element->GetParentNode()->GetDisplay() == Display::Flex)
-	{
-		type = FormattingContextType::Block;
-	}
-
-	switch (type)
-	{
-	case FormattingContextType::Block: return BlockFormattingContext::Format(parent_container, element, override_initial_box);
-	case FormattingContextType::Table: return TableFormattingContext::Format(parent_container, element, override_initial_box);
-	case FormattingContextType::Flex: return FlexFormattingContext::Format(parent_container, element, override_initial_box);
-	case FormattingContextType::None: break;
-	}
-
-	return nullptr;
 }
 
 UniquePtr<LayoutBox> BlockFormattingContext::Format(ContainerBox* parent_container, Element* element, const Box* override_initial_box)

@@ -26,8 +26,8 @@
  *
  */
 
-#ifndef RMLUI_CORE_LAYOUTDETAILS_H
-#define RMLUI_CORE_LAYOUTDETAILS_H
+#ifndef RMLUI_CORE_LAYOUT_LAYOUTDETAILS_H
+#define RMLUI_CORE_LAYOUT_LAYOUTDETAILS_H
 
 #include "../../../Include/RmlUi/Core/StyleTypes.h"
 #include "../../../Include/RmlUi/Core/Types.h"

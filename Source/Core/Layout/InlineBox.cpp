@@ -26,7 +26,7 @@
  *
  */
 
-#include "LayoutInlineBox.h"
+#include "InlineBox.h"
 #include "../../../Include/RmlUi/Core/Box.h"
 #include "../../../Include/RmlUi/Core/Element.h"
 #include "../../../Include/RmlUi/Core/FontMetrics.h"

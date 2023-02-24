@@ -60,19 +60,22 @@ set(Core_HDR_FILES
     ${PROJECT_SOURCE_DIR}/Source/Core/GeometryBackgroundBorder.h
     ${PROJECT_SOURCE_DIR}/Source/Core/GeometryDatabase.h
     ${PROJECT_SOURCE_DIR}/Source/Core/IdNameMap.h
-    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutBlockBox.h
-    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutBlockBoxSpace.h
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/BlockContainer.h
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/BlockFormattingContext.h
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/ContainerBox.h
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/FlexFormattingContext.h
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/FloatedBoxSpace.h
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/FormattingContext.h
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/InlineBox.h
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/InlineContainer.h
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/InlineLevelBox.h
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/InlineTypes.h
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutBox.h
     ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutDetails.h
     ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutEngine.h
-    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutFlex.h
-    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutFormattingContext.h
-    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutInlineBox.h
-    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutInlineContainer.h
-    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutInlineLevelBox.h
-    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutInlineTypes.h
-    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutLineBox.h
-    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutTable.h
-    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutTableDetails.h
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LineBox.h
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/TableDetails.h
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/TableFormattingContext.h
     ${PROJECT_SOURCE_DIR}/Source/Core/Memory.h
     ${PROJECT_SOURCE_DIR}/Source/Core/PluginRegistry.h
     ${PROJECT_SOURCE_DIR}/Source/Core/Pool.h
@@ -331,18 +334,21 @@ set(Core_SRC_FILES
     ${PROJECT_SOURCE_DIR}/Source/Core/GeometryBackgroundBorder.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/GeometryDatabase.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/GeometryUtilities.cpp
-    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutBlockBox.cpp
-    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutBlockBoxSpace.cpp
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/BlockContainer.cpp
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/BlockFormattingContext.cpp
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/ContainerBox.cpp
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/FlexFormattingContext.cpp
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/FloatedBoxSpace.cpp
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/FormattingContext.cpp
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/InlineBox.cpp
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/InlineContainer.cpp
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/InlineLevelBox.cpp
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutBox.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutDetails.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutEngine.cpp
-    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutFlex.cpp
-    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutFormattingContext.cpp
-    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutInlineBox.cpp
-    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutInlineContainer.cpp
-    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutInlineLevelBox.cpp
-    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutLineBox.cpp
-    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutTable.cpp
-    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutTableDetails.cpp
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LineBox.cpp
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/TableDetails.cpp
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/TableFormattingContext.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/Log.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/Math.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/Memory.cpp

@@ -26,31 +26,28 @@
  *
  */
 
-#ifndef RMLUI_CORE_LAYOUT_LAYOUTENGINE_H
-#define RMLUI_CORE_LAYOUT_LAYOUTENGINE_H
+#ifndef RMLUI_CORE_LAYOUT_BLOCKFORMATTINGCONTEXT_H
+#define RMLUI_CORE_LAYOUT_BLOCKFORMATTINGCONTEXT_H
 
 #include "../../../Include/RmlUi/Core/Types.h"
+#include "FormattingContext.h"
 
 namespace Rml {
 
-/**
-	@author Michael R. P. Ragazzon
+class Box;
+class BlockContainer;
+class ContainerBox;
+class LayoutBox;
 
-	Based on original work by: Robert Curry and Peter Curry
- */
-
-class LayoutEngine {
+class BlockFormattingContext final : public FormattingContext {
 public:
-	/// Formats the contents for a root-level element, usually a document, absolutely positioned, floating, or replaced element. Establishes a new
-	/// block formatting context.
-	/// @param[in] element The element to lay out.
-	/// @param[in] containing_block The size of the containing block.
-	/// @param[in] override_initial_box Optional pointer to a box to override the generated box for the element.
-	/// @param[out] visible_overflow_size Optionally output the overflow size of the element.
-	static void FormatElement(Element* element, Vector2f containing_block);
+	static UniquePtr<LayoutBox> Format(ContainerBox* parent_container, Element* element, const Box* override_initial_box);
 
-	static void* AllocateLayoutChunk(size_t size);
-	static void DeallocateLayoutChunk(void* chunk, size_t size);
+private:
+	static bool FormatBlockBox(BlockContainer* parent_container, Element* element);
+	static bool FormatInlineBox(BlockContainer* parent_container, Element* element);
+
+	static bool FormatBlockContainerChild(BlockContainer* parent_container, Element* element);
 };
 
 } // namespace Rml

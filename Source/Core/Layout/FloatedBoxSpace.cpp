@@ -26,27 +26,26 @@
  *
  */
 
-#include "LayoutBlockBoxSpace.h"
+#include "FloatedBoxSpace.h"
 #include "../../../Include/RmlUi/Core/ComputedValues.h"
 #include "../../../Include/RmlUi/Core/Element.h"
 #include "../../../Include/RmlUi/Core/ElementScroll.h"
-#include "LayoutBlockBox.h"
+#include "BlockContainer.h"
 #include "LayoutEngine.h"
 #include <float.h>
 
 namespace Rml {
 
-LayoutBlockBoxSpace::LayoutBlockBoxSpace() {}
+FloatedBoxSpace::FloatedBoxSpace() {}
 
-LayoutBlockBoxSpace::~LayoutBlockBoxSpace() {}
+FloatedBoxSpace::~FloatedBoxSpace() {}
 
-Vector2f LayoutBlockBoxSpace::NextBoxPosition(const BlockContainer* parent, float& box_width, float cursor, const Vector2f dimensions,
-	bool nowrap) const
+Vector2f FloatedBoxSpace::NextBoxPosition(const BlockContainer* parent, float& box_width, float cursor, const Vector2f dimensions, bool nowrap) const
 {
 	return NextBoxPosition(parent, box_width, cursor, dimensions, nowrap, Style::Float::None);
 }
 
-Vector2f LayoutBlockBoxSpace::NextFloatPosition(const BlockContainer* parent, float& out_box_width, float cursor, Vector2f dimensions,
+Vector2f FloatedBoxSpace::NextFloatPosition(const BlockContainer* parent, float& out_box_width, float cursor, Vector2f dimensions,
 	Style::Float float_property, Style::Clear clear_property) const
 {
 	// Shift the cursor down (if necessary) so it isn't placed any higher than a previously-floated box.
@@ -66,10 +65,10 @@ Vector2f LayoutBlockBoxSpace::NextFloatPosition(const BlockContainer* parent, fl
 	return margin_offset;
 }
 
-void LayoutBlockBoxSpace::PlaceFloat(Style::Float float_property, Vector2f margin_position, Vector2f margin_size, Vector2f overflow_position,
+void FloatedBoxSpace::PlaceFloat(Style::Float float_property, Vector2f margin_position, Vector2f margin_size, Vector2f overflow_position,
 	Vector2f overflow_size)
 {
-	boxes[float_property == Style::Float::Left ? LEFT : RIGHT].push_back(SpaceBox{margin_position, margin_size});
+	boxes[float_property == Style::Float::Left ? LEFT : RIGHT].push_back(FloatedBox{margin_position, margin_size});
 
 	// Set our extents so they enclose the new box.
 	extent_top_left_overflow = Math::Min(extent_top_left_overflow, overflow_position);
@@ -77,7 +76,7 @@ void LayoutBlockBoxSpace::PlaceFloat(Style::Float float_property, Vector2f margi
 	extent_bottom_right_margin = Math::Max(extent_bottom_right_margin, margin_position + margin_size);
 }
 
-float LayoutBlockBoxSpace::DetermineClearPosition(float cursor, Style::Clear clear_property) const
+float FloatedBoxSpace::DetermineClearPosition(float cursor, Style::Clear clear_property) const
 {
 	using namespace Style;
 	// Clear left boxes.
@@ -97,7 +96,7 @@ float LayoutBlockBoxSpace::DetermineClearPosition(float cursor, Style::Clear cle
 	return cursor;
 }
 
-Vector2f LayoutBlockBoxSpace::NextBoxPosition(const BlockContainer* parent, float& maximum_box_width, const float cursor, const Vector2f dimensions,
+Vector2f FloatedBoxSpace::NextBoxPosition(const BlockContainer* parent, float& maximum_box_width, const float cursor, const Vector2f dimensions,
 	const bool nowrap, const Style::Float float_property) const
 {
 	const float parent_scrollbar_width = parent->GetElement()->GetElementScroll()->GetScrollbarSize(ElementScroll::VERTICAL);
@@ -116,7 +115,7 @@ Vector2f LayoutBlockBoxSpace::NextBoxPosition(const BlockContainer* parent, floa
 	// First up; we iterate through all boxes that share our edge, pushing ourself to the side of them if we intersect
 	// them. We record the height of the lowest box that gets in our way; in the event we can't be positioned at this
 	// height, we'll reposition ourselves at that height for the next iteration.
-	for (const SpaceBox& fixed_box : boxes[box_edge])
+	for (const FloatedBox& fixed_box : boxes[box_edge])
 	{
 		// If the fixed box's bottom edge is above our top edge, then we can safely skip it.
 		if (fixed_box.offset.y + fixed_box.dimensions.y <= box_position.y)
@@ -160,7 +159,7 @@ Vector2f LayoutBlockBoxSpace::NextBoxPosition(const BlockContainer* parent, floa
 	// maximum width the box can stretch to, if it is placed at this location.
 	maximum_box_width = (box_edge == LEFT ? parent_edge_right - box_position.x : box_position.x + dimensions.x);
 
-	for (const SpaceBox& fixed_box : boxes[1 - box_edge])
+	for (const FloatedBox& fixed_box : boxes[1 - box_edge])
 	{
 		// If the fixed box's bottom edge is above our top edge, then we can safely skip it.
 		if (fixed_box.offset.y + fixed_box.dimensions.y <= box_position.y)
@@ -199,7 +198,7 @@ Vector2f LayoutBlockBoxSpace::NextBoxPosition(const BlockContainer* parent, floa
 	// Third; we go through all of the boxes (on both sides), checking for vertical collisions.
 	for (int i = 0; i < 2; ++i)
 	{
-		for (const SpaceBox& fixed_box : boxes[i])
+		for (const FloatedBox& fixed_box : boxes[i])
 		{
 			// If the fixed box's bottom edge is above our top edge, then we can safely skip it.
 			if (fixed_box.offset.y + fixed_box.dimensions.y <= box_position.y)
@@ -229,7 +228,7 @@ Vector2f LayoutBlockBoxSpace::NextBoxPosition(const BlockContainer* parent, floa
 	return box_position;
 }
 
-Vector2f LayoutBlockBoxSpace::GetDimensions(LayoutFloatBoxEdge edge) const
+Vector2f FloatedBoxSpace::GetDimensions(LayoutFloatBoxEdge edge) const
 {
 	// For now, we don't really use the top-left extent, because it is not allowed in CSS to scroll to content located
 	// to the top or left, and thus we have no use for it currently. We could use it later to help detect overflow on
@@ -238,27 +237,27 @@ Vector2f LayoutBlockBoxSpace::GetDimensions(LayoutFloatBoxEdge edge) const
 	return edge == LayoutFloatBoxEdge::Margin ? extent_bottom_right_margin : extent_bottom_right_overflow;
 }
 
-float LayoutBlockBoxSpace::GetShrinkToFitWidth(float edge_left, float edge_right) const
+float FloatedBoxSpace::GetShrinkToFitWidth(float edge_left, float edge_right) const
 {
 	// For the left-anchored boxes: Find the right-most edge of the boxes, relative to our parent's left edge.
 	float left_shrink_width = 0.f;
-	for (const SpaceBox& box : boxes[LEFT])
+	for (const FloatedBox& box : boxes[LEFT])
 		left_shrink_width = Math::Max(left_shrink_width, box.offset.x - edge_left + box.dimensions.x);
 
 	// Conversely, for the right-anchored boxes: Find the left-most edge, relative to our parent's right edge.
 	float right_shrink_width = 0.f;
-	for (const SpaceBox& box : boxes[RIGHT])
+	for (const FloatedBox& box : boxes[RIGHT])
 		right_shrink_width = Math::Max(right_shrink_width, edge_right - box.offset.x);
 
 	return left_shrink_width + right_shrink_width;
 }
 
-void* LayoutBlockBoxSpace::operator new(size_t size)
+void* FloatedBoxSpace::operator new(size_t size)
 {
 	return LayoutEngine::AllocateLayoutChunk(size);
 }
 
-void LayoutBlockBoxSpace::operator delete(void* chunk, size_t size)
+void FloatedBoxSpace::operator delete(void* chunk, size_t size)
 {
 	LayoutEngine::DeallocateLayoutChunk(chunk, size);
 }

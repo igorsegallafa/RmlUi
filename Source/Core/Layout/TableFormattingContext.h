@@ -26,12 +26,12 @@
  *
  */
 
-#ifndef RMLUI_CORE_LAYOUTTABLE_H
-#define RMLUI_CORE_LAYOUTTABLE_H
+#ifndef RMLUI_CORE_LAYOUT_TABLEFORMATTINGCONTEXT_H
+#define RMLUI_CORE_LAYOUT_TABLEFORMATTINGCONTEXT_H
 
 #include "../../../Include/RmlUi/Core/Types.h"
-#include "LayoutFormattingContext.h"
-#include "LayoutTableDetails.h"
+#include "FormattingContext.h"
+#include "TableFormattingDetails.h"
 
 namespace Rml {
 

@@ -26,13 +26,17 @@
  *
  */
 
-#ifndef RMLUI_CORE_LAYOUTFLEX_H
-#define RMLUI_CORE_LAYOUTFLEX_H
+#ifndef RMLUI_CORE_LAYOUT_FLEXFORMATTINGCONTEXT_H
+#define RMLUI_CORE_LAYOUT_FLEXFORMATTINGCONTEXT_H
 
 #include "../../../Include/RmlUi/Core/Types.h"
-#include "LayoutFormattingContext.h"
+#include "FormattingContext.h"
 
 namespace Rml {
+
+class LayoutBox;
+class ContainerBox;
+class FlexContainer;
 
 class FlexFormattingContext final : public FormattingContext {
 public:

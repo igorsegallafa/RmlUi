@@ -26,193 +26,18 @@
  *
  */
 
-#ifndef RMLUI_CORE_LAYOUTBLOCKBOX_H
-#define RMLUI_CORE_LAYOUTBLOCKBOX_H
+#ifndef RMLUI_CORE_LAYOUT_BLOCKCONTAINER_H
+#define RMLUI_CORE_LAYOUT_BLOCKCONTAINER_H
 
-#include "../../../Include/RmlUi/Core/Box.h"
 #include "../../../Include/RmlUi/Core/Types.h"
-#include "LayoutLineBox.h"
+#include "ContainerBox.h"
 
 namespace Rml {
 
-class LayoutBlockBoxSpace;
-class LayoutEngine;
+class FloatedBoxSpace;
+class LineBox;
 class InlineBox;
 class InlineContainer;
-
-class LayoutBox {
-public:
-	enum class Type { Root, BlockContainer, InlineContainer, FlexContainer, TableWrapper, Replaced };
-
-	Type GetType() const { return type; }
-
-	// Returns the border size of this box including overflowing content. Similar to the scrollable overflow rectangle,
-	// but shrinked if overflow is caught here. This can be wider than the box if we are overflowing.
-	// @note Only available after the box has been closed.
-	Vector2f GetVisibleOverflowSize() const { return visible_overflow_size; }
-
-	// TODO: Do we really want virtual for these?
-	virtual const Box* GetBoxPtr() const { return nullptr; }
-	virtual bool GetBaselineOfLastLine(float& /*out_baseline*/) const { return false; }
-
-	/// Calculate the dimensions of the box's internal content width; i.e. the size used to calculate the shrink-to-fit width.
-	/// @return The inner shrink-to-fit width of this box.
-	virtual float GetShrinkToFitWidth() const { return 0.f; }
-
-	// Debug dump layout tree.
-	String DumpLayoutTree(int depth = 0) const { return DebugDumpTree(depth); }
-
-	virtual ~LayoutBox() = default;
-
-	void* operator new(size_t size);
-	void operator delete(void* chunk, size_t size);
-
-protected:
-	LayoutBox(Type type) : type(type) {}
-
-	void SetVisibleOverflowSize(Vector2f size) { visible_overflow_size = size; }
-
-	// Debug dump layout tree.
-	virtual String DebugDumpTree(int depth) const = 0;
-
-private:
-	Type type;
-
-	Vector2f visible_overflow_size;
-};
-
-class ContainerBox : public LayoutBox {
-public:
-	bool IsScrollContainer() const { return overflow_x != Style::Overflow::Visible || overflow_y != Style::Overflow::Visible; }
-
-	// Determine if this element should have scrollbars or not, and create them if so.
-	void ResetScrollbars(const Box& box);
-
-	/// Adds an absolutely positioned element, to be formatted and positioned when closing this container, see 'ClosePositionedElements'.
-	void AddAbsoluteElement(Element* element, Vector2f static_position, Element* static_relative_offset_parent);
-	/// Adds a relatively positioned descendent which we act as a containing block for.
-	void AddRelativeElement(Element* element);
-
-	ContainerBox* GetParent() { return parent_container; }
-	Element* GetElement() { return element; }
-	Style::Position GetPositionProperty() const { return position_property; }
-	bool HasLocalTransformOrPerspective() const { return has_local_transform_or_perspective; }
-
-protected:
-	ContainerBox(Type type, Element* element, ContainerBox* parent_container) : LayoutBox(type), element(element), parent_container(parent_container)
-	{
-		if (element)
-		{
-			const auto& computed = element->GetComputedValues();
-			overflow_x = computed.overflow_x();
-			overflow_y = computed.overflow_y();
-			position_property = computed.position();
-			has_local_transform_or_perspective = (computed.has_local_transform() || computed.has_local_perspective());
-		}
-	}
-
-	// Checks if we have a new overflow on an auto-scrolling element. If so, our vertical scrollbar will be enabled and
-	// our block boxes will be destroyed. All content will need to re-formatted.
-	// @returns True if no overflow occured, false if it did.
-	bool CatchOverflow(const Vector2f content_size, const Box& box, const float max_height) const;
-
-	/// Set the box and scrollable area on our element, possibly catch any overflow.
-	/// @param content_overflow_size The size of the visible content, relative to our content area.
-	/// @param box The box to be set on the element.
-	/// @param max_height Maximum height of the content area, if any.
-	/// @returns True if no overflow occured, false if it did.
-	bool SubmitBox(const Vector2f content_overflow_size, const Box& box, const float max_height);
-
-	/// Formats, sizes, and positions all absolute elements whose containing block is this, and offsets relative elements.
-	void ClosePositionedElements();
-
-	Element* const element;
-
-private:
-	struct AbsoluteElement {
-		Vector2f static_position;               // The hypothetical position of the element as if it was placed in normal flow.
-		Element* static_position_offset_parent; // The element for which the static position is offset from.
-	};
-	using AbsoluteElementMap = SmallUnorderedMap<Element*, AbsoluteElement>;
-
-	// Used by block contexts only; stores any elements that are to be absolutely positioned within this block box.
-	AbsoluteElementMap absolute_elements;
-	// Used by block contexts only; stores any elements that are relatively positioned and whose containing block is this.
-	ElementList relative_elements;
-
-	Style::Overflow overflow_x = Style::Overflow::Visible;
-	Style::Overflow overflow_y = Style::Overflow::Visible;
-	Style::Position position_property = Style::Position::Static;
-	bool has_local_transform_or_perspective = false;
-
-	ContainerBox* parent_container = nullptr;
-};
-
-class RootBox final : public ContainerBox {
-public:
-	RootBox(Vector2f containing_block) : ContainerBox(Type::Root, nullptr, nullptr), box(containing_block) {}
-
-	const Box* GetBoxPtr() const override { return &box; }
-
-	String DebugDumpTree(int depth) const override { return String(depth * 2, ' ') + "RootBox"; /* TODO */ }
-
-private:
-	Box box;
-};
-
-class FlexContainer final : public ContainerBox {
-public:
-	FlexContainer(Element* element, ContainerBox* parent_container) : ContainerBox(Type::FlexContainer, element, parent_container)
-	{
-		RMLUI_ASSERT(element);
-	}
-
-	String DebugDumpTree(int depth) const override { return String(depth * 2, ' ') + "FlexContainer"; /* TODO */ }
-
-	bool Close(const Vector2f content_overflow_size, const Box& box)
-	{
-		if (!SubmitBox(content_overflow_size, box, -1.f))
-			return false;
-
-		ClosePositionedElements();
-		return true;
-	}
-
-	const Box* GetBoxPtr() const override { return &box; }
-
-	Box& GetBox() { return box; }
-
-private:
-	Box box;
-};
-
-class TableWrapper final : public ContainerBox {
-public:
-	TableWrapper(Element* element, ContainerBox* parent_container) : ContainerBox(Type::TableWrapper, element, parent_container)
-	{
-		RMLUI_ASSERT(element);
-	}
-
-	String DebugDumpTree(int depth) const override { return String(depth * 2, ' ') + "TableWrapper"; /* TODO */ }
-
-	void Close(const Vector2f content_overflow_size, const Box& box)
-	{
-		bool result = SubmitBox(content_overflow_size, box, -1.f);
-
-		// Since the table wrapper cannot generate scrollbars, this should always pass.
-		RMLUI_ASSERT(result);
-		(void)result;
-
-		ClosePositionedElements();
-	}
-
-	const Box* GetBoxPtr() const override { return &box; }
-
-	Box& GetBox() { return box; }
-
-private:
-	Box box;
-};
 
 /**
     A container for block-level boxes.
@@ -230,7 +55,7 @@ public:
 	/// @param box[in] The box used for this block box.
 	/// @param min_height[in] The minimum height of the content box.
 	/// @param max_height[in] The maximum height of the content box.
-	BlockContainer(ContainerBox* parent_container, LayoutBlockBoxSpace* space, Element* element, const Box& box, float min_height, float max_height);
+	BlockContainer(ContainerBox* parent_container, FloatedBoxSpace* space, Element* element, const Box& box, float min_height, float max_height);
 	/// Releases the block box.
 	~BlockContainer();
 
@@ -300,7 +125,7 @@ public:
 	Element* GetElement() const;
 
 	/// Returns the block box space.
-	const LayoutBlockBoxSpace* GetBlockBoxSpace() const;
+	const FloatedBoxSpace* GetBlockBoxSpace() const;
 
 	/// Returns the position of the block box, relative to its parent's content area.
 	/// @return The relative position of the block box.
@@ -354,16 +179,16 @@ private:
 
 	// TODO: All comments in the following.
 
-	UniquePtr<LayoutBlockBoxSpace> root_space;
+	UniquePtr<FloatedBoxSpace> root_space;
 	// Used by block contexts only; stores the block box space managing our space, as occupied by floating elements of this box and our ancestors.
-	LayoutBlockBoxSpace* space;
+	FloatedBoxSpace* space;
 	// Used by block contexts only; stores the list of block boxes under this box.
 	BlockBoxList block_boxes;
 	// Stores any floating elements that are waiting for a line break to be positioned.
 	QueuedFloatList queued_float_elements;
 	// Used by block contexts only; stores an inline element hierarchy that was interrupted by a child block box.
 	// The hierarchy will be resumed in an inline-context box once the intervening block box is completed.
-	UniquePtr<LayoutLineBox> interrupted_line_box;
+	UniquePtr<LineBox> interrupted_line_box;
 
 	// The inner content size (excluding any padding/border/margins).
 	// This is extended as child block boxes are closed, or from external formatting contexts.

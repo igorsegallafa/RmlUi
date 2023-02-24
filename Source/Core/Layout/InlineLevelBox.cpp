@@ -26,7 +26,7 @@
  *
  */
 
-#include "LayoutInlineLevelBox.h"
+#include "InlineLevelBox.h"
 #include "../../../Include/RmlUi/Core/ComputedValues.h"
 #include "../../../Include/RmlUi/Core/Core.h"
 #include "../../../Include/RmlUi/Core/ElementText.h"

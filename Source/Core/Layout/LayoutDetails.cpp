@@ -33,8 +33,9 @@
 #include "../../../Include/RmlUi/Core/ElementText.h"
 #include "../../../Include/RmlUi/Core/Math.h"
 #include "../../../Include/RmlUi/Core/Profiling.h"
+#include "ContainerBox.h"
+#include "FormattingContext.h"
 #include "LayoutEngine.h"
-#include "LayoutFormattingContext.h"
 #include <float.h>
 
 namespace Rml {

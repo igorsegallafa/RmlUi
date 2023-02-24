@@ -26,11 +26,12 @@
  *
  */
 
-#include "LayoutFlex.h"
+#include "FlexFormattingContext.h"
 #include "../../../Include/RmlUi/Core/ComputedValues.h"
 #include "../../../Include/RmlUi/Core/Element.h"
 #include "../../../Include/RmlUi/Core/ElementScroll.h"
 #include "../../../Include/RmlUi/Core/Types.h"
+#include "ContainerBox.h"
 #include "LayoutDetails.h"
 #include "LayoutEngine.h"
 #include <algorithm>

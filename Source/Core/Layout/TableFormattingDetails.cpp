@@ -26,10 +26,10 @@
  *
  */
 
-#include "LayoutTableDetails.h"
+#include "TableFormattingDetails.h"
 #include "../../../Include/RmlUi/Core/ComputedValues.h"
 #include "../../../Include/RmlUi/Core/Element.h"
-#include "LayoutBlockBox.h" // TODO: Only need table wrapper
+#include "ContainerBox.h"
 #include "LayoutDetails.h"
 #include <algorithm>
 #include <float.h>
