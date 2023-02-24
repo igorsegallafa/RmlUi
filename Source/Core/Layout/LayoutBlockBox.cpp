@@ -27,15 +27,16 @@
  */
 
 #include "LayoutBlockBox.h"
-#include "../../Include/RmlUi/Core/ComputedValues.h"
-#include "../../Include/RmlUi/Core/Element.h"
-#include "../../Include/RmlUi/Core/ElementScroll.h"
-#include "../../Include/RmlUi/Core/ElementUtilities.h"
-#include "../../Include/RmlUi/Core/Profiling.h"
-#include "../../Include/RmlUi/Core/Property.h"
+#include "../../../Include/RmlUi/Core/ComputedValues.h"
+#include "../../../Include/RmlUi/Core/Element.h"
+#include "../../../Include/RmlUi/Core/ElementScroll.h"
+#include "../../../Include/RmlUi/Core/ElementUtilities.h"
+#include "../../../Include/RmlUi/Core/Profiling.h"
+#include "../../../Include/RmlUi/Core/Property.h"
 #include "LayoutBlockBoxSpace.h"
 #include "LayoutDetails.h"
 #include "LayoutEngine.h"
+#include "LayoutFormattingContext.h"
 #include "LayoutInlineContainer.h"
 
 namespace Rml {

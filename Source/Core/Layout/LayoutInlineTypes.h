@@ -26,34 +26,43 @@
  *
  */
 
-#ifndef RMLUI_CORE_LAYOUTFLEX_H
-#define RMLUI_CORE_LAYOUTFLEX_H
+#ifndef RMLUI_CORE_LAYOUTINLINETYPES_H
+#define RMLUI_CORE_LAYOUTINLINETYPES_H
 
-#include "../../Include/RmlUi/Core/Types.h"
-#include "LayoutFormattingContext.h"
+#include "../../../Include/RmlUi/Core/Types.h"
 
 namespace Rml {
 
-class FlexFormattingContext final : public FormattingContext {
-public:
-	static UniquePtr<LayoutBox> Format(ContainerBox* parent_container, Element* element, const Box* override_initial_box);
+using LayoutOverflowHandle = int;
+using LayoutFragmentHandle = int;
 
-private:
-	FlexFormattingContext() = default;
+enum class InlineLayoutMode {
+	WrapAny,          // Allow wrapping to avoid overflow, even if nothing is placed.
+	WrapAfterContent, // Allow wrapping to avoid overflow, but first place at least *some* content on this line.
+	Nowrap,           // Place all content on this line, regardless of overflow.
+};
 
-	/// Format the flexbox and its children.
-	/// @param[out] flex_resulting_content_size The final content size of the flex container.
-	/// @param[out] flex_content_overflow_size Overflow size in case flex items or their contents overflow the container.
-	void Format(Vector2f& flex_resulting_content_size, Vector2f& flex_content_overflow_size) const;
+enum class FragmentType : byte {
+	Invalid,   // Could not be placed.
+	InlineBox, // An inline box.
+	SizedBox,  // Sized inline-level boxes that are not inline-boxes.
+	TextRun,   // Text runs.
+};
 
-	Vector2f flex_available_content_size;
-	Vector2f flex_content_containing_block;
-	Vector2f flex_content_offset;
-	Vector2f flex_min_size;
-	Vector2f flex_max_size;
+struct FragmentConstructor {
+	FragmentType type = FragmentType::Invalid;
+	float layout_width = 0.f;
+	LayoutFragmentHandle fragment_handle = {}; // Handle to enable the inline-level box to reference any fragment-specific data.
+	LayoutOverflowHandle overflow_handle = {}; // Overflow handle is non-zero when there is another fragment to be layed out.
+};
 
-	Element* element_flex = nullptr;
-	FlexContainer* flex_container_box = nullptr;
+struct PlacedFragment {
+	Element* offset_parent;
+	LayoutFragmentHandle handle;
+	Vector2f position;
+	float layout_width;
+	bool split_left;
+	bool split_right;
 };
 
 } // namespace Rml

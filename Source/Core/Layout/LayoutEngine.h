@@ -26,43 +26,34 @@
  *
  */
 
-#ifndef RMLUI_CORE_LAYOUTINLINETYPES_H
-#define RMLUI_CORE_LAYOUTINLINETYPES_H
+#ifndef RMLUI_CORE_LAYOUTENGINE_H
+#define RMLUI_CORE_LAYOUTENGINE_H
 
-#include "../../Include/RmlUi/Core/Types.h"
+#include "../../../Include/RmlUi/Core/Types.h"
+#include "LayoutBlockBox.h"
 
 namespace Rml {
 
-using LayoutOverflowHandle = int;
-using LayoutFragmentHandle = int;
+class Box;
 
-enum class InlineLayoutMode {
-	WrapAny,          // Allow wrapping to avoid overflow, even if nothing is placed.
-	WrapAfterContent, // Allow wrapping to avoid overflow, but first place at least *some* content on this line.
-	Nowrap,           // Place all content on this line, regardless of overflow.
-};
+/**
+	@author Michael R. P. Ragazzon
 
-enum class FragmentType : byte {
-	Invalid,   // Could not be placed.
-	InlineBox, // An inline box.
-	SizedBox,  // Sized inline-level boxes that are not inline-boxes.
-	TextRun,   // Text runs.
-};
+	Original authors: Robert Curry, and Peter Curry
+ */
 
-struct FragmentConstructor {
-	FragmentType type = FragmentType::Invalid;
-	float layout_width = 0.f;
-	LayoutFragmentHandle fragment_handle = {}; // Handle to enable the inline-level box to reference any fragment-specific data.
-	LayoutOverflowHandle overflow_handle = {}; // Overflow handle is non-zero when there is another fragment to be layed out.
-};
+class LayoutEngine {
+public:
+	/// Formats the contents for a root-level element, usually a document, absolutely positioned, floating, or replaced element. Establishes a new
+	/// block formatting context.
+	/// @param[in] element The element to lay out.
+	/// @param[in] containing_block The size of the containing block.
+	/// @param[in] override_initial_box Optional pointer to a box to override the generated box for the element.
+	/// @param[out] visible_overflow_size Optionally output the overflow size of the element.
+	static void FormatElement(Element* element, Vector2f containing_block);
 
-struct PlacedFragment {
-	Element* offset_parent;
-	LayoutFragmentHandle handle;
-	Vector2f position;
-	float layout_width;
-	bool split_left;
-	bool split_right;
+	static void* AllocateLayoutChunk(size_t size);
+	static void DeallocateLayoutChunk(void* chunk, size_t size);
 };
 
 } // namespace Rml

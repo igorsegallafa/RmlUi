@@ -38,8 +38,8 @@
 #include "DataModel.h"
 #include "DataView.h"
 #include "ElementStyle.h"
-#include "LayoutDetails.h"
-#include "LayoutEngine.h"
+#include "Layout/LayoutDetails.h"
+#include "Layout/LayoutEngine.h"
 #include "TransformState.h"
 #include <limits>
 

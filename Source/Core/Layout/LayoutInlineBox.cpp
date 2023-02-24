@@ -27,9 +27,9 @@
  */
 
 #include "LayoutInlineBox.h"
-#include "../../Include/RmlUi/Core/Box.h"
-#include "../../Include/RmlUi/Core/Element.h"
-#include "../../Include/RmlUi/Core/FontMetrics.h"
+#include "../../../Include/RmlUi/Core/Box.h"
+#include "../../../Include/RmlUi/Core/Element.h"
+#include "../../../Include/RmlUi/Core/FontMetrics.h"
 
 namespace Rml {
 

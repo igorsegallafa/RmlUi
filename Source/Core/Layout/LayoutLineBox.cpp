@@ -27,8 +27,8 @@
  */
 
 #include "LayoutLineBox.h"
-#include "../../Include/RmlUi/Core/Element.h"
-#include "../../Include/RmlUi/Core/StyleTypes.h"
+#include "../../../Include/RmlUi/Core/Element.h"
+#include "../../../Include/RmlUi/Core/StyleTypes.h"
 #include "LayoutEngine.h"
 #include "LayoutInlineBox.h"
 #include "LayoutInlineLevelBox.h"

@@ -26,35 +26,34 @@
  *
  */
 
-#ifndef RMLUI_CORE_LAYOUTENGINE_H
-#define RMLUI_CORE_LAYOUTENGINE_H
+#ifndef RMLUI_CORE_LAYOUTFLEX_H
+#define RMLUI_CORE_LAYOUTFLEX_H
 
-#include "../../Include/RmlUi/Core/Types.h"
-#include "LayoutBlockBox.h"
-#include "LayoutFormattingContext.h" // TODO: Remove, only used for FormatSettings
+#include "../../../Include/RmlUi/Core/Types.h"
+#include "LayoutFormattingContext.h"
 
 namespace Rml {
 
-class Box;
-
-/**
-	@author Michael R. P. Ragazzon
-
-	Original authors: Robert Curry, and Peter Curry
- */
-
-class LayoutEngine {
+class FlexFormattingContext final : public FormattingContext {
 public:
-	/// Formats the contents for a root-level element, usually a document, absolutely positioned, floating, or replaced element. Establishes a new
-	/// block formatting context.
-	/// @param[in] element The element to lay out.
-	/// @param[in] containing_block The size of the containing block.
-	/// @param[in] override_initial_box Optional pointer to a box to override the generated box for the element.
-	/// @param[out] visible_overflow_size Optionally output the overflow size of the element.
-	static void FormatElement(Element* element, Vector2f containing_block);
+	static UniquePtr<LayoutBox> Format(ContainerBox* parent_container, Element* element, const Box* override_initial_box);
 
-	static void* AllocateLayoutChunk(size_t size);
-	static void DeallocateLayoutChunk(void* chunk, size_t size);
+private:
+	FlexFormattingContext() = default;
+
+	/// Format the flexbox and its children.
+	/// @param[out] flex_resulting_content_size The final content size of the flex container.
+	/// @param[out] flex_content_overflow_size Overflow size in case flex items or their contents overflow the container.
+	void Format(Vector2f& flex_resulting_content_size, Vector2f& flex_content_overflow_size) const;
+
+	Vector2f flex_available_content_size;
+	Vector2f flex_content_containing_block;
+	Vector2f flex_content_offset;
+	Vector2f flex_min_size;
+	Vector2f flex_max_size;
+
+	Element* element_flex = nullptr;
+	FlexContainer* flex_container_box = nullptr;
 };
 
 } // namespace Rml

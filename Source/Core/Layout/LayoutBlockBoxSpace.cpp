@@ -27,9 +27,9 @@
  */
 
 #include "LayoutBlockBoxSpace.h"
-#include "../../Include/RmlUi/Core/ComputedValues.h"
-#include "../../Include/RmlUi/Core/Element.h"
-#include "../../Include/RmlUi/Core/ElementScroll.h"
+#include "../../../Include/RmlUi/Core/ComputedValues.h"
+#include "../../../Include/RmlUi/Core/Element.h"
+#include "../../../Include/RmlUi/Core/ElementScroll.h"
 #include "LayoutBlockBox.h"
 #include "LayoutEngine.h"
 #include <float.h>

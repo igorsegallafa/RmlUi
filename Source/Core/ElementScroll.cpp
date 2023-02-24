@@ -33,7 +33,7 @@
 #include "../../Include/RmlUi/Core/ElementUtilities.h"
 #include "../../Include/RmlUi/Core/Event.h"
 #include "../../Include/RmlUi/Core/Factory.h"
-#include "LayoutDetails.h"
+#include "Layout/LayoutDetails.h"
 #include "WidgetScroll.h"
 
 namespace Rml {

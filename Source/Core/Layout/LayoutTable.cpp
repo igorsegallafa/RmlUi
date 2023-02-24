@@ -27,9 +27,9 @@
  */
 
 #include "LayoutTable.h"
-#include "../../Include/RmlUi/Core/ComputedValues.h"
-#include "../../Include/RmlUi/Core/Element.h"
-#include "../../Include/RmlUi/Core/Types.h"
+#include "../../../Include/RmlUi/Core/ComputedValues.h"
+#include "../../../Include/RmlUi/Core/Element.h"
+#include "../../../Include/RmlUi/Core/Types.h"
 #include "LayoutDetails.h"
 #include "LayoutEngine.h"
 #include "LayoutTableDetails.h"

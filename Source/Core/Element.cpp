@@ -53,7 +53,7 @@
 #include "EventDispatcher.h"
 #include "EventSpecification.h"
 #include "ElementDecoration.h"
-#include "LayoutEngine.h"
+#include "Layout/LayoutEngine.h"
 #include "PluginRegistry.h"
 #include "PropertiesIterator.h"
 #include "Pool.h"

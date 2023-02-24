@@ -29,7 +29,7 @@
 #ifndef RMLUI_CORE_LAYOUTFORMATTINGCONTEXT_H
 #define RMLUI_CORE_LAYOUTFORMATTINGCONTEXT_H
 
-#include "../../Include/RmlUi/Core/Types.h"
+#include "../../../Include/RmlUi/Core/Types.h"
 #include "LayoutBlockBox.h"
 
 namespace Rml {

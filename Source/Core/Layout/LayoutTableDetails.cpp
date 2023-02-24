@@ -27,8 +27,8 @@
  */
 
 #include "LayoutTableDetails.h"
-#include "../../Include/RmlUi/Core/ComputedValues.h"
-#include "../../Include/RmlUi/Core/Element.h"
+#include "../../../Include/RmlUi/Core/ComputedValues.h"
+#include "../../../Include/RmlUi/Core/Element.h"
 #include "LayoutBlockBox.h" // TODO: Only need table wrapper
 #include "LayoutDetails.h"
 #include <algorithm>
