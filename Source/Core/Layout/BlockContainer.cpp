@@ -51,8 +51,6 @@ BlockContainer::BlockContainer(ContainerBox* _parent_container, FloatedBoxSpace*
 		root_space = MakeUnique<FloatedBoxSpace>();
 		space = root_space.get();
 	}
-
-	wrap_content = (element->GetComputedValues().white_space() != Style::WhiteSpace::Nowrap);
 }
 
 BlockContainer::~BlockContainer() {}
@@ -69,16 +67,14 @@ bool BlockContainer::Close(BlockContainer* parent_block_container)
 		float content_height = box_cursor;
 
 		if (!parent_block_container)
-			content_height = Math::Max(content_height, space->GetDimensions(LayoutFloatBoxEdge::Margin).y - (position.y + box.GetPosition().y));
+			content_height = Math::Max(content_height, space->GetDimensions(FloatedBoxEdge::Margin).y - (position.y + box.GetPosition().y));
 
 		content_height = Math::Clamp(content_height, min_height, max_height);
 		box.SetContent({box.GetSize().x, content_height});
 	}
 
-	// Check how big our floated area is.
-	const Vector2f space_box = space->GetDimensions(LayoutFloatBoxEdge::Overflow) - (position + box.GetPosition());
-
-	// Start with the inner content size, as set by the child block boxes or external formatting contexts.
+	// Find the size of our content.
+	const Vector2f space_box = space->GetDimensions(FloatedBoxEdge::Overflow) - (position + box.GetPosition());
 	Vector2f content_box = Math::Max(inner_content_size, space_box);
 	content_box.y = Math::Max(content_box.y, box_cursor);
 
@@ -141,7 +137,7 @@ bool BlockContainer::CloseChildBox(LayoutBox* child, Vector2f child_position, fl
 	return result;
 }
 
-BlockContainer* BlockContainer::AddBlockBox(Element* child_element, const Box& box, float min_height, float max_height)
+BlockContainer* BlockContainer::OpenBlockBox(Element* child_element, const Box& box, float min_height, float max_height)
 {
 	if (!CloseOpenInlineContainer())
 		return nullptr;
@@ -168,7 +164,6 @@ LayoutBox* BlockContainer::AddBlockLevelBox(UniquePtr<LayoutBox> block_level_box
 {
 	RMLUI_ASSERT(box.GetSize().y >= 0.f); // Assumes child element already formatted and sized.
 
-	// TODO: Most of this is essentially the same as above in 'AddBlockBox'.
 	if (!CloseOpenInlineContainer())
 		return nullptr;
 
@@ -316,7 +311,7 @@ Vector2f BlockContainer::NextBoxPosition(const Box& child_box, Style::Clear clea
 	else if (const LayoutBox* block_box = GetOpenLayoutBox())
 	{
 		// Check for a collapsing vertical margin with our last child, which will be vertically adjacent to the new box.
-		if (const Box* open_box = block_box->GetBoxPtr())
+		if (const Box* open_box = block_box->GetIfBox())
 		{
 			const float open_bottom_margin = open_box->GetEdge(Box::MARGIN, Box::BOTTOM);
 			const float margin_sum = open_bottom_margin + child_top_margin;
@@ -373,7 +368,7 @@ float BlockContainer::GetShrinkToFitWidth() const
 		{
 			const float child_inner_width = block_box->GetShrinkToFitWidth();
 			float child_edges_width = 0.f;
-			if (const Box* child_box = block_box->GetBoxPtr())
+			if (const Box* child_box = block_box->GetIfBox())
 				child_edges_width = child_box->GetSizeAcross(Box::HORIZONTAL, Box::MARGIN, Box::PADDING);
 
 			content_width = Math::Max(content_width, child_edges_width + child_inner_width);
@@ -395,6 +390,11 @@ float BlockContainer::GetShrinkToFitWidth() const
 	content_width = Math::Clamp(content_width, min_width, max_width);
 
 	return content_width;
+}
+
+const Box* BlockContainer::GetIfBox() const
+{
+	return &box;
 }
 
 Element* BlockContainer::GetElement() const
@@ -468,11 +468,10 @@ InlineContainer* BlockContainer::EnsureOpenInlineContainer()
 	// Otherwise, we open a new one.
 	if (!inline_container)
 	{
-		const float line_height = element->GetLineHeight();
 		const float scrollbar_width = (IsScrollContainer() ? element->GetElementScroll()->GetScrollbarSize(ElementScroll::VERTICAL) : 0.f);
 		const float available_width = box.GetSize().x - scrollbar_width;
 
-		auto inline_container_ptr = MakeUnique<InlineContainer>(this, available_width, line_height, wrap_content);
+		auto inline_container_ptr = MakeUnique<InlineContainer>(this, available_width);
 		inline_container = inline_container_ptr.get();
 		child_boxes.push_back(std::move(inline_container_ptr));
 
@@ -498,7 +497,14 @@ bool BlockContainer::CloseOpenInlineContainer()
 	if (InlineContainer* inline_container = GetOpenInlineContainer())
 	{
 		EnsureEmptyInterruptedLineBox();
-		return inline_container->Close(&interrupted_line_box);
+
+		Vector2f child_position;
+		float child_height = 0.f;
+		inline_container->Close(&interrupted_line_box, child_position, child_height);
+
+		// Increment our cursor. If this close fails, it means this block container generated an automatic scrollbar.
+		if (!CloseChildBox(inline_container, child_position, child_height, 0.f))
+			return false;
 	}
 
 	return true;
@@ -539,6 +545,7 @@ void BlockContainer::PlaceFloat(Element* element, float vertical_position, Vecto
 
 bool BlockContainer::GetBaselineOfLastLine(float& out_baseline) const
 {
+	// Return the baseline of our last child that itself has a baseline.
 	for (int i = (int)child_boxes.size() - 1; i >= 0; i--)
 	{
 		if (child_boxes[i]->GetBaselineOfLastLine(out_baseline))

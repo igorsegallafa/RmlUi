@@ -39,7 +39,7 @@ namespace Rml {
 /**
     Abstraction for layout boxes that can act as a containing block.
 
-    Implements functionality for catching overflow, and for handling positioned boxes that we act as a containing block for.
+    Implements functionality for catching overflow, and for handling positioned boxes that the box acts as a containing block for.
 */
 class ContainerBox : public LayoutBox {
 public:
@@ -105,7 +105,7 @@ class RootBox final : public ContainerBox {
 public:
 	RootBox(Vector2f containing_block) : ContainerBox(Type::Root, nullptr, nullptr), box(containing_block) {}
 
-	const Box* GetBoxPtr() const override { return &box; }
+	const Box* GetIfBox() const override { return &box; }
 	String DebugDumpTree(int depth) const override { return String(depth * 2, ' ') + "RootBox"; /* TODO */ }
 
 private:
@@ -133,7 +133,7 @@ public:
 		return true;
 	}
 
-	const Box* GetBoxPtr() const override { return &box; }
+	const Box* GetIfBox() const override { return &box; }
 	String DebugDumpTree(int depth) const override { return String(depth * 2, ' ') + "FlexContainer"; /* TODO */ }
 
 	Box& GetBox() { return box; }
@@ -166,7 +166,7 @@ public:
 		ClosePositionedElements();
 	}
 
-	const Box* GetBoxPtr() const override { return &box; }
+	const Box* GetIfBox() const override { return &box; }
 	String DebugDumpTree(int depth) const override { return String(depth * 2, ' ') + "TableWrapper"; /* TODO */ }
 
 	Box& GetBox() { return box; }

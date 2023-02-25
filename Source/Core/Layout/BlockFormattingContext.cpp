@@ -171,7 +171,7 @@ bool BlockFormattingContext::FormatBlockBox(BlockContainer* parent_container, El
 	float min_height, max_height;
 	LayoutDetails::GetDefiniteMinMaxHeight(min_height, max_height, element->GetComputedValues(), box, containing_block.y);
 
-	BlockContainer* container = parent_container->AddBlockBox(element, box, min_height, max_height);
+	BlockContainer* container = parent_container->OpenBlockBox(element, box, min_height, max_height);
 	if (!container)
 		return false;
 

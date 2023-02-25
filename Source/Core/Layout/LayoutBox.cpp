@@ -31,6 +31,20 @@
 
 namespace Rml {
 
+const Box* LayoutBox::GetIfBox() const
+{
+	return nullptr;
+}
+
+bool LayoutBox::GetBaselineOfLastLine(float& /*out_baseline*/) const
+{
+	return false;
+}
+
+float LayoutBox::GetShrinkToFitWidth() const
+{
+	return 0.f;
+}
 void* LayoutBox::operator new(size_t size)
 {
 	void* memory = LayoutEngine::AllocateLayoutChunk(size);

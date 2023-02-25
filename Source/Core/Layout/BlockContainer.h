@@ -62,28 +62,24 @@ public:
 	/// Releases the block box.
 	~BlockContainer();
 
-	/// Closes the box. This will determine the element's height (if it was unspecified).
-	/// @param parent_block_box Our parent which will be sized to contain this box, or nullptr for the root of the block formatting context.
+	/// Closes the box. This will determine the element's height if it was unspecified.
+	/// @param[in] parent_block_container Our parent which will be sized to contain this box, or nullptr for the root of the block formatting context.
 	/// @return False if the block box caused an automatic vertical scrollbar to appear, forcing a reformat of the current block formatting context.
 	bool Close(BlockContainer* parent_block_container);
 
-	/// Called by a closing block box child. Increments the cursor.
-	/// @param[in] child The closing child block-level box.
-	/// @param[in] child_position The border position of the child, relative to the current block formatting context.
-	/// @param[in] child_size The border size of the child.
-	/// @param[in] child_margin_bottom The bottom margin width of the child.
-	/// @return False if the block box caused an automatic vertical scrollbar to appear, forcing a reformat of the current block formatting context.
-	/// TODO: Can we simplify this? Rename? This is more like increment box cursor and enlarge content size, and only needed for block-level boxes.
-	bool CloseChildBox(LayoutBox* child, Vector2f child_position, float child_height, float child_margin_bottom);
-
-	/// Creates a new block box and adds it as a child of this one.
-	/// @param element[in] The new block element.
-	/// @param box[in] The box used for the new block box.
-	/// @param min_height[in] The minimum height of the content box.
-	/// @param max_height[in] The maximum height of the content box.
+	/// Creates and opens a new block box, and adds it as a child of this one.
+	/// @param[in] element The new block element.
+	/// @param[in] box The edges, width, and optionally height of the new box.
+	/// @param[in] min_height The minimum height of the content box.
+	/// @param[in] max_height The maximum height of the content box.
 	/// @return The block box representing the element. Once the element's children have been positioned, Close() must be called on it.
-	BlockContainer* AddBlockBox(Element* element, const Box& box, float min_height, float max_height);
-	// TODO
+	BlockContainer* OpenBlockBox(Element* element, const Box& box, float min_height, float max_height);
+
+	/// Add a block-level box whose contents have been formatted in an independent formatting context.
+	/// @param[in] block_level_box The box to add as a new child of this.
+	/// @param[in] element The element represented by the new box.
+	/// @param[in] box The formatted box.
+	/// @return A pointer to the added block-level box.
 	LayoutBox* AddBlockLevelBox(UniquePtr<LayoutBox> block_level_box, Element* element, const Box& box);
 
 	// Adds an element to this block box to be handled as a floating element.
@@ -134,8 +130,9 @@ public:
 
 	// -- Inherited from LayoutBox --
 
+	const Box* GetIfBox() const override;
 	float GetShrinkToFitWidth() const override;
-	const Box* GetBoxPtr() const override { return &box; }
+	bool GetBaselineOfLastLine(float& out_baseline) const override;
 
 private:
 	InlineContainer* EnsureOpenInlineContainer();
@@ -143,6 +140,15 @@ private:
 	const InlineContainer* GetOpenInlineContainer() const;
 
 	const LayoutBox* GetOpenLayoutBox() const;
+
+	/// Called by a closing child block-level box. Increments the cursor.
+	/// @param[in] child The closing child box.
+	/// @param[in] child_position The border position of the child, relative to the current block formatting context.
+	/// @param[in] child_size The border size of the child.
+	/// @param[in] child_margin_bottom The bottom margin width of the child.
+	/// @return False if the block box caused an automatic vertical scrollbar to appear, forcing a reformat of the current block formatting context.
+	/// TODO: Can we simplify this? Rename? This is more like increment box cursor and enlarge content size, and only needed for block-level boxes.
+	bool CloseChildBox(LayoutBox* child, Vector2f child_position, float child_height, float child_margin_bottom);
 
 	// Closes the inline container if there is one open. Returns false if our formatting context needs to be reformatted.
 	bool CloseOpenInlineContainer();
@@ -153,8 +159,6 @@ private:
 	// Positions a floating element within this block box.
 	void PlaceFloat(Element* element, float vertical_position, Vector2f visible_overflow_size);
 
-	// Return the baseline of the last line box of this or any descendant inline-level boxes.
-	bool GetBaselineOfLastLine(float& out_baseline) const override;
 
 	// Debug dump layout tree.
 	String DebugDumpTree(int depth) const override;
@@ -172,9 +176,6 @@ private:
 	Box box;
 	float min_height = 0.f;
 	float max_height = -1.f;
-
-	// True if any inline formatting contexts started inside this box should wrap their content instead of overflowing.
-	bool wrap_content = true;
 
 	// The vertical position of the next block box to be added to this box, relative to our box's top content edge.
 	float box_cursor = 0.f;

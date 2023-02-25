@@ -228,13 +228,13 @@ Vector2f FloatedBoxSpace::NextBoxPosition(const BlockContainer* parent, float& m
 	return box_position;
 }
 
-Vector2f FloatedBoxSpace::GetDimensions(LayoutFloatBoxEdge edge) const
+Vector2f FloatedBoxSpace::GetDimensions(FloatedBoxEdge edge) const
 {
 	// For now, we don't really use the top-left extent, because it is not allowed in CSS to scroll to content located
 	// to the top or left, and thus we have no use for it currently. We could use it later to help detect overflow on
 	// the top-left sides. For example so we can hide parts of floats pushing outside the top-left sides of its parent
 	// which is set to 'overflow: auto'.
-	return edge == LayoutFloatBoxEdge::Margin ? extent_bottom_right_margin : extent_bottom_right_overflow;
+	return edge == FloatedBoxEdge::Margin ? extent_bottom_right_margin : extent_bottom_right_overflow;
 }
 
 float FloatedBoxSpace::GetShrinkToFitWidth(float edge_left, float edge_right) const

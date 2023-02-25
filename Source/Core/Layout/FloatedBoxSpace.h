@@ -37,13 +37,14 @@ namespace Rml {
 class Element;
 class BlockContainer;
 
-enum class LayoutFloatBoxEdge { Margin, Overflow };
+enum class FloatedBoxEdge {
+	Margin,   // The box's margin area, used for layout sizing.
+	Overflow, // Includes the box's border box plus any visible overflow, used to determine overflow and scrolling area.
+};
 
 /**
     Each block box has a space object for managing the space occupied by its floating elements, and those of its
     ancestors as relevant.
-
-    @author Peter Curry
  */
 
 class FloatedBoxSpace {
@@ -81,8 +82,7 @@ public:
 
 	/// Returns the size of the rectangle encompassing all boxes within the space, relative to the block formatting context space.
 	/// @param[in] edges Which edge of the boxes to encompass.
-	/// @note Generally, the margin box is used for layout sizing, while the overflow size is the border box unless it has visible overflow,
-	Vector2f GetDimensions(LayoutFloatBoxEdge edge) const;
+	Vector2f GetDimensions(FloatedBoxEdge edge) const;
 
 	/// Get the width of the floated boxes for calculating the shrink-to-fit width.
 	float GetShrinkToFitWidth(float edge_left, float edge_right) const;

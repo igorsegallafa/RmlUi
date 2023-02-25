@@ -42,15 +42,18 @@
 
 namespace Rml {
 
-InlineContainer::InlineContainer(BlockContainer* _parent, float _available_width, float _element_line_height, bool _wrap_content) :
-	LayoutBox(Type::InlineContainer), parent(_parent), element_line_height(_element_line_height), wrap_content(_wrap_content),
-	root_inline_box(_parent->GetElement())
+InlineContainer::InlineContainer(BlockContainer* _parent, float _available_width) :
+	LayoutBox(Type::InlineContainer), parent(_parent), root_inline_box(_parent->GetElement())
 {
 	RMLUI_ASSERT(_parent);
 
-	box_size = Vector2f(_available_width, -1);
+	box_size = {_available_width, -1.f};
 	position = parent->NextBoxPosition();
-	text_align = parent->GetElement()->GetComputedValues().text_align();
+
+	const auto& computed = parent->GetElement()->GetComputedValues();
+	element_line_height = computed.line_height().value;
+	wrap_content = (computed.white_space() != Style::WhiteSpace::Nowrap);
+	text_align = computed.text_align();
 }
 
 InlineContainer::~InlineContainer() {}
@@ -138,7 +141,7 @@ void InlineContainer::AddChainedBox(UniquePtr<LineBox> open_line_box)
 	line_boxes.push_back(std::move(open_line_box));
 }
 
-bool InlineContainer::Close(UniquePtr<LineBox>* out_open_line_box)
+void InlineContainer::Close(UniquePtr<LineBox>* out_open_line_box, Vector2f& out_position, float& out_height)
 {
 	RMLUI_ZoneScoped;
 
@@ -162,11 +165,8 @@ bool InlineContainer::Close(UniquePtr<LineBox>* out_open_line_box)
 	visible_overflow_size.x = Math::RoundDownFloat(visible_overflow_size.x);
 	SetVisibleOverflowSize(visible_overflow_size);
 
-	// Increment our block container's cursor. If this close fails, it means our parent container generated an automatic scrollbar.
-	if (!parent->CloseChildBox(this, position, box_size.y, 0.f))
-		return false;
-
-	return true;
+	out_position = position;
+	out_height = box_size.y;
 }
 
 void InlineContainer::CloseOpenLineBox(bool split_all_open_boxes, UniquePtr<LineBox>* out_split_line)

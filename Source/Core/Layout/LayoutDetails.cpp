@@ -194,7 +194,7 @@ ContainingBlock LayoutDetails::GetContainingBlock(ContainerBox* parent_container
 			container = container->GetParent();
 	}
 
-	const Box* box = container->GetBoxPtr();
+	const Box* box = container->GetIfBox();
 	if (!box)
 	{
 		RMLUI_ERROR;

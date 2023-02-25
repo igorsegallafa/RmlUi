@@ -45,13 +45,11 @@ class LineBox;
     Always a direct child of a block container where it acts as a block-level box, and starts a new inline formatting
     context. It maintains a stack of line boxes in which generated inline-level boxes are placed within. Not a proper
     CSS term, but effectively a "block container that only contains inline-level boxes".
-
-    @author Michael R. P. Ragazzon
  */
 class InlineContainer final : public LayoutBox {
 public:
 	/// Creates a new block box in an inline context.
-	InlineContainer(BlockContainer* parent, float available_width, float element_line_height, bool wrap_content);
+	InlineContainer(BlockContainer* parent, float available_width);
 	~InlineContainer();
 
 	/// Adds a new inline-level element to this inline-context box.
@@ -73,9 +71,10 @@ public:
 	void AddChainedBox(UniquePtr<LineBox> open_line_box);
 
 	/// Closes the box. This will determine the element's height (if it was unspecified).
-	/// @param[out] Optionally, output the open inline box.
-	/// @return True if the element was closed, false if our formatting context needs to be reformatted.
-	bool Close(UniquePtr<LineBox>* out_open_line_box);
+	/// @param[out] out_open_line_box Optionally, output the open inline box.
+	/// @param[out] out_position Outputs the position of this container.
+	/// @param[out] out_height Outputs the height of this container.
+	void Close(UniquePtr<LineBox>* out_open_line_box, Vector2f& out_position, float& out_height);
 
 	/// Update the placement of the open line box, e.g. to account for newly placed floats.
 	void UpdateOpenLineBoxPlacement();
@@ -85,13 +84,10 @@ public:
 	/// Returns an estimate for the position of a hypothetical next box to be placed, relative to the content box of this container.
 	Vector2f GetStaticPositionEstimate(bool inline_level_box) const;
 
-	/// Calculate the dimensions of the box's internal content width; i.e. the size used to calculate the shrink-to-fit width.
+	// -- Inherited from LayoutBox --
+
 	float GetShrinkToFitWidth() const override;
-
-	/// Get the baseline of the last line.
-	/// @return True if the baseline was found.
 	bool GetBaselineOfLastLine(float& out_baseline) const override;
-
 	String DebugDumpTree(int depth) const override;
 
 private:
@@ -118,11 +114,11 @@ private:
 	Vector2f box_size;
 
 	// The element's computed line-height. Not necessarily the same as the height of our lines.
-	float element_line_height;
-	// True if content should overflow the line box instead of wrapping.
-	bool wrap_content;
+	float element_line_height = 0.f;
+	// True if content should wrap instead of overflowing the line box.
+	bool wrap_content = false;
 	// The element's text-align property.
-	Style::TextAlign text_align;
+	Style::TextAlign text_align = {};
 
 	// The vertical position of the currently open line, or otherwise the next one to be placed, relative to the top of this box.
 	float box_cursor = 0;
