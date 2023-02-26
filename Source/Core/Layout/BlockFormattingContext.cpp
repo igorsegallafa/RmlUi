@@ -130,10 +130,9 @@ UniquePtr<LayoutBox> BlockFormattingContext::Format(ContainerBox* parent_contain
 	float min_height, max_height;
 	LayoutDetails::GetDefiniteMinMaxHeight(min_height, max_height, element->GetComputedValues(), box, containing_block.y);
 
-	UniquePtr<BlockContainer> root_block_container = MakeUnique<BlockContainer>(parent_container, nullptr, element, box, min_height, max_height);
+	UniquePtr<BlockContainer> container = MakeUnique<BlockContainer>(parent_container, nullptr, element, box, min_height, max_height);
 
-	BlockContainer* container = root_block_container.get();
-	DebugDumpLayoutTree debug_dump_tree(element, container);
+	DebugDumpLayoutTree debug_dump_tree(element, container.get());
 
 	container->ResetScrollbars(box);
 
@@ -144,7 +143,7 @@ UniquePtr<LayoutBox> BlockFormattingContext::Format(ContainerBox* parent_contain
 		bool all_children_formatted = true;
 		for (int i = 0; i < element->GetNumChildren() && all_children_formatted; i++)
 		{
-			if (!FormatBlockContainerChild(container, element->GetChild(i)))
+			if (!FormatBlockContainerChild(container.get(), element->GetChild(i)))
 				all_children_formatted = false;
 		}
 
@@ -153,12 +152,10 @@ UniquePtr<LayoutBox> BlockFormattingContext::Format(ContainerBox* parent_contain
 			break;
 
 		// Otherwise, restart formatting now that one or both scrollbars have been enabled.
-		root_block_container->ResetContents();
+		container->ResetContents();
 	}
 
-	SubmitElementLayout(element);
-
-	return root_block_container;
+	return container;
 }
 
 bool BlockFormattingContext::FormatBlockBox(BlockContainer* parent_container, Element* element)
@@ -185,8 +182,6 @@ bool BlockFormattingContext::FormatBlockBox(BlockContainer* parent_container, El
 
 	if (!container->Close(parent_container))
 		return false;
-
-	SubmitElementLayout(element);
 
 	return true;
 }

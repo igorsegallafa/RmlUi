@@ -105,8 +105,6 @@ UniquePtr<LayoutBox> TableFormattingContext::Format(ContainerBox* parent_contain
 
 	table_wrapper_box->Close(table_overflow_size, box);
 
-	SubmitElementLayout(element_table);
-
 	return table_wrapper_box;
 }
 

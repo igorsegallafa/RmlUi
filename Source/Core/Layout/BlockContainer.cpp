@@ -87,7 +87,7 @@ bool BlockContainer::Close(BlockContainer* parent_block_container)
 		RMLUI_ASSERTMSG(GetParent() == parent_block_container, "Mismatched parent box.");
 
 		// If this close fails, it means this block box has caused our parent box to generate an automatic vertical scrollbar.
-		if (!parent_block_container->CloseChildBox(this, position, box.GetSizeAcross(Box::VERTICAL, Box::BORDER),
+		if (!parent_block_container->EncloseChildBox(this, position, box.GetSizeAcross(Box::VERTICAL, Box::BORDER),
 				box.GetEdge(Box::MARGIN, Box::BOTTOM)))
 			return false;
 	}
@@ -114,14 +114,16 @@ bool BlockContainer::Close(BlockContainer* parent_block_container)
 		}
 	}
 
-	element->SetBaseline(element_baseline);
+	SetElementBaseline(element_baseline);
 
 	EnsureEmptyInterruptedLineBox();
+
+	SubmitElementLayout();
 
 	return true;
 }
 
-bool BlockContainer::CloseChildBox(LayoutBox* child, Vector2f child_position, float child_height, float child_margin_bottom)
+bool BlockContainer::EncloseChildBox(LayoutBox* child, Vector2f child_position, float child_height, float child_margin_bottom)
 {
 	child_position -= (box.GetPosition() + position);
 
@@ -179,7 +181,7 @@ LayoutBox* BlockContainer::AddBlockLevelBox(UniquePtr<LayoutBox> block_level_box
 	LayoutBox* block_level_box = block_level_box_ptr.get();
 	child_boxes.push_back(std::move(block_level_box_ptr));
 
-	if (!CloseChildBox(block_level_box, child_position, child_box.GetSizeAcross(Box::VERTICAL, Box::BORDER),
+	if (!EncloseChildBox(block_level_box, child_position, child_box.GetSizeAcross(Box::VERTICAL, Box::BORDER),
 			child_box.GetEdge(Box::MARGIN, Box::BOTTOM)))
 		return nullptr;
 
@@ -504,7 +506,7 @@ bool BlockContainer::CloseOpenInlineContainer()
 		inline_container->Close(&interrupted_line_box, child_position, child_height);
 
 		// Increment our cursor. If this close fails, it means this block container generated an automatic scrollbar.
-		if (!CloseChildBox(inline_container, child_position, child_height, 0.f))
+		if (!EncloseChildBox(inline_container, child_position, child_height, 0.f))
 			return false;
 	}
 

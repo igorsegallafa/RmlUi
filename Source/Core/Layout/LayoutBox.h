@@ -41,18 +41,13 @@ public:
 	virtual ~LayoutBox() = default;
 
 	Type GetType() const { return type; }
-
-	// Return the border size of this box including overflowing content. Similar to the scrollable overflow rectangle,
-	// but shrinked if overflow is caught here. This can be wider than the box if we are overflowing.
-	// @note Only available after the box has been closed.
 	Vector2f GetVisibleOverflowSize() const { return visible_overflow_size; }
 
-	// Return a pointer to the geometry box if this layout box has one.
+	// Return a pointer to the dimensions box if this layout box has one.
 	virtual const Box* GetIfBox() const;
 	// Return the baseline of the last line of this box, if any. Returns true if a baseline was found, otherwise false.
 	virtual bool GetBaselineOfLastLine(float& out_baseline) const;
-	/// Calculate the dimensions of the box's internal content width; i.e. the size used to calculate the shrink-to-fit width.
-	/// @return The inner shrink-to-fit width of this box.
+	// Calculate the box's inner content width, i.e. the size used to calculate the shrink-to-fit width.
 	virtual float GetShrinkToFitWidth() const;
 
 	// Debug dump layout tree.
@@ -70,6 +65,9 @@ protected:
 
 private:
 	Type type;
+
+	// Visible overflow size is the border size of this box, plus any overflowing content. If this is a scroll
+	// container, then any overflow should be caught here, and not contribute to our visible overflow size.
 	Vector2f visible_overflow_size;
 };
 

@@ -138,14 +138,13 @@ private:
 
 	const LayoutBox* GetOpenLayoutBox() const;
 
-	/// Called by a closing child block-level box. Increments the cursor.
-	/// @param[in] child The closing child box.
+	/// Increment our cursor and content size, to enclose a sized block-level child box.
+	/// @param[in] child The child box.
 	/// @param[in] child_position The border position of the child, relative to the current block formatting context.
 	/// @param[in] child_size The border size of the child.
 	/// @param[in] child_margin_bottom The bottom margin width of the child.
-	/// @return False if the block box caused an automatic vertical scrollbar to appear, forcing a reformat of the current block formatting context.
-	/// TODO: Can we simplify this? Rename? This is more like increment box cursor and enlarge content size, and only needed for block-level boxes.
-	bool CloseChildBox(LayoutBox* child, Vector2f child_position, float child_height, float child_margin_bottom);
+	/// @return False if this caused an automatic vertical scrollbar to appear, forcing a reformat of the current block formatting context.
+	bool EncloseChildBox(LayoutBox* child, Vector2f child_position, float child_height, float child_margin_bottom);
 
 	// Closes the inline container if there is one open. Returns false if our formatting context needs to be reformatted.
 	bool CloseOpenInlineContainer();
@@ -166,7 +165,7 @@ private:
 	};
 	using QueuedFloatList = Vector<QueuedFloat>;
 
-	// Position of this box, relative to the border box of the root of our block formatting context.
+	// Position of this box, relative to the border area of the root of our block formatting context.
 	Vector2f position;
 
 	Box box;

@@ -72,9 +72,4 @@ UniquePtr<LayoutBox> FormattingContext::FormatIndependent(ContainerBox* parent_c
 	return nullptr;
 }
 
-void FormattingContext::SubmitElementLayout(Element* element)
-{
-	element->OnLayout();
-}
-
 } // namespace Rml

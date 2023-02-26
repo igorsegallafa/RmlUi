@@ -59,9 +59,6 @@ public:
 		FormattingContextType backup_context);
 
 protected:
-	// Calls Element::OnLayout (proxy for private access to Element).
-	static void SubmitElementLayout(Element* element);
-
 	FormattingContext() = default;
 	~FormattingContext() = default;
 };

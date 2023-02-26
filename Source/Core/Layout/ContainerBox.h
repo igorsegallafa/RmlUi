@@ -45,12 +45,12 @@ class ContainerBox : public LayoutBox {
 public:
 	bool IsScrollContainer() const { return overflow_x != Style::Overflow::Visible || overflow_y != Style::Overflow::Visible; }
 
-	// Enable or disable scrollbars for an element to prepare it for first round of layouting, according to our properties.
+	// Enable or disable scrollbars for the element we represent, preparing it for the first round of layouting, according to our properties.
 	void ResetScrollbars(const Box& box);
 
 	// Adds an absolutely positioned element, to be formatted and positioned when closing this container, see 'ClosePositionedElements'.
 	void AddAbsoluteElement(Element* element, Vector2f static_position, Element* static_relative_offset_parent);
-	// Adds a relatively positioned descendent which we act as a containing block for.
+	// Adds a relatively positioned element which we act as a containing block for.
 	void AddRelativeElement(Element* element);
 
 	ContainerBox* GetParent() { return parent_container; }
@@ -62,11 +62,14 @@ protected:
 	ContainerBox(Type type, Element* element, ContainerBox* parent_container);
 
 	/// Checks if we have a new overflow on an auto-scrolling element. If so, our vertical scrollbar will be enabled and
-	/// our block boxes will be destroyed. All content will need to re-formatted.
+	/// our block boxes will be destroyed. All content will need to be re-formatted.
+	/// @param[in] content_overflow_size The size of the visible content, relative to our content area.
+	/// @param[in] box The box built for the element, possibly with a non-determinate height.
+	/// @param[in] max_height Maximum height of the content area, if any.
 	/// @returns True if no overflow occured, false if it did.
-	bool CatchOverflow(const Vector2f content_size, const Box& box, const float max_height) const;
+	bool CatchOverflow(const Vector2f content_overflow_size, const Box& box, const float max_height) const;
 
-	/// Set the box and scrollable area on our element, possibly catch any overflow.
+	/// Set the box and scrollable area on our element, possibly catching any overflow.
 	/// @param[in] content_overflow_size The size of the visible content, relative to our content area.
 	/// @param[in] box The box to be set on the element.
 	/// @param[in] max_height Maximum height of the content area, if any.
@@ -76,6 +79,12 @@ protected:
 	/// Formats, sizes, and positions all absolute elements whose containing block is this, and offsets relative elements.
 	void ClosePositionedElements();
 
+	// Set the element's baseline (proxy for private access to Element).
+	void SetElementBaseline(float element_baseline);
+	// Calls Element::OnLayout (proxy for private access to Element).
+	void SubmitElementLayout();
+
+	// The element this box represents, if any.
 	Element* const element;
 
 private:
@@ -85,10 +94,8 @@ private:
 	};
 	using AbsoluteElementMap = SmallUnorderedMap<Element*, AbsoluteElement>;
 
-	// Used by block contexts only; stores any elements that are to be absolutely positioned within this block box.
-	AbsoluteElementMap absolute_elements;
-	// Used by block contexts only; stores any elements that are relatively positioned and whose containing block is this.
-	ElementList relative_elements;
+	AbsoluteElementMap absolute_elements; // List of absolutely positioned elements that we act as a containing block for.
+	ElementList relative_elements;        // List of relatively positioned elements that we act as a containing block for.
 
 	Style::Overflow overflow_x = Style::Overflow::Visible;
 	Style::Overflow overflow_y = Style::Overflow::Visible;
@@ -130,6 +137,7 @@ public:
 			return false;
 
 		ClosePositionedElements();
+		SubmitElementLayout();
 		return true;
 	}
 
@@ -164,6 +172,7 @@ public:
 		(void)result;
 
 		ClosePositionedElements();
+		SubmitElementLayout();
 	}
 
 	const Box* GetIfBox() const override { return &box; }

@@ -32,6 +32,7 @@
 #include "../../../Include/RmlUi/Core/ElementScroll.h"
 #include "../../../Include/RmlUi/Core/Profiling.h"
 #include "FormattingContext.h"
+#include <algorithm>
 
 namespace Rml {
 
@@ -57,55 +58,67 @@ void ContainerBox::AddAbsoluteElement(Element* element, Vector2f static_position
 
 void ContainerBox::AddRelativeElement(Element* element)
 {
-	relative_elements.push_back(element);
+	// The same relative element may be added multiple times during repeated layout iterations, avoid any duplicates.
+	if (std::find(relative_elements.begin(), relative_elements.end(), element) == relative_elements.end())
+		relative_elements.push_back(element);
 }
 
 void ContainerBox::ClosePositionedElements()
 {
-	// Note: Indexed iteration must be used here, as new absolute elements may be added to this box during each
-	// iteration while the element is formatted, thereby invalidating references and iterators of 'absolute_elements'.
-	for (const auto& absolute_element_pair : absolute_elements)
-	{
-		Element* absolute_element = absolute_element_pair.first;
-		const Vector2f static_position = absolute_element_pair.second.static_position;
-		Element* static_position_offset_parent = absolute_element_pair.second.static_position_offset_parent;
-
-		// Find the static position relative to this containing block. First, calculate the offset from ourself to the
-		// static position's offset parent. Assumes (1) that this container box is part of the containing block chain of
-		// the static position offset parent, and (2) that all offsets in this chain has been set already.
-		Vector2f relative_position;
-		for (Element* ancestor = static_position_offset_parent; ancestor && ancestor != element; ancestor = ancestor->GetOffsetParent())
-			relative_position += ancestor->GetRelativeOffset(Box::BORDER);
-
-		// Now simply add the result to the stored static position to get the static position in our local space.
-		Vector2f offset = relative_position + static_position;
-
-		// Lay out the element.
-		FormattingContext::FormatIndependent(this, absolute_element, nullptr, FormattingContextType::Block);
-
-		// Now that the element's box has been built, we can offset the position we determined was appropriate for it by
-		// the element's margin. This is necessary because the coordinate system for the box begins at the border, not
-		// the margin.
-		offset.x += absolute_element->GetBox().GetEdge(Box::MARGIN, Box::LEFT);
-		offset.y += absolute_element->GetBox().GetEdge(Box::MARGIN, Box::TOP);
-
-		// Set the offset of the element; the element itself will take care of any RCSS-defined positional offsets.
-		absolute_element->SetOffset(offset, element);
-	}
-
-	absolute_elements.clear();
-
-	// The same relative elements may have been added multiple times during repeated layout iterations, remove any duplicates.
-	std::sort(relative_elements.begin(), relative_elements.end());
-	relative_elements.erase(std::unique(relative_elements.begin(), relative_elements.end()), relative_elements.end());
-
-	// Any relatively positioned elements that we act as containing block for may also need to be have their positions
-	// updated to reflect changes to the size of this block box.
-	// TODO: Maybe do this first, in case the static position of absolutely positioned elements depends on any of these relative positions.
+	// Any relatively positioned elements that we act as containing block for may need to be have their positions
+	// updated to reflect changes to the size of this block box. Update relative offsets before handling absolute
+	// elements, as this may affect the resolved static position of the absolute elements.
 	for (Element* child : relative_elements)
 		child->UpdateOffset();
 
 	relative_elements.clear();
+
+	while (!absolute_elements.empty())
+	{
+		// New absolute elements may be added to this box during formatting below. To avoid invalidated iterators and
+		// references, move the list to a local copy to iterate over, and repeat if new elements are added.
+		AbsoluteElementMap absolute_elements_iterate = std::move(absolute_elements);
+		absolute_elements.clear();
+
+		for (const auto& absolute_element_pair : absolute_elements_iterate)
+		{
+			Element* absolute_element = absolute_element_pair.first;
+			const Vector2f static_position = absolute_element_pair.second.static_position;
+			Element* static_position_offset_parent = absolute_element_pair.second.static_position_offset_parent;
+
+			// Find the static position relative to this containing block. First, calculate the offset from ourself to
+			// the static position's offset parent. Assumes (1) that this container box is part of the containing block
+			// chain of the static position offset parent, and (2) that all offsets in this chain has been set already.
+			Vector2f relative_position;
+			for (Element* ancestor = static_position_offset_parent; ancestor && ancestor != element; ancestor = ancestor->GetOffsetParent())
+				relative_position += ancestor->GetRelativeOffset(Box::BORDER);
+
+			// Now simply add the result to the stored static position to get the static position in our local space.
+			Vector2f offset = relative_position + static_position;
+
+			// Lay out the element.
+			FormattingContext::FormatIndependent(this, absolute_element, nullptr, FormattingContextType::Block);
+
+			// Now that the element's box has been built, we can offset the position we determined was appropriate for
+			// it by the element's margin. This is necessary because the coordinate system for the box begins at the
+			// border, not the margin.
+			offset.x += absolute_element->GetBox().GetEdge(Box::MARGIN, Box::LEFT);
+			offset.y += absolute_element->GetBox().GetEdge(Box::MARGIN, Box::TOP);
+
+			// Set the offset of the element; the element itself will take care of any RCSS-defined positional offsets.
+			absolute_element->SetOffset(offset, element);
+		}
+	}
+}
+
+void ContainerBox::SetElementBaseline(float element_baseline)
+{
+	element->SetBaseline(element_baseline);
+}
+
+void ContainerBox::SubmitElementLayout()
+{
+	element->OnLayout();
 }
 
 ContainerBox::ContainerBox(Type type, Element* element, ContainerBox* parent_container) :
@@ -121,7 +134,7 @@ ContainerBox::ContainerBox(Type type, Element* element, ContainerBox* parent_con
 	}
 }
 
-bool ContainerBox::CatchOverflow(const Vector2f content_size, const Box& box, const float max_height) const
+bool ContainerBox::CatchOverflow(const Vector2f content_overflow_size, const Box& box, const float max_height) const
 {
 	if (!IsScrollContainer())
 		return true;
@@ -145,7 +158,7 @@ bool ContainerBox::CatchOverflow(const Vector2f content_size, const Box& box, co
 
 	// @performance If we have auto-height sizing and the horizontal scrollbar is enabled, then we can in principle
 	// simply add the scrollbar size to the height instead of formatting the element all over again.
-	if (overflow_x == Style::Overflow::Auto && content_size.x > available_space.x + 0.5f)
+	if (overflow_x == Style::Overflow::Auto && content_overflow_size.x > available_space.x + 0.5f)
 	{
 		if (element_scroll->GetScrollbarSize(ElementScroll::HORIZONTAL) == 0.f)
 		{
@@ -157,7 +170,7 @@ bool ContainerBox::CatchOverflow(const Vector2f content_size, const Box& box, co
 	}
 
 	// If we're auto-scrolling and our height is fixed, we have to check if this box has exceeded our client height.
-	if (overflow_y == Style::Overflow::Auto && content_size.y > available_space.y + 0.5f)
+	if (overflow_y == Style::Overflow::Auto && content_overflow_size.y > available_space.y + 0.5f)
 	{
 		if (element_scroll->GetScrollbarSize(ElementScroll::VERTICAL) == 0.f)
 		{
@@ -172,9 +185,6 @@ bool ContainerBox::CatchOverflow(const Vector2f content_size, const Box& box, co
 
 bool ContainerBox::SubmitBox(const Vector2f content_overflow_size, const Box& box, const float max_height)
 {
-	// TODO: Properly compute the visible overflow size / scrollable overflow rectangle.
-	//       https://www.w3.org/TR/css-overflow-3/#scrollable
-	//
 	Vector2f visible_overflow_size;
 
 	// Set the computed box on the element.
@@ -202,6 +212,8 @@ bool ContainerBox::SubmitBox(const Vector2f content_overflow_size, const Box& bo
 			is_scroll_container ? element->GetElementScroll()->GetScrollbarSize(ElementScroll::VERTICAL) : 0.f,
 			is_scroll_container ? element->GetElementScroll()->GetScrollbarSize(ElementScroll::HORIZONTAL) : 0.f,
 		};
+
+		// Scrollable overflow is the set of things extending our padding area, for which scrolling could be provided.
 		const Vector2f scrollable_overflow_size = Math::Max(padding_size - scrollbar_size, padding_top_left + content_overflow_size);
 
 		element->SetBox(box);

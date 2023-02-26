@@ -108,8 +108,6 @@ UniquePtr<LayoutBox> FlexFormattingContext::Format(ContainerBox* parent_containe
 			break;
 	}
 
-	SubmitElementLayout(element);
-
 	return flex_container_box;
 }
 

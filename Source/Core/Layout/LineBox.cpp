@@ -56,7 +56,6 @@ bool LineBox::AddBox(InlineLevelBox* box, InlineLayoutMode layout_mode, LayoutOv
 
 	const float box_placement_cursor = box_cursor + open_spacing_left;
 
-	// TODO: Maybe always pass the actual available width, and let the createfragment functions handle the mode correctly.
 	float available_width = FLT_MAX;
 	if (layout_mode != InlineLayoutMode::Nowrap)
 	{
