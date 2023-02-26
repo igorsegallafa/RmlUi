@@ -113,7 +113,7 @@ public:
 	RootBox(Vector2f containing_block) : ContainerBox(Type::Root, nullptr, nullptr), box(containing_block) {}
 
 	const Box* GetIfBox() const override { return &box; }
-	String DebugDumpTree(int depth) const override { return String(depth * 2, ' ') + "RootBox"; /* TODO */ }
+	String DebugDumpTree(int depth) const override;
 
 private:
 	Box box;
@@ -124,25 +124,14 @@ private:
 */
 class FlexContainer final : public ContainerBox {
 public:
-	FlexContainer(Element* element, ContainerBox* parent_container) : ContainerBox(Type::FlexContainer, element, parent_container)
-	{
-		RMLUI_ASSERT(element);
-	}
+	FlexContainer(Element* element, ContainerBox* parent_container);
 
 	// Submits the formatted box to the flex container element, and propagates any uncaught overflow to this box.
 	// @returns True if it succeeds, otherwise false if it needs to be formatted again because scrollbars were enabled.
-	bool Close(const Vector2f content_overflow_size, const Box& box)
-	{
-		if (!SubmitBox(content_overflow_size, box, -1.f))
-			return false;
-
-		ClosePositionedElements();
-		SubmitElementLayout();
-		return true;
-	}
+	bool Close(const Vector2f content_overflow_size, const Box& box);
 
 	const Box* GetIfBox() const override { return &box; }
-	String DebugDumpTree(int depth) const override { return String(depth * 2, ' ') + "FlexContainer"; /* TODO */ }
+	String DebugDumpTree(int depth) const override;
 
 	Box& GetBox() { return box; }
 
@@ -157,26 +146,13 @@ private:
 */
 class TableWrapper final : public ContainerBox {
 public:
-	TableWrapper(Element* element, ContainerBox* parent_container) : ContainerBox(Type::TableWrapper, element, parent_container)
-	{
-		RMLUI_ASSERT(element);
-	}
+	TableWrapper(Element* element, ContainerBox* parent_container);
 
 	// Submits the formatted box to the table element, and propagates any uncaught overflow to this box.
-	void Close(const Vector2f content_overflow_size, const Box& box)
-	{
-		bool result = SubmitBox(content_overflow_size, box, -1.f);
-
-		// Since the table wrapper cannot generate scrollbars, this should always pass.
-		RMLUI_ASSERT(result);
-		(void)result;
-
-		ClosePositionedElements();
-		SubmitElementLayout();
-	}
+	void Close(const Vector2f content_overflow_size, const Box& box);
 
 	const Box* GetIfBox() const override { return &box; }
-	String DebugDumpTree(int depth) const override { return String(depth * 2, ' ') + "TableWrapper"; /* TODO */ }
+	String DebugDumpTree(int depth) const override;
 
 	Box& GetBox() { return box; }
 

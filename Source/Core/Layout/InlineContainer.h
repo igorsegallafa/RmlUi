@@ -43,8 +43,8 @@ class LineBox;
     A container for inline-level boxes.
 
     Always a direct child of a block container where it acts as a block-level box, and starts a new inline formatting
-    context. It maintains a stack of line boxes in which generated inline-level boxes are placed within. Not a proper
-    CSS term, but effectively a "block container that only contains inline-level boxes".
+    context. It maintains a stack of line boxes in which fragments generated from inline-level boxes are placed within.
+    Not a proper CSS term, but effectively a "block container that only contains inline-level boxes".
  */
 class InlineContainer final : public LayoutBox {
 public:

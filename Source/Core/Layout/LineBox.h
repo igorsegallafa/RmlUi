@@ -38,6 +38,15 @@ class InlineBox;
 class InlineBoxRoot;
 class InlineLevelBox;
 
+/*
+    Horizontally places fragments generated from inline-level boxes.
+
+    Inline boxes can nest other inline-level boxes, thereby creating a tree of inline-level boxes. This tree structure
+    needs to be considered for the generated fragments as well, since their size and position depend on this tree
+    structure.
+
+    Note that a single inline-level box can generate multiple fragments, possibly placed in different line boxes.
+*/
 class LineBox final {
 public:
 	LineBox() = default;
@@ -46,17 +55,23 @@ public:
 	// Set the line box position and dimensions.
 	void SetLineBox(Vector2f line_position, float line_width, float line_minimum_height);
 
-	// Returns true if the box should be placed again on a new line, either because the box could not fit or there is more content to be placed.
+	/// Generates a fragment from a box and places it on this line, if possible.
+	/// @param[in] box The inline-level box to be placed.
+	/// @param[in] layout_mode The inline layout mode, which affects the fragment generation.
+	/// @param[in,out] inout_overflow_handle A handle to resume fragment generation from a partially placed box.
+	/// @return True if the box should be placed again on a new line, either because the box could not fit or there is more content to be placed.
 	bool AddBox(InlineLevelBox* box, InlineLayoutMode layout_mode, LayoutOverflowHandle& inout_overflow_handle);
 
-	/// Close the open inline box.
+	/// Closes the open inline box.
 	/// @param[in] inline_box The inline box to be closed. Should match the currently open box, strictly used for verification.
 	/// @note Only inline boxes need to be closed, not other inline-level boxes since they do not contain child boxes.
 	void CloseInlineBox(InlineBox* inline_box);
 
-	// Vertically positions each fragment and sizes the line, after splitting any open inline boxes to be placed on a new line.
-	// @param[out] out_height_of_line Resulting height of line. This can be different from the element's computed line-height property.
-	// @return The next line if any open fragments had to be split or wrapped down.
+	/// Vertically positions each fragment and sizes the line, after splitting any open inline boxes to be placed on a new line.
+	/// @param[in] root_inline_box The root inline box of our inline container.
+	/// @param[in] split_all_open_boxes Split all open inline boxes, even if they have no content.
+	/// @param[out] out_height_of_line Resulting height of line. This can be different from the element's computed line-height property.
+	/// @return The next line if any open fragments had to be split or wrapped down.
 	UniquePtr<LineBox> DetermineVerticalPositioning(const InlineBoxRoot* root_inline_box, bool split_all_open_boxes, float& out_height_of_line);
 
 	// Closes the line and submits all fragments. Thereby positioning, sizing, and placing their corresponding boxes.
@@ -126,7 +141,6 @@ private:
 		float max_ascent = 0.f;
 		float max_descent = 0.f;
 	};
-
 	using FragmentList = Vector<Fragment>;
 
 	// Place an open fragment.
@@ -138,14 +152,15 @@ private:
 	// Vertically align all descendants of the subtree. Returns the ascent of the top-most box, and descent of the bottom-most box.
 	void VerticallyAlignSubtree(int subtree_root_index, int children_end_index, float& max_ascent, float& max_descent);
 
+	// Returns true if the fragment establishes an aligned subtree.
 	static bool IsAlignedSubtreeRoot(const Fragment& fragment)
 	{
 		return (fragment.vertical_align == VerticalAlignType::Top || fragment.vertical_align == VerticalAlignType::Bottom);
 	}
-
+	// Returns the aligned subtree root for a given fragment, based on its ancestors.
 	FragmentIndex DetermineAlignedSubtreeRoot(FragmentIndex index) const
 	{
-		while (index != -1)
+		while (index != RootFragmentIndex)
 		{
 			const Fragment& fragment = fragments[index];
 			if (IsAlignedSubtreeRoot(fragment))
@@ -167,7 +182,7 @@ private:
 		}
 	}
 
-	// Position of the line, relative to our parent root.
+	// Position of the line, relative to our block formatting context root.
 	Vector2f line_position;
 	// Available space for the line. Based on our parent box content width, possibly shrinked due to floating boxes.
 	float line_width = 0.f;
@@ -191,7 +206,6 @@ private:
 
 	// Content offset due to space distribution from 'text-align'. Available after close.
 	float offset_horizontal_alignment = 0.f;
-
 	// The line box's height above baseline. Available after close.
 	float total_height_above_baseline = 0.f;
 };

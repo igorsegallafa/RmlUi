@@ -306,7 +306,7 @@ String InlineContainer::DebugDumpTree(int depth) const
 
 	value += root_inline_box.DebugDumpTree(depth + 1);
 
-	for (auto&& line_box : line_boxes)
+	for (const auto& line_box : line_boxes)
 		value += line_box->DebugDumpTree(depth + 1);
 
 	return value;

@@ -34,6 +34,9 @@
 
 namespace Rml {
 
+/*
+    A box used to represent the formatting structure of the document, taking part in the box tree.
+*/
 class LayoutBox {
 public:
 	enum class Type { Root, BlockContainer, InlineContainer, FlexContainer, TableWrapper };

@@ -412,7 +412,6 @@ float LineBox::GetBaseline() const
 String LineBox::DebugDumpTree(int depth) const
 {
 	const String value = String(depth * 2, ' ') + "LineBox (" + ToString(fragments.size()) + " fragment" + (fragments.size() == 1 ? "" : "s") + ")\n";
-
 	return value;
 }
 

@@ -32,6 +32,7 @@
 #include "../../../Include/RmlUi/Core/ElementScroll.h"
 #include "../../../Include/RmlUi/Core/Profiling.h"
 #include "FormattingContext.h"
+#include "LayoutDetails.h"
 #include <algorithm>
 
 namespace Rml {
@@ -241,6 +242,53 @@ bool ContainerBox::SubmitBox(const Vector2f content_overflow_size, const Box& bo
 	SetVisibleOverflowSize(visible_overflow_size);
 
 	return true;
+}
+
+String RootBox::DebugDumpTree(int depth) const
+{
+	return String(depth * 2, ' ') + "RootBox";
+}
+
+FlexContainer::FlexContainer(Element* element, ContainerBox* parent_container) : ContainerBox(Type::FlexContainer, element, parent_container)
+{
+	RMLUI_ASSERT(element);
+}
+
+bool FlexContainer::Close(const Vector2f content_overflow_size, const Box& box)
+{
+	if (!SubmitBox(content_overflow_size, box, -1.f))
+		return false;
+
+	ClosePositionedElements();
+	SubmitElementLayout();
+	return true;
+}
+
+String FlexContainer::DebugDumpTree(int depth) const
+{
+	return String(depth * 2, ' ') + "FlexContainer" + " | " + LayoutDetails::GetDebugElementName(element);
+}
+
+TableWrapper::TableWrapper(Element* element, ContainerBox* parent_container) : ContainerBox(Type::TableWrapper, element, parent_container)
+{
+	RMLUI_ASSERT(element);
+}
+
+void TableWrapper::Close(const Vector2f content_overflow_size, const Box& box)
+{
+	bool result = SubmitBox(content_overflow_size, box, -1.f);
+
+	// Since the table wrapper cannot generate scrollbars, this should always pass.
+	RMLUI_ASSERT(result);
+	(void)result;
+
+	ClosePositionedElements();
+	SubmitElementLayout();
+}
+
+String TableWrapper::DebugDumpTree(int depth) const
+{
+	return String(depth * 2, ' ') + "TableWrapper" + " | " + LayoutDetails::GetDebugElementName(element);
 }
 
 } // namespace Rml
