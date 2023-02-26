@@ -137,18 +137,18 @@ bool BlockContainer::CloseChildBox(LayoutBox* child, Vector2f child_position, fl
 	return result;
 }
 
-BlockContainer* BlockContainer::OpenBlockBox(Element* child_element, const Box& box, float min_height, float max_height)
+BlockContainer* BlockContainer::OpenBlockBox(Element* child_element, const Box& child_box, float min_height, float max_height)
 {
 	if (!CloseOpenInlineContainer())
 		return nullptr;
 
-	auto child_container_ptr = MakeUnique<BlockContainer>(this, space, child_element, box, min_height, max_height);
+	auto child_container_ptr = MakeUnique<BlockContainer>(this, space, child_element, child_box, min_height, max_height);
 	BlockContainer* child_container = child_container_ptr.get();
 
-	child_container->position = NextBoxPosition(box, child_element->GetComputedValues().clear());
+	child_container->position = NextBoxPosition(child_box, child_element->GetComputedValues().clear());
 	child_element->SetOffset(child_container->position - position, element);
 
-	child_container->ResetScrollbars(box);
+	child_container->ResetScrollbars(child_box);
 
 	// Store relatively positioned elements with their containing block so that their offset can be updated after
 	// their containing block has been sized.
@@ -160,16 +160,16 @@ BlockContainer* BlockContainer::OpenBlockBox(Element* child_element, const Box& 
 	return child_container;
 }
 
-LayoutBox* BlockContainer::AddBlockLevelBox(UniquePtr<LayoutBox> block_level_box_ptr, Element* child_element, const Box& box)
+LayoutBox* BlockContainer::AddBlockLevelBox(UniquePtr<LayoutBox> block_level_box_ptr, Element* child_element, const Box& child_box)
 {
-	RMLUI_ASSERT(box.GetSize().y >= 0.f); // Assumes child element already formatted and sized.
+	RMLUI_ASSERT(child_box.GetSize().y >= 0.f); // Assumes child element already formatted and sized.
 
 	if (!CloseOpenInlineContainer())
 		return nullptr;
 
 	// Clear any floats to avoid overlapping them. In CSS, it is allowed to instead shrink the box and place it next to
 	// any floats, but we keep it simple here for now and just clear them.
-	Vector2f child_position = NextBoxPosition(box, Style::Clear::Both);
+	Vector2f child_position = NextBoxPosition(child_box, Style::Clear::Both);
 
 	child_element->SetOffset(child_position - position, element);
 
@@ -179,20 +179,21 @@ LayoutBox* BlockContainer::AddBlockLevelBox(UniquePtr<LayoutBox> block_level_box
 	LayoutBox* block_level_box = block_level_box_ptr.get();
 	child_boxes.push_back(std::move(block_level_box_ptr));
 
-	if (!CloseChildBox(block_level_box, child_position, box.GetSizeAcross(Box::VERTICAL, Box::BORDER), box.GetEdge(Box::MARGIN, Box::BOTTOM)))
+	if (!CloseChildBox(block_level_box, child_position, child_box.GetSizeAcross(Box::VERTICAL, Box::BORDER),
+			child_box.GetEdge(Box::MARGIN, Box::BOTTOM)))
 		return nullptr;
 
 	return block_level_box;
 }
 
-InlineBoxHandle BlockContainer::AddInlineElement(Element* element, const Box& box)
+InlineBoxHandle BlockContainer::AddInlineElement(Element* element, const Box& child_box)
 {
 	RMLUI_ZoneScoped;
 
 	// Inline-level elements need to be added to an inline container, open one if needed.
 	InlineContainer* inline_container = EnsureOpenInlineContainer();
 
-	InlineBox* inline_box = inline_container->AddInlineElement(element, box);
+	InlineBox* inline_box = inline_container->AddInlineElement(element, child_box);
 
 	if (element->GetPosition() == Style::Position::Relative)
 		AddRelativeElement(element);

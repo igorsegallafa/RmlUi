@@ -38,6 +38,9 @@ class LayoutBox;
 class ContainerBox;
 class FlexContainer;
 
+/*
+    Formats a flex container element and its flex items according to flexible box (flexbox) layout rules.
+*/
 class FlexFormattingContext final : public FormattingContext {
 public:
 	static UniquePtr<LayoutBox> Format(ContainerBox* parent_container, Element* element, const Box* override_initial_box);

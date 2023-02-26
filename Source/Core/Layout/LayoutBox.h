@@ -38,6 +38,8 @@ class LayoutBox {
 public:
 	enum class Type { Root, BlockContainer, InlineContainer, FlexContainer, TableWrapper };
 
+	virtual ~LayoutBox() = default;
+
 	Type GetType() const { return type; }
 
 	// Return the border size of this box including overflowing content. Similar to the scrollable overflow rectangle,
@@ -56,8 +58,6 @@ public:
 	// Debug dump layout tree.
 	String DumpLayoutTree(int depth = 0) const { return DebugDumpTree(depth); }
 
-	virtual ~LayoutBox() = default;
-
 	void* operator new(size_t size);
 	void operator delete(void* chunk, size_t size);
 
@@ -66,7 +66,6 @@ protected:
 
 	void SetVisibleOverflowSize(Vector2f size) { visible_overflow_size = size; }
 
-	// Debug dump layout tree.
 	virtual String DebugDumpTree(int depth) const = 0;
 
 private:

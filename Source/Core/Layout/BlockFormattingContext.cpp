@@ -224,7 +224,6 @@ bool BlockFormattingContext::FormatBlockContainerChild(BlockContainer* parent_co
 	if (element->GetTagName() == "br")
 	{
 		parent_container->AddBreak();
-		SubmitElementLayout(element);
 		return true;
 	}
 
@@ -253,6 +252,7 @@ bool BlockFormattingContext::FormatBlockContainerChild(BlockContainer* parent_co
 		return true;
 	}
 
+	// If the element creates an independent formatting context, then format it accordingly.
 	if (UniquePtr<LayoutBox> layout_box = FormattingContext::FormatIndependent(parent_container, element, nullptr, FormattingContextType::None))
 	{
 		// If the element is floating, we remove it from the flow.
@@ -273,9 +273,6 @@ bool BlockFormattingContext::FormatBlockContainerChild(BlockContainer* parent_co
 			auto inline_box_handle = parent_container->AddInlineElement(element, element->GetBox());
 			parent_container->CloseInlineElement(inline_box_handle);
 		}
-
-		// TODO: Not always positioned yet.
-		SubmitElementLayout(element);
 
 		return true;
 	}

@@ -148,9 +148,7 @@ Vector2f FloatedBoxSpace::NextBoxPosition(const BlockContainer* parent, float& m
 			next_cursor = Math::Min(next_cursor, fixed_box.offset.y + fixed_box.dimensions.y);
 
 			// Were we pushed out of our containing box? If so, try again at the next cursor position.
-			float normalised_position = box_position.x - parent_edge_left;
-			// TODO: Subtract parent scrollbar? Or just compare box_position to parent_edge_right?
-			if (normalised_position < 0 || normalised_position + dimensions.x > parent->GetBox().GetSize().x)
+			if (box_position.x < parent_edge_left || box_position.x + dimensions.x > parent_edge_right)
 				return NextBoxPosition(parent, maximum_box_width, next_cursor + 0.01f, dimensions, nowrap, float_property);
 		}
 	}

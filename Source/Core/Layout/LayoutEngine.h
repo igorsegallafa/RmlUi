@@ -34,19 +34,18 @@
 namespace Rml {
 
 /**
-	@author Michael R. P. Ragazzon
+    @author Michael R. P. Ragazzon
 
-	Based on original work by: Robert Curry and Peter Curry
+    Based on original work by: Robert Curry and Peter Curry
+
+    See the CSS glossary for terms used in the layout engine:
+    https://www.w3.org/TR/css-display-3/#glossary
  */
-
 class LayoutEngine {
 public:
-	/// Formats the contents for a root-level element, usually a document, absolutely positioned, floating, or replaced element. Establishes a new
-	/// block formatting context.
+	/// Formats the contents for a root-level element, usually a document, or a replaced element with custom formatting.
 	/// @param[in] element The element to lay out.
 	/// @param[in] containing_block The size of the containing block.
-	/// @param[in] override_initial_box Optional pointer to a box to override the generated box for the element.
-	/// @param[out] visible_overflow_size Optionally output the overflow size of the element.
 	static void FormatElement(Element* element, Vector2f containing_block);
 
 	static void* AllocateLayoutChunk(size_t size);
