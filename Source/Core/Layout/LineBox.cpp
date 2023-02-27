@@ -31,7 +31,7 @@
 #include "../../../Include/RmlUi/Core/StyleTypes.h"
 #include "InlineBox.h"
 #include "InlineLevelBox.h"
-#include "LayoutEngine.h"
+#include "LayoutPools.h"
 #include <numeric>
 
 namespace Rml {
@@ -417,12 +417,12 @@ String LineBox::DebugDumpTree(int depth) const
 
 void* LineBox::operator new(size_t size)
 {
-	return LayoutEngine::AllocateLayoutChunk(size);
+	return LayoutPools::AllocateLayoutChunk(size);
 }
 
 void LineBox::operator delete(void* chunk, size_t size)
 {
-	LayoutEngine::DeallocateLayoutChunk(chunk, size);
+	LayoutPools::DeallocateLayoutChunk(chunk, size);
 }
 
 } // namespace Rml

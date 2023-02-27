@@ -32,18 +32,18 @@
 #include "../../../Include/RmlUi/Core/ElementText.h"
 #include "../../../Include/RmlUi/Core/FontEngineInterface.h"
 #include "LayoutDetails.h"
-#include "LayoutEngine.h"
+#include "LayoutPools.h"
 
 namespace Rml {
 
 void* InlineLevelBox::operator new(size_t size)
 {
-	return LayoutEngine::AllocateLayoutChunk(size);
+	return LayoutPools::AllocateLayoutChunk(size);
 }
 
 void InlineLevelBox::operator delete(void* chunk, size_t size)
 {
-	LayoutEngine::DeallocateLayoutChunk(chunk, size);
+	LayoutPools::DeallocateLayoutChunk(chunk, size);
 }
 
 InlineLevelBox::~InlineLevelBox() {}

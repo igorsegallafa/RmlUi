@@ -27,7 +27,7 @@
  */
 
 #include "LayoutBox.h"
-#include "LayoutEngine.h"
+#include "LayoutPools.h"
 
 namespace Rml {
 
@@ -47,13 +47,13 @@ float LayoutBox::GetShrinkToFitWidth() const
 }
 void* LayoutBox::operator new(size_t size)
 {
-	void* memory = LayoutEngine::AllocateLayoutChunk(size);
+	void* memory = LayoutPools::AllocateLayoutChunk(size);
 	return memory;
 }
 
 void LayoutBox::operator delete(void* chunk, size_t size)
 {
-	LayoutEngine::DeallocateLayoutChunk(chunk, size);
+	LayoutPools::DeallocateLayoutChunk(chunk, size);
 }
 
 } // namespace Rml

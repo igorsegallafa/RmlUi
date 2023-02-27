@@ -73,9 +73,10 @@ set(Core_HDR_FILES
     ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutBox.h
     ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutDetails.h
     ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutEngine.h
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutPools.h
     ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LineBox.h
-    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/TableDetails.h
     ${PROJECT_SOURCE_DIR}/Source/Core/Layout/TableFormattingContext.h
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/TableFormattingDetails.h
     ${PROJECT_SOURCE_DIR}/Source/Core/Memory.h
     ${PROJECT_SOURCE_DIR}/Source/Core/PluginRegistry.h
     ${PROJECT_SOURCE_DIR}/Source/Core/Pool.h
@@ -346,9 +347,10 @@ set(Core_SRC_FILES
     ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutBox.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutDetails.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutEngine.cpp
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LayoutPools.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/Layout/LineBox.cpp
-    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/TableDetails.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/Layout/TableFormattingContext.cpp
+    ${PROJECT_SOURCE_DIR}/Source/Core/Layout/TableFormattingDetails.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/Log.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/Math.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/Memory.cpp

@@ -69,13 +69,11 @@ enum class BuildBoxMode {
  */
 class LayoutDetails {
 public:
-	/// Generates the box for an element.
+	/// Generates the box dimensions for an element.
 	/// @param[out] box The box to be built.
 	/// @param[in] containing_block The dimensions of the content area of the block containing the element.
 	/// @param[in] element The element to build the box for.
 	/// @param[in] box_context The formatting context in which the box is generated.
-	/// @param[in] override_shrink_to_fit_width Provide a fixed shrink-to-fit width instead of formatting the element when its properties allow
-	/// shrinking.
 	static void BuildBox(Box& box, Vector2f containing_block, Element* element, BuildBoxMode box_context = BuildBoxMode::Block);
 
 	// Retrieves the minimum and maximum width from an element's computed values.

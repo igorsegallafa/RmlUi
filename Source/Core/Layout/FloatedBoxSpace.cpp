@@ -31,7 +31,7 @@
 #include "../../../Include/RmlUi/Core/Element.h"
 #include "../../../Include/RmlUi/Core/ElementScroll.h"
 #include "BlockContainer.h"
-#include "LayoutEngine.h"
+#include "LayoutPools.h"
 #include <float.h>
 
 namespace Rml {
@@ -252,12 +252,12 @@ float FloatedBoxSpace::GetShrinkToFitWidth(float edge_left, float edge_right) co
 
 void* FloatedBoxSpace::operator new(size_t size)
 {
-	return LayoutEngine::AllocateLayoutChunk(size);
+	return LayoutPools::AllocateLayoutChunk(size);
 }
 
 void FloatedBoxSpace::operator delete(void* chunk, size_t size)
 {
-	LayoutEngine::DeallocateLayoutChunk(chunk, size);
+	LayoutPools::DeallocateLayoutChunk(chunk, size);
 }
 
 } // namespace Rml
