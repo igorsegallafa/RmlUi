@@ -113,11 +113,9 @@ public:
 	/// @param area_inner The last area to include, anything inside this is excluded.
 	float GetSizeAcross(Direction direction, Area area_outer, Area area_inner = Area::CONTENT) const;
 
-	/// Returns the size of the frame starting at 'area_outer', up-to and including 'area_inner'.
-	/// @example GetSizeAround(BORDER, PADDING) returns the total (width, height) of the borders and paddings, from all four sides.
-	/// @param area_outer The widest area to include.
-	/// @param area_inner The last area to include, anything inside this is excluded. When set to CONTENT, equivalent to GetSize().
-	Vector2f GetSizeAround(Area area_outer, Area area_inner) const;
+	/// Returns the size of the frame defined by the given area, not including inner areas.
+	/// @param area The area to use.
+	Vector2f GetFrameSize(Area area) const;
 
 	/// Compares the size of the content area and the other area edges.
 	/// @return True if the boxes represent the same area.
