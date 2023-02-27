@@ -36,6 +36,7 @@
 #include "InlineContainer.h"
 #include "LineBox.h"
 #include <algorithm>
+#include <cstddef>
 
 namespace Rml {
 

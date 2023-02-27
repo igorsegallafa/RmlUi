@@ -34,6 +34,7 @@
 #include "FormattingContext.h"
 #include "LayoutDetails.h"
 #include <algorithm>
+#include <cmath>
 
 namespace Rml {
 

@@ -128,7 +128,7 @@ void InlineContainer::CloseInlineElement(InlineBox* inline_box)
 void InlineContainer::AddBreak(float line_height)
 {
 	// Simply end the line if one is open, otherwise increment by the line height.
-	if (LineBox* line_box = GetOpenLineBox())
+	if (GetOpenLineBox())
 		CloseOpenLineBox(true);
 	else
 		box_cursor += line_height;

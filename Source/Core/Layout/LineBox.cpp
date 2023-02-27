@@ -32,6 +32,7 @@
 #include "InlineBox.h"
 #include "InlineLevelBox.h"
 #include "LayoutPools.h"
+#include <float.h>
 #include <numeric>
 
 namespace Rml {
