@@ -220,7 +220,7 @@ bool ContainerBox::SubmitBox(const Vector2f content_overflow_size, const Box& bo
 		element->SetBox(box);
 		element->SetScrollableOverflowRectangle(scrollable_overflow_size);
 
-		const Vector2f border_size = padding_size + box.GetSizeAround(Box::BORDER, Box::BORDER);
+		const Vector2f border_size = padding_size + box.GetFrameSize(Box::BORDER);
 
 		// Set the visible overflow size so that ancestors can catch any overflow produced by us. That is, hiding it or
 		// providing a scrolling mechanism. If this box is a scroll container, we catch our own overflow here; then,
